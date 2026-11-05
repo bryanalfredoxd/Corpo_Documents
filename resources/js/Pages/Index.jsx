@@ -60,6 +60,11 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
     // Vistas principales: 'libro-fiscal' | 'directorio' | 'generador-pdf'
     const [currentView, setCurrentView] = useState('libro-fiscal');
 
+    // Selector de Formato de Plantilla PDF:
+    // 'formato-1': Factura Fiscal Estándar (Estructura Agrosuministros Rodríguez)
+    // 'formato-2': Proforma Industrial / Maquinarias & Importación (Estructura Moaiven Group)
+    const [selectedPdfFormat, setSelectedPdfFormat] = useState('formato-1');
+
     // Filtros de directorio
     const [directoryType, setDirectoryType] = useState('todos'); // todos | empresas | personas
     const [searchQuery, setSearchQuery] = useState('');
@@ -114,6 +119,21 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         default_terms: 'Comprobante fiscal válido. Conserve este documento para efectos legales y de garantía.'
     };
 
+    // Ficha técnica base para proformas industriales (Moaiven CAT 320C L o maquinaria pesada)
+    const defaultTechnicalSpecs = [
+        { category: 'Especificaciones del motor', name: 'Marca y modelo de motor', value: 'Mitsubishi 3066 TAA, diésel turboalimentado' },
+        { category: 'Especificaciones del motor', name: 'Potencia neta', value: '103 kW (138 HP)' },
+        { category: 'Especificaciones operativas', name: 'Peso operativo total', value: '20,800 kg (20.8 toneladas)' },
+        { category: 'Especificaciones operativas', name: 'Capacidad de cucharón', value: '1.2 m³' },
+        { category: 'Especificaciones operativas', name: 'Profundidad máxima de excavación', value: '6.11 m' },
+        { category: 'Especificaciones operativas', name: 'Motor de giro (swing motor)', value: 'Kawasaki M5X130CHB-11A (N° parte CAT 158-8986)' },
+        { category: 'Especificaciones operativas', name: 'Bomba hidráulica principal', value: 'Kawasaki AP12S (N° parte CAT 173-3381)' },
+        { category: 'Dimensiones', name: 'Dimensiones de transporte (L×A×A)', value: '9.42 × 2.98 × 3.01 m' },
+        { category: 'Dimensiones', name: 'Ancho de oruga', value: '600 mm' },
+        { category: 'Extras', name: 'Emisiones', value: 'Cumple Tier 1 a nivel mundial' },
+        { category: 'Extras', name: 'País de origen', value: 'Made in Japan (Shin Caterpillar Mitsubishi)' },
+    ];
+
     // Plantilla de factura completamente limpia a la espera de ser llenada
     const getEmptyInvoice = (company) => ({
         company_id: company?.id || (companies.length > 0 ? companies[0].id : ''),
@@ -124,6 +144,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         issue_date: new Date().toISOString().split('T')[0],
         due_date: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
         offer_validity_days: 15,
+        delivery_address: '',
         sale_condition: 'Venta de Contado',
         sales_channel: 'Oficina / Presencial',
         bcv_exchange_rate: 876.80,
@@ -134,6 +155,17 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         discount: 0,
         tax_percentage: 16.00,
         terms_conditions: company?.default_terms || '',
+        // Campos específicos sincronizados para Formato 2: Proforma Industrial / Moaiven
+        equipment_year: '2021 / Reciente (Inspeccionado)',
+        equipment_vin: 'CAT0320CL089124',
+        customs_text: 'INCLUIDO',
+        payment_milestone_1_pct: 70,
+        payment_milestone_1_text: 'Al momento de firmar el contrato, para iniciar la verificación, compra del equipo y proceso de envío.',
+        payment_milestone_2_pct: 30,
+        payment_milestone_2_text: '15 días antes de la llegada del equipo al puerto de destino en Venezuela.',
+        shipping_terms_notes: 'Tiempo de carga: una vez confirmada la compra del equipo en China, el mismo cuenta con un plazo de hasta veinte (20) días hábiles para ser cargado en puerto, sujeto a la disponibilidad de espacio (booking) ofrecida por la naviera.',
+        company_social_handle: '',
+        technical_specs: defaultTechnicalSpecs.map(s => ({ ...s })),
         items: [
             { description: '', details: '', quantity: 1, unit: 'unid', unit_price: '', is_tax_exempt: false }
         ]
@@ -207,6 +239,47 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         });
     };
 
+    // Manejadores para la Ficha Técnica y Parámetros del Formato 2 (Moaiven / Proforma Industrial)
+    const handleAddTechSpec = () => {
+        setInvoiceForm(prev => ({
+            ...prev,
+            technical_specs: [
+                ...(prev.technical_specs || []),
+                { category: 'Especificaciones Generales', name: 'Nueva Característica', value: 'Valor' }
+            ]
+        }));
+    };
+
+    const handleRemoveTechSpec = (index) => {
+        setInvoiceForm(prev => ({
+            ...prev,
+            technical_specs: (prev.technical_specs || []).filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleTechSpecChange = (index, field, val) => {
+        setInvoiceForm(prev => {
+            const list = [...(prev.technical_specs || [])];
+            list[index] = { ...list[index], [field]: val };
+            return { ...prev, technical_specs: list };
+        });
+    };
+
+    const handleResetDefaultTechSpecs = () => {
+        setInvoiceForm(prev => ({
+            ...prev,
+            technical_specs: defaultTechnicalSpecs.map(s => ({ ...s })),
+            equipment_year: '2021 / Reciente (Inspeccionado)',
+            equipment_vin: 'CAT0320CL089124',
+            customs_text: 'INCLUIDO',
+            payment_milestone_1_pct: 70,
+            payment_milestone_1_text: 'Al momento de firmar el contrato, para iniciar la verificación, compra del equipo y proceso de envío.',
+            payment_milestone_2_pct: 30,
+            payment_milestone_2_text: '15 días antes de la llegada del equipo al puerto de destino en Venezuela.',
+            shipping_terms_notes: 'Tiempo de carga: una vez confirmada la compra del equipo en China, el mismo cuenta con un plazo de hasta veinte (20) días hábiles para ser cargado en puerto, sujeto a la disponibilidad de espacio (booking) ofrecida por la naviera.'
+        }));
+    };
+
     // Envío del formulario de factura a Laravel
     const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
     const handleSubmitInvoice = (e) => {
@@ -231,6 +304,9 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
     // Cargar una factura pasada en el formulario y sincronizarla en tiempo real
     const handleLoadInvoiceToEditor = (inv) => {
         setSelectedCompanyId(inv.company_id);
+        if (inv.document_type === 'proforma') {
+            setSelectedPdfFormat('formato-2');
+        }
         setInvoiceForm({
             company_id: inv.company_id,
             client_id: inv.client_id,
@@ -240,6 +316,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
             issue_date: inv.issue_date ? inv.issue_date.split('T')[0] : new Date().toISOString().split('T')[0],
             due_date: inv.due_date ? inv.due_date.split('T')[0] : '',
             offer_validity_days: inv.offer_validity_days || 15,
+            delivery_address: inv.delivery_address || '',
             sale_condition: inv.sale_condition || 'Venta de Contado',
             sales_channel: inv.sales_channel || 'Oficina',
             bcv_exchange_rate: Number(inv.bcv_exchange_rate || 876.80),
@@ -250,6 +327,16 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
             discount: Number(inv.discount || 0),
             tax_percentage: Number(inv.tax_percentage || 16),
             terms_conditions: inv.terms_conditions || '',
+            shipping_terms_notes: inv.shipping_terms_notes || 'Tiempo de carga: una vez confirmada la compra del equipo en China, el mismo cuenta con un plazo de hasta veinte (20) días hábiles para ser cargado en puerto, sujeto a la disponibilidad de espacio (booking) ofrecida por la naviera.',
+            equipment_year: inv.technical_specs?.equipment_year || '2021 / Reciente (Inspeccionado)',
+            equipment_vin: inv.technical_specs?.equipment_vin || 'CAT0320CL089124',
+            customs_text: inv.technical_specs?.customs_text || 'INCLUIDO',
+            payment_milestone_1_pct: inv.technical_specs?.payment_milestone_1_pct || 70,
+            payment_milestone_1_text: inv.technical_specs?.payment_milestone_1_text || 'Al momento de firmar el contrato, para iniciar la verificación, compra del equipo y proceso de envío.',
+            payment_milestone_2_pct: inv.technical_specs?.payment_milestone_2_pct || 30,
+            payment_milestone_2_text: inv.technical_specs?.payment_milestone_2_text || '15 días antes de la llegada del equipo al puerto de destino en Venezuela.',
+            company_social_handle: inv.technical_specs?.company_social_handle || '',
+            technical_specs: Array.isArray(inv.technical_specs) ? inv.technical_specs : (Array.isArray(inv.technical_specs?.specs) ? inv.technical_specs.specs : defaultTechnicalSpecs.map(s => ({ ...s }))),
             items: (inv.items && inv.items.length > 0)
                 ? inv.items.map(it => ({
                     description: it.description,
@@ -1035,7 +1122,14 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         <button
                                             key={t.id}
                                             type="button"
-                                            onClick={() => setInvoiceForm(prev => ({ ...prev, document_type: t.id }))}
+                                            onClick={() => {
+                                                setInvoiceForm(prev => ({ ...prev, document_type: t.id }));
+                                                if (t.id === 'proforma') {
+                                                    setSelectedPdfFormat('formato-2');
+                                                } else if (t.id === 'factura') {
+                                                    setSelectedPdfFormat('formato-1');
+                                                }
+                                            }}
                                             className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer font-black text-xs ${invoiceForm.document_type === t.id
                                                 ? 'bg-blue-700 text-white shadow-xs'
                                                 : 'text-slate-800 hover:text-black hover:bg-slate-200'
@@ -1414,7 +1508,250 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 </div>
                             </div>
 
-                            {/* SECCIÓN 4: DESGLOSE FISCAL & LIQUIDACIÓN */}
+                            {/* SECCIÓN 4: PARÁMETROS ESPECÍFICOS DE PROFORMA INDUSTRIAL (FORMATO 2) */}
+                            {selectedPdfFormat === 'formato-2' && (
+                                <div className="space-y-4 p-4 bg-amber-50/40 rounded-xl border-2 border-amber-300">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-1.5">
+                                            <Layers className="w-4 h-4 text-amber-600" />
+                                            <span className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                                                Ficha Técnica & Condiciones DDP (Formato 2)
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleResetDefaultTechSpecs}
+                                            className="text-[11px] font-black text-amber-700 hover:text-amber-900 flex items-center gap-1 cursor-pointer"
+                                            title="Restaurar valores de prueba Moaiven CAT 320C L"
+                                        >
+                                            <Sparkles className="w-3 h-3" />
+                                            <span>Restaurar Ficha Moaiven</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Subsección 1: Identificadores y Logística */}
+                                    <div className="space-y-2.5 pt-1">
+                                        <span className="text-[11px] font-black text-slate-700 block uppercase">
+                                            1. Identificadores del Equipo y Entrega
+                                        </span>
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="text-[11px] font-black text-black block mb-0.5">
+                                                    Año de Fabricación
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={invoiceForm.equipment_year || ''}
+                                                    onChange={(e) => setInvoiceForm(prev => ({ ...prev, equipment_year: e.target.value }))}
+                                                    placeholder="2021 / Reciente..."
+                                                    className="h-8 w-full bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-bold text-black"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-black text-black block mb-0.5">
+                                                    N° de Serie / VIN
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={invoiceForm.equipment_vin || ''}
+                                                    onChange={(e) => setInvoiceForm(prev => ({ ...prev, equipment_vin: e.target.value }))}
+                                                    placeholder="CAT0320CL089124..."
+                                                    className="h-8 w-full bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-mono font-bold text-black"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="text-[11px] font-black text-black block mb-0.5">
+                                                    Validez de Oferta (Días)
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={invoiceForm.offer_validity_days || 15}
+                                                    onChange={(e) => setInvoiceForm(prev => ({ ...prev, offer_validity_days: Number(e.target.value) }))}
+                                                    className="h-8 w-full bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-mono font-bold text-black"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-black text-black block mb-0.5">
+                                                    Aduana y Nacionalización
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={invoiceForm.customs_text || ''}
+                                                    onChange={(e) => setInvoiceForm(prev => ({ ...prev, customs_text: e.target.value }))}
+                                                    placeholder="INCLUIDO o monto..."
+                                                    className="h-8 w-full bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-bold text-black"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[11px] font-black text-black block mb-0.5">
+                                                Dirección de Entrega en Destino (DDP)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={invoiceForm.delivery_address || ''}
+                                                onChange={(e) => setInvoiceForm(prev => ({ ...prev, delivery_address: e.target.value }))}
+                                                placeholder="Ej: Puerto Cabello / Barinas (dejar vacío para usar la del cliente)"
+                                                className="h-8 w-full bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-bold text-black"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[11px] font-black text-black block mb-0.5">
+                                                Usuario Redes / TikTok de la Empresa
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={invoiceForm.company_social_handle || ''}
+                                                onChange={(e) => setInvoiceForm(prev => ({ ...prev, company_social_handle: e.target.value }))}
+                                                placeholder="Ej: @moaiven.logistic"
+                                                className="h-8 w-full bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-bold text-black"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Subsección 2: Condiciones de Pago DDP */}
+                                    <div className="space-y-2.5 pt-2 border-t border-amber-200">
+                                        <span className="text-[11px] font-black text-slate-700 block uppercase">
+                                            2. Condiciones de Pago (Hitos 70% / 30% o Personalizado)
+                                        </span>
+                                        
+                                        {/* Hito 1 */}
+                                        <div className="p-2.5 bg-white rounded-lg border border-slate-300 space-y-1.5">
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="font-black text-black">Hito 1 (Anticipo):</span>
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={invoiceForm.payment_milestone_1_pct ?? 70}
+                                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, payment_milestone_1_pct: Number(e.target.value) }))}
+                                                        className="h-7 w-16 text-center font-mono font-black border border-slate-300 rounded px-1 text-xs"
+                                                    />
+                                                    <span className="font-bold text-slate-700">%</span>
+                                                    <span className="font-mono font-black text-blue-900 bg-blue-50 px-2 py-0.5 rounded text-[11px] ml-1">
+                                                        USD ${(totalUsd * (Number(invoiceForm.payment_milestone_1_pct || 70) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={invoiceForm.payment_milestone_1_text || ''}
+                                                onChange={(e) => setInvoiceForm(prev => ({ ...prev, payment_milestone_1_text: e.target.value }))}
+                                                placeholder="Descripción del hito 1..."
+                                                className="h-7 w-full bg-slate-50 border border-slate-200 rounded px-2 text-[11px] font-medium text-slate-800"
+                                            />
+                                        </div>
+
+                                        {/* Hito 2 */}
+                                        <div className="p-2.5 bg-white rounded-lg border border-slate-300 space-y-1.5">
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="font-black text-black">Hito 2 (Saldo):</span>
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={invoiceForm.payment_milestone_2_pct ?? 30}
+                                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, payment_milestone_2_pct: Number(e.target.value) }))}
+                                                        className="h-7 w-16 text-center font-mono font-black border border-slate-300 rounded px-1 text-xs"
+                                                    />
+                                                    <span className="font-bold text-slate-700">%</span>
+                                                    <span className="font-mono font-black text-blue-900 bg-blue-50 px-2 py-0.5 rounded text-[11px] ml-1">
+                                                        USD ${(totalUsd * (Number(invoiceForm.payment_milestone_2_pct || 30) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={invoiceForm.payment_milestone_2_text || ''}
+                                                onChange={(e) => setInvoiceForm(prev => ({ ...prev, payment_milestone_2_text: e.target.value }))}
+                                                placeholder="Descripción del hito 2..."
+                                                className="h-7 w-full bg-slate-50 border border-slate-200 rounded px-2 text-[11px] font-medium text-slate-800"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Subsección 3: Condiciones de Carga y Envío */}
+                                    <div className="space-y-1.5 pt-2 border-t border-amber-200">
+                                        <label className="text-[11px] font-black text-slate-700 block uppercase">
+                                            3. Condiciones de Carga y Envío (Marítimo / Origen)
+                                        </label>
+                                        <textarea
+                                            rows={3}
+                                            value={invoiceForm.shipping_terms_notes || ''}
+                                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, shipping_terms_notes: e.target.value }))}
+                                            placeholder="Cláusula de tiempo de carga en puerto, booking, etc."
+                                            className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                        />
+                                    </div>
+
+                                    {/* Subsección 4: Ficha Técnica Dinámica del Equipo */}
+                                    <div className="space-y-2 pt-2 border-t border-amber-200">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[11px] font-black text-slate-700 uppercase">
+                                                4. Ficha Técnica del Equipo ({invoiceForm.technical_specs?.length || 0} filas)
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={handleAddTechSpec}
+                                                className="h-7 px-2.5 bg-slate-900 hover:bg-black text-white rounded-md text-[11px] font-black flex items-center gap-1 cursor-pointer transition-colors"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                                <span>Añadir Fila</span>
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                            {(invoiceForm.technical_specs || []).map((spec, idx) => (
+                                                <div key={idx} className="p-2 bg-white rounded-lg border border-slate-300 space-y-1 shadow-2xs">
+                                                    <div className="flex justify-between items-center gap-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Categoría (Ej: Motor, Operativas, Dimensiones...)"
+                                                            value={spec.category || ''}
+                                                            onChange={(e) => handleTechSpecChange(idx, 'category', e.target.value)}
+                                                            className="h-6 w-full bg-slate-100 border border-slate-200 rounded px-2 text-[10px] font-black text-slate-800 uppercase"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveTechSpec(idx)}
+                                                            className="h-6 px-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded cursor-pointer"
+                                                            title="Eliminar especificación"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                    <div className="grid grid-cols-12 gap-1.5">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Parámetro (Ej: Marca y modelo)"
+                                                            value={spec.name || ''}
+                                                            onChange={(e) => handleTechSpecChange(idx, 'name', e.target.value)}
+                                                            className="col-span-5 h-6 bg-white border border-slate-300 rounded px-1.5 text-[11px] font-bold text-black"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Detalle (Ej: Mitsubishi 3066 TAA)"
+                                                            value={spec.value || ''}
+                                                            onChange={(e) => handleTechSpecChange(idx, 'value', e.target.value)}
+                                                            className="col-span-7 h-6 bg-white border border-slate-300 rounded px-1.5 text-[11px] font-medium text-slate-900"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SECCIÓN 5: DESGLOSE FISCAL & LIQUIDACIÓN */}
                             <div className="border-t-2 border-slate-200 pt-3 space-y-2 text-xs font-mono font-black">
                                 <div className="flex justify-between items-center text-black">
                                     <span>Subtotal Renglones:</span>
@@ -1480,11 +1817,43 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                         {/* COLUMNA DERECHA (7 cols): HOJA FÍSICA A4 100% SINCRONIZADA EN TIEMPO REAL */}
                         <div className="lg:col-span-7 space-y-4 print:space-y-0 print:w-full print:m-0 print:p-0 print:block">
-                            <div className="flex items-center justify-between no-print">
-                                <div className="flex items-center gap-2 text-xs font-black text-black uppercase tracking-wider">
-                                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    <span>Vista Previa • Hoja Física A4 Sincronizada en Vivo</span>
+                            {/* BARRA SUPERIOR DE CONTROL CON SELECTOR DE FORMATO 1 / FORMATO 2 */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 no-print bg-white p-3 rounded-xl border border-slate-300 shadow-2xs">
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                    <div className="flex items-center gap-1.5 text-xs font-black text-black uppercase tracking-wider">
+                                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span className="hidden sm:inline">Plantilla:</span>
+                                    </div>
+                                    
+                                    {/* Selector de Formato 1 (Fiscal Agrosuministros) / Formato 2 (Industrial Moaiven) */}
+                                    <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-300 text-xs font-black">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedPdfFormat('formato-1')}
+                                            className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                selectedPdfFormat === 'formato-1'
+                                                    ? 'bg-slate-900 text-white shadow-xs'
+                                                    : 'text-slate-800 hover:text-black hover:bg-slate-200'
+                                            }`}
+                                        >
+                                            <FileText className="w-3.5 h-3.5" />
+                                            <span>Formato 1: Fiscal Estándar</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedPdfFormat('formato-2')}
+                                            className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                selectedPdfFormat === 'formato-2'
+                                                    ? 'bg-slate-900 text-white shadow-xs'
+                                                    : 'text-slate-800 hover:text-black hover:bg-slate-200'
+                                            }`}
+                                        >
+                                            <Layers className="w-3.5 h-3.5 text-amber-400" />
+                                            <span>Formato 2: Proforma Industrial</span>
+                                        </button>
+                                    </div>
                                 </div>
+
                                 <div className="flex items-center space-x-2">
                                     <button
                                         onClick={() => window.print()}
@@ -1503,259 +1872,535 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 </div>
                             </div>
 
-                            {/* DOCUMENTO FÍSICO A4 EN VIVO (ESTRUCTURA 1:1 SEGÚN FACTURA AGROSUMINISTROS RODRÍGUEZ) */}
+                            {/* CONTENEDOR DE HOJA FÍSICA A4 EN VIVO */}
                             <div className="bg-white rounded-lg shadow-sm p-8 sm:p-10 text-slate-900 text-xs font-sans relative printable-sheet border border-slate-200 print:bg-white print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:w-full">
 
-                                {/* 1. CABECERA / MEMBRETE INSTITUCIONAL */}
-                                <div className="flex justify-between items-start gap-6 pb-4">
-                                    {/* Lado Izquierdo: Logo y Datos de la Empresa Emisora */}
-                                    <div className="flex items-start gap-4 min-w-0">
-                                        {activeCompany.logo_url ? (
-                                            <div className="w-20 h-20 shrink-0 flex items-center justify-start">
-                                                <img
-                                                    src={activeCompany.logo_url}
-                                                    alt={activeCompany.name}
-                                                    className="max-h-20 max-w-full w-auto h-auto object-contain object-left"
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div className="w-16 h-16 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xl shrink-0">
-                                                {activeCompany.name.substring(0, 2).toUpperCase()}
-                                            </div>
-                                        )}
-
-                                        <div className="min-w-0 space-y-0.5">
-                                            <h1 className="text-base font-black text-slate-900 uppercase tracking-tight leading-snug">
-                                                {activeCompany.name}
-                                            </h1>
-                                            <p className="text-xs font-bold text-slate-900">
-                                                RIF: {activeCompany.tax_id}
-                                            </p>
-                                            <p className="text-xs text-slate-700 leading-tight">
-                                                {activeCompany.address}
-                                            </p>
-                                            <p className="text-xs text-slate-700">
-                                                Teléfono / WhatsApp: {activeCompany.phone}
-                                            </p>
-                                            {activeCompany.email && (
-                                                <p className="text-xs text-slate-700">
-                                                    Email: {activeCompany.email}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Lado Derecho: Título de Factura, Correlativo, Fecha y Control */}
-                                    <div className="text-right shrink-0">
-                                        <h2 className="text-2xl font-black text-slate-950 uppercase tracking-wide leading-none">
-                                            {invoiceForm.document_type === 'factura' ? 'FACTURA' : invoiceForm.document_type.toUpperCase()}
-                                        </h2>
-                                        {invoiceForm.document_subtitle && (
-                                            <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 mt-0.5">
-                                                {invoiceForm.document_subtitle}
-                                            </p>
-                                        )}
-                                        <p className="text-base font-mono font-black text-slate-900 mt-1.5 leading-none">
-                                            N° {projectedCorrelative}
-                                        </p>
-                                        <p className="text-xs text-slate-800 mt-2">
-                                            <span className="font-bold">Fecha:</span> {invoiceForm.issue_date}
-                                        </p>
-                                        <p className="text-xs text-slate-800 mt-0.5">
-                                            <span className="font-bold">Control:</span> {projectedControlNumber}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Línea Divisoria Sólida Superior */}
-                                <div className="border-b-2 border-slate-950 mb-5"></div>
-
-                                {/* 2. DATOS DEL CLIENTE Y CONDICIONES DE LA VENTA (2 COLUMNAS 1:1) */}
-                                <div className="grid grid-cols-2 gap-8 text-xs pb-4 mb-4 border-b border-slate-300">
-                                    {/* Columna Izquierda: Datos del Adquiriente */}
+                                {selectedPdfFormat === 'formato-1' ? (
+                                    /* ========================================================================= */
+                                    /* FORMATO 1: FISCAL ESTÁNDAR (ESTRUCTURA 1:1 AGROSUMINISTROS RODRÍGUEZ)     */
+                                    /* ========================================================================= */
                                     <div>
-                                        <h3 className="font-black uppercase text-slate-950 text-xs mb-2 tracking-wide">
-                                            DATOS DEL ADQUIRIENTE / CLIENTE
-                                        </h3>
-                                        {currentSelectedClient ? (
-                                            <div className="space-y-1">
-                                                <div className="grid grid-cols-12 gap-1">
-                                                    <span className="col-span-4 text-slate-600 font-bold">Cliente:</span>
-                                                    <span className="col-span-8 font-bold text-slate-950 uppercase">{currentSelectedClient.name}</span>
+                                        {/* 1. CABECERA / MEMBRETE INSTITUCIONAL */}
+                                        <div className="flex justify-between items-start gap-6 pb-4">
+                                            {/* Lado Izquierdo: Logo y Datos de la Empresa Emisora */}
+                                            <div className="flex items-start gap-4 min-w-0">
+                                                {activeCompany.logo_url ? (
+                                                    <div className="w-20 h-20 shrink-0 flex items-center justify-start">
+                                                        <img
+                                                            src={activeCompany.logo_url}
+                                                            alt={activeCompany.name}
+                                                            className="max-h-20 max-w-full w-auto h-auto object-contain object-left"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-16 h-16 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xl shrink-0">
+                                                        {activeCompany.name.substring(0, 2).toUpperCase()}
+                                                    </div>
+                                                )}
+
+                                                <div className="min-w-0 space-y-0.5">
+                                                    <h1 className="text-base font-black text-slate-900 uppercase tracking-tight leading-snug">
+                                                        {activeCompany.name}
+                                                    </h1>
+                                                    <p className="text-xs font-bold text-slate-900">
+                                                        RIF: {activeCompany.tax_id}
+                                                    </p>
+                                                    <p className="text-xs text-slate-700 leading-tight">
+                                                        {activeCompany.address}
+                                                    </p>
+                                                    <p className="text-xs text-slate-700">
+                                                        Teléfono / WhatsApp: {activeCompany.phone}
+                                                    </p>
+                                                    {activeCompany.email && (
+                                                        <p className="text-xs text-slate-700">
+                                                            Email: {activeCompany.email}
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                <div className="grid grid-cols-12 gap-1">
-                                                    <span className="col-span-4 text-slate-600 font-bold">Cédula / RIF:</span>
-                                                    <span className="col-span-8 font-mono font-bold text-slate-950">{currentSelectedClient.tax_id}</span>
-                                                </div>
-                                                <div className="grid grid-cols-12 gap-1">
-                                                    <span className="col-span-4 text-slate-600 font-bold">Teléfono:</span>
-                                                    <span className="col-span-8 text-slate-900">{currentSelectedClient.phone || 'N/A'}</span>
-                                                </div>
-                                                {currentSelectedClient.address && (
-                                                    <div className="grid grid-cols-12 gap-1">
-                                                        <span className="col-span-4 text-slate-600 font-bold">Dirección:</span>
-                                                        <span className="col-span-8 text-slate-800">{currentSelectedClient.address}</span>
+                                            </div>
+
+                                            {/* Lado Derecho: Título de Factura, Correlativo, Fecha y Control */}
+                                            <div className="text-right shrink-0">
+                                                <h2 className="text-2xl font-black text-slate-950 uppercase tracking-wide leading-none">
+                                                    {invoiceForm.document_type === 'factura' ? 'FACTURA' : invoiceForm.document_type.toUpperCase()}
+                                                </h2>
+                                                {invoiceForm.document_subtitle && (
+                                                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 mt-0.5">
+                                                        {invoiceForm.document_subtitle}
+                                                    </p>
+                                                )}
+                                                <p className="text-base font-mono font-black text-slate-900 mt-1.5 leading-none">
+                                                    N° {projectedCorrelative}
+                                                </p>
+                                                <p className="text-xs text-slate-800 mt-2">
+                                                    <span className="font-bold">Fecha:</span> {invoiceForm.issue_date}
+                                                </p>
+                                                <p className="text-xs text-slate-800 mt-0.5">
+                                                    <span className="font-bold">Control:</span> {projectedControlNumber}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Línea Divisoria Sólida Superior */}
+                                        <div className="border-b-2 border-slate-950 mb-5"></div>
+
+                                        {/* 2. DATOS DEL CLIENTE Y CONDICIONES DE LA VENTA (2 COLUMNAS 1:1) */}
+                                        <div className="grid grid-cols-2 gap-8 text-xs pb-4 mb-4 border-b border-slate-300">
+                                            {/* Columna Izquierda: Datos del Adquiriente */}
+                                            <div>
+                                                <h3 className="font-black uppercase text-slate-950 text-xs mb-2 tracking-wide">
+                                                    DATOS DEL ADQUIRIENTE / CLIENTE
+                                                </h3>
+                                                {currentSelectedClient ? (
+                                                    <div className="space-y-1">
+                                                        <div className="grid grid-cols-12 gap-1">
+                                                            <span className="col-span-4 text-slate-600 font-bold">Cliente:</span>
+                                                            <span className="col-span-8 font-bold text-slate-950 uppercase">{currentSelectedClient.name}</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-12 gap-1">
+                                                            <span className="col-span-4 text-slate-600 font-bold">Cédula / RIF:</span>
+                                                            <span className="col-span-8 font-mono font-bold text-slate-950">{currentSelectedClient.tax_id}</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-12 gap-1">
+                                                            <span className="col-span-4 text-slate-600 font-bold">Teléfono:</span>
+                                                            <span className="col-span-8 text-slate-900">{currentSelectedClient.phone || 'N/A'}</span>
+                                                        </div>
+                                                        {currentSelectedClient.address && (
+                                                            <div className="grid grid-cols-12 gap-1">
+                                                                <span className="col-span-4 text-slate-600 font-bold">Dirección:</span>
+                                                                <span className="col-span-8 text-slate-800">{currentSelectedClient.address}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="py-1 text-slate-500 italic">
+                                                        [ Cliente no seleccionado en el formulario ]
                                                     </div>
                                                 )}
                                             </div>
-                                        ) : (
-                                            <div className="py-1 text-slate-500 italic">
-                                                [ Cliente no seleccionado en el formulario ]
-                                            </div>
-                                        )}
-                                    </div>
 
-                                    {/* Columna Derecha: Condiciones de la Venta */}
-                                    <div>
-                                        <h3 className="font-black uppercase text-slate-950 text-xs mb-2 tracking-wide">
-                                            CONDICIONES DE LA VENTA
-                                        </h3>
-                                        <div className="space-y-1">
-                                            <div className="grid grid-cols-12 gap-1">
-                                                <span className="col-span-4 text-slate-600 font-bold">Condición:</span>
-                                                <span className="col-span-8 font-bold text-slate-950">{invoiceForm.sale_condition}</span>
-                                            </div>
-                                            <div className="grid grid-cols-12 gap-1">
-                                                <span className="col-span-4 text-slate-600 font-bold">Canal:</span>
-                                                <span className="col-span-8 font-bold text-slate-950">{invoiceForm.sales_channel || 'Oficina / Presencial'}</span>
-                                            </div>
-                                            <div className="grid grid-cols-12 gap-1">
-                                                <span className="col-span-4 text-slate-600 font-bold">Tasa BS:</span>
-                                                <span className="col-span-8 font-mono font-bold text-slate-950">
-                                                    Bs. {Number(invoiceForm.bcv_exchange_rate || 876.80).toFixed(2)} / USD
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 3. TABLA DE RENGLONES Y PRODUCTOS (ENCABEZADO CON DOBLE LÍNEA SÓLIDA) */}
-                                <div className="mb-6">
-                                    <table className="w-full text-left text-xs border-collapse">
-                                        <thead className="border-t-2 border-b-2 border-slate-950 uppercase font-black text-slate-950 text-xs">
-                                            <tr>
-                                                <th className="py-2.5 px-2 w-8 text-center">#</th>
-                                                <th className="py-2.5 px-3">DESCRIPCIÓN DEL PRODUCTO</th>
-                                                <th className="py-2.5 px-3 text-center w-24">CANT.</th>
-                                                <th className="py-2.5 px-3 text-right w-28">PRECIO UNIT. ($)</th>
-                                                <th className="py-2.5 px-3 text-right w-28">TOTAL ($)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200">
-                                            {invoiceForm.items.map((it, idx) => (
-                                                <tr key={idx}>
-                                                    <td className="py-3 px-2 text-center font-mono font-bold text-slate-800">{idx + 1}</td>
-                                                    <td className="py-3 px-3">
-                                                        <span className="font-bold text-slate-950 block">
-                                                            {it.description || '[ Renglón pendiente por describir ]'}
+                                            {/* Columna Derecha: Condiciones de la Venta */}
+                                            <div>
+                                                <h3 className="font-black uppercase text-slate-950 text-xs mb-2 tracking-wide">
+                                                    CONDICIONES DE LA VENTA
+                                                </h3>
+                                                <div className="space-y-1">
+                                                    <div className="grid grid-cols-12 gap-1">
+                                                        <span className="col-span-4 text-slate-600 font-bold">Condición:</span>
+                                                        <span className="col-span-8 font-bold text-slate-950">{invoiceForm.sale_condition}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-12 gap-1">
+                                                        <span className="col-span-4 text-slate-600 font-bold">Canal:</span>
+                                                        <span className="col-span-8 font-bold text-slate-950">{invoiceForm.sales_channel || 'Oficina / Presencial'}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-12 gap-1">
+                                                        <span className="col-span-4 text-slate-600 font-bold">Tasa BS:</span>
+                                                        <span className="col-span-8 font-mono font-bold text-slate-950">
+                                                            Bs. {Number(invoiceForm.bcv_exchange_rate || 876.80).toFixed(2)} / USD
                                                         </span>
-                                                        {it.details && (
-                                                            <span className="text-[11px] text-slate-600 block mt-0.5">
-                                                                {it.details}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 3. TABLA DE RENGLONES Y PRODUCTOS */}
+                                        <div className="mb-6">
+                                            <table className="w-full text-left text-xs border-collapse">
+                                                <thead className="border-t-2 border-b-2 border-slate-950 uppercase font-black text-slate-950 text-xs">
+                                                    <tr>
+                                                        <th className="py-2.5 px-2 w-8 text-center">#</th>
+                                                        <th className="py-2.5 px-3">DESCRIPCIÓN DEL PRODUCTO</th>
+                                                        <th className="py-2.5 px-3 text-center w-24">CANT.</th>
+                                                        <th className="py-2.5 px-3 text-right w-28">PRECIO UNIT. ($)</th>
+                                                        <th className="py-2.5 px-3 text-right w-28">TOTAL ($)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-200">
+                                                    {invoiceForm.items.map((it, idx) => (
+                                                        <tr key={idx}>
+                                                            <td className="py-3 px-2 text-center font-mono font-bold text-slate-800">{idx + 1}</td>
+                                                            <td className="py-3 px-3">
+                                                                <span className="font-bold text-slate-950 block">
+                                                                    {it.description || '[ Renglón pendiente por describir ]'}
+                                                                </span>
+                                                                {it.details && (
+                                                                    <span className="text-[11px] text-slate-600 block mt-0.5">
+                                                                        {it.details}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
+                                                                {it.quantity} {it.unit}
+                                                            </td>
+                                                            <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
+                                                                ${Number(it.unit_price || 0).toFixed(2)} {it.unit && <span className="text-[10px] text-slate-500 font-normal">/{it.unit}</span>}
+                                                            </td>
+                                                            <td className="py-3 px-3 text-right font-mono font-black text-slate-950">
+                                                                ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
+                                                                {it.is_tax_exempt && (
+                                                                    <span className="text-[10px] text-blue-900 font-black ml-1">(E)</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            <div className="border-b border-slate-300"></div>
+                                        </div>
+
+                                        {/* 4. FORMA DE PAGO Y LIQUIDACIÓN DE TOTALES */}
+                                        <div className="grid grid-cols-2 gap-8 text-xs mb-8 items-start">
+                                            <div>
+                                                <h3 className="font-black uppercase text-slate-950 text-xs mb-2 tracking-wide">
+                                                    FORMA DE PAGO
+                                                </h3>
+                                                <p className="text-slate-800">
+                                                    <span className="text-slate-600 font-bold">Medio:</span>{' '}
+                                                    <span className="font-black text-slate-950 uppercase">{invoiceForm.payment_method || 'PAGO MOVIL'}</span>
+                                                </p>
+                                                {invoiceForm.payment_reference && (
+                                                    <p className="text-slate-800 mt-1">
+                                                        <span className="text-slate-600 font-bold">Ref:</span>{' '}
+                                                        <span className="font-mono font-bold text-slate-950">{invoiceForm.payment_reference}</span>
+                                                    </p>
+                                                )}
+                                                <div className="border-l-2 border-slate-400 pl-2.5 mt-3 py-0.5 text-[10px] text-slate-600 italic leading-snug">
+                                                    Monto en Bolívares (VES) calculado según la Tasa BS indicada a la fecha de la transacción.
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5 font-mono text-right text-xs">
+                                                <div className="flex justify-between py-1 border-b border-slate-200">
+                                                    <span className="font-sans font-bold text-slate-700">Subtotal:</span>
+                                                    <span className="font-bold text-slate-900">${itemsSubtotal.toFixed(2)}</span>
+                                                </div>
+                                                {Number(invoiceForm.shipping_cost || 0) > 0 && (
+                                                    <div className="flex justify-between py-1 border-b border-slate-200">
+                                                        <span className="font-sans font-bold text-slate-700">Flete / Delivery:</span>
+                                                        <span className="font-bold text-slate-900">${Number(invoiceForm.shipping_cost).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                <div className="flex justify-between py-1 border-b-2 border-slate-950">
+                                                    <span className="font-sans font-bold text-slate-700">IVA ({Number(invoiceForm.tax_percentage)}%):</span>
+                                                    <span className="font-bold text-slate-900">${taxAmount.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between pt-2 text-sm font-black">
+                                                    <span className="font-sans">TOTAL USD:</span>
+                                                    <span className="text-slate-950">${totalUsd.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs font-bold text-blue-900 pt-0.5">
+                                                    <span className="font-sans font-bold text-slate-700">TOTAL VES:</span>
+                                                    <span>Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 5. TÉRMINOS Y CONDICIONES DE ENTREGA & FIRMAS */}
+                                        <div className="pt-4 border-t border-slate-300 text-xs">
+                                            <div className="grid grid-cols-2 gap-8 items-end">
+                                                <div>
+                                                    <h3 className="font-black uppercase text-slate-950 text-xs mb-1 tracking-wide">
+                                                        TÉRMINOS Y CONDICIONES DE ENTREGA
+                                                    </h3>
+                                                    <p className="text-[10px] text-slate-600 leading-relaxed">
+                                                        {invoiceForm.terms_conditions || activeCompany.default_terms || 'Comprobante generado por el sistema. Para devoluciones o reclamos conserve este documento. Plazo máximo de reclamación: 3 días hábiles desde la fecha de emisión.'}
+                                                    </p>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4 text-center text-[10px] font-black uppercase text-slate-900">
+                                                    <div>
+                                                        <div className="border-t border-dashed border-slate-400 pt-2 mb-1"></div>
+                                                        <span>FIRMA Y SELLO EMISOR</span>
+                                                    </div>
+                                                    <div>
+                                                        <div className="border-t border-dashed border-slate-400 pt-2 mb-1"></div>
+                                                        <span>RECIBIDO CONFORME</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="border-t border-slate-200 mt-6 pt-3 text-center text-[10px] text-slate-500">
+                                                {activeCompany.name} • RIF: {activeCompany.tax_id} • Barinitas, Edo. Barinas • Sistema de Gestión y Facturación
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* ========================================================================= */
+                                    /* FORMATO 2: PROFORMA INDUSTRIAL / IMPORTACIÓN (ESTRUCTURA 1:1 MOAIVEN)     */
+                                    /* ========================================================================= */
+                                    <div className="text-slate-900 text-xs">
+
+                                        {/* ---------- PÁGINA 1: FICHA TÉCNICA & DATOS DEL CLIENTE ---------- */}
+                                        <div className="space-y-4">
+                                            {/* Cabecera Moaiven */}
+                                            <div className="flex justify-between items-start gap-4">
+                                                <div className="max-w-[340px] space-y-1">
+                                                    {activeCompany.logo_url ? (
+                                                        <div className="h-16 flex items-center justify-start mb-2">
+                                                            <img
+                                                                src={activeCompany.logo_url}
+                                                                alt={activeCompany.name}
+                                                                className="max-h-16 max-w-[200px] object-contain object-left"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-2xl font-black text-[#0E1C33] tracking-tighter mb-1">
+                                                            {activeCompany.name.split(' ')[0]}
+                                                        </div>
+                                                    )}
+                                                    <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">
+                                                        {activeCompany.name.includes('MOAIVEN') ? 'GROUP C.A. · IMPORT & LOGISTICS' : `${activeCompany.name} · IMPORT & LOGISTICS`}
+                                                    </p>
+                                                    <p className="text-xs font-bold text-slate-800">
+                                                        RIF: {activeCompany.tax_id}
+                                                    </p>
+                                                    <p className="text-xs text-slate-600 leading-tight">
+                                                        {activeCompany.address}
+                                                    </p>
+                                                    {activeCompany.email && (
+                                                        <p className="text-xs text-slate-600">
+                                                            {activeCompany.email}
+                                                        </p>
+                                                    )}
+                                                    <p className="text-xs text-slate-600">
+                                                        WhatsApp: {activeCompany.phone}
+                                                    </p>
+                                                    <p className="text-xs text-slate-600">
+                                                        TikTok: {invoiceForm.company_social_handle || (`@${activeCompany.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.logistic`)}
+                                                    </p>
+                                                </div>
+
+                                                <div className="text-right shrink-0">
+                                                    <h2 className="text-3xl font-black text-[#0E1C33] tracking-tight leading-none uppercase">
+                                                        {invoiceForm.document_type === 'factura' ? 'PROFORMA' : invoiceForm.document_type.toUpperCase()}
+                                                    </h2>
+                                                    <p className="text-xs font-black text-[#C9A227] tracking-wider uppercase mt-1">
+                                                        {invoiceForm.document_subtitle || 'LÍNEA MÁQUINAS'}
+                                                    </p>
+                                                    <div className="text-xs text-slate-800 space-y-1 mt-3">
+                                                        <p>
+                                                            <span className="font-medium text-slate-600">N° de Proforma:</span>{' '}
+                                                            <span className="font-mono font-black text-[#0E1C33]">{projectedCorrelative}</span>
+                                                        </p>
+                                                        <p>
+                                                            <span className="font-medium text-slate-600">Fecha de emisión:</span>{' '}
+                                                            <span className="font-mono font-bold">{invoiceForm.issue_date}</span>
+                                                        </p>
+                                                        <p>
+                                                            <span className="font-medium text-slate-600">Validez de la oferta:</span>{' '}
+                                                            <span className="font-bold">{invoiceForm.offer_validity_days || 15} días</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Franja Dorada Gruesa Distintiva Moaiven */}
+                                            <div className="h-2.5 bg-[#C9A227] my-4 rounded-xs"></div>
+
+                                            {/* Sección: DATOS DEL CLIENTE */}
+                                            <div className="border border-slate-300 rounded-xs overflow-hidden mb-5">
+                                                <div className="bg-[#0E1C33] text-white font-black text-xs uppercase px-3 py-1.5 tracking-wider">
+                                                    DATOS DEL CLIENTE
+                                                </div>
+                                                <div className="p-3 text-xs space-y-1.5 bg-white">
+                                                    <div className="grid grid-cols-12 gap-2">
+                                                        <span className="col-span-4 font-bold text-slate-800">Nombre / Razón social</span>
+                                                        <span className="col-span-8 font-black text-black uppercase border-b border-dotted border-slate-400 pb-0.5">
+                                                            {currentSelectedClient?.name || '_____________________________________________________'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-12 gap-2">
+                                                        <span className="col-span-4 font-bold text-slate-800">Cédula / RIF</span>
+                                                        <span className="col-span-8 font-mono font-black text-black border-b border-dotted border-slate-400 pb-0.5">
+                                                            {currentSelectedClient?.tax_id || '_____________________________________________________'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-12 gap-2">
+                                                        <span className="col-span-4 font-bold text-slate-800">Teléfono</span>
+                                                        <span className="col-span-8 text-black font-semibold border-b border-dotted border-slate-400 pb-0.5">
+                                                            {currentSelectedClient?.phone || '_____________________________________________________'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-12 gap-2">
+                                                        <span className="col-span-4 font-bold text-slate-800">Dirección de entrega</span>
+                                                        <span className="col-span-8 text-black font-medium border-b border-dotted border-slate-400 pb-0.5">
+                                                            {invoiceForm.delivery_address || currentSelectedClient?.address || '_____________________________________________________'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Sección: FICHA TÉCNICA DEL EQUIPO */}
+                                            <div className="border border-slate-300 rounded-xs overflow-hidden">
+                                                <div className="bg-[#0E1C33] text-white font-black text-xs uppercase px-3 py-1.5 tracking-wider">
+                                                    FICHA TÉCNICA DEL EQUIPO
+                                                </div>
+                                                
+                                                {/* Título y Subtítulo del Equipo */}
+                                                <div className="p-3 border-b border-slate-200 bg-white">
+                                                    <h3 className="text-sm font-black text-[#0E1C33] uppercase">
+                                                        {invoiceForm.items[0]?.description || 'CATERPILLAR 320C L'}
+                                                        <span className="font-normal text-slate-600 text-xs lowercase ml-2">
+                                                            — {invoiceForm.items[0]?.details || 'Excavadora sobre orugas'}
+                                                        </span>
+                                                    </h3>
+                                                </div>
+
+                                                {/* Tabla Dinámica de Especificaciones Técnicas con Zebra Striping */}
+                                                <div className="text-xs">
+                                                    {Array.from(new Set((invoiceForm.technical_specs || []).map(s => s.category || 'Especificaciones'))).map((catName, catIdx) => {
+                                                        const specsInCat = (invoiceForm.technical_specs || []).filter(s => (s.category || 'Especificaciones') === catName);
+                                                        return (
+                                                            <div key={catIdx}>
+                                                                <div className="bg-slate-100/90 px-3 py-1 font-black text-slate-900 border-b border-slate-200 uppercase text-[11px] tracking-wide">
+                                                                    {catName}
+                                                                </div>
+                                                                {specsInCat.map((spec, sIdx) => (
+                                                                    <div
+                                                                        key={sIdx}
+                                                                        className={`grid grid-cols-12 px-3 py-1.5 border-b border-slate-200 ${
+                                                                            sIdx % 2 === 1 ? 'bg-[#F4F5F7]' : 'bg-white'
+                                                                        }`}
+                                                                    >
+                                                                        <span className="col-span-5 font-medium text-slate-700">{spec.name}</span>
+                                                                        <span className="col-span-7 font-bold text-slate-900">{spec.value}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            <div className="text-right text-[10px] text-slate-400 pt-2 border-t border-slate-200">
+                                                Página 1 de 2 • Proforma Comercial {projectedCorrelative}
+                                            </div>
+                                        </div>
+
+                                        {/* SALTO DE PÁGINA PARA IMPRESIÓN Y PDF */}
+                                        <div className="print-page-break my-10 border-b-2 border-dashed border-slate-300 no-print py-2 text-center text-xs font-bold text-slate-400">
+                                            --- Fin de Página 1 • Salto de Página A4 para Página 2 ---
+                                        </div>
+
+                                        {/* ---------- PÁGINA 2: DESGLOSE DE PRECIOS DDP, PAGOS & CONDICIONES DE ENVÍO ---------- */}
+                                        <div className="space-y-5 pt-4">
+                                            {/* Identificadores del equipo */}
+                                            <div className="border border-slate-300 rounded-xs p-3 text-xs bg-white space-y-1.5">
+                                                <div className="grid grid-cols-12 gap-2">
+                                                    <span className="col-span-4 font-bold text-slate-800">Año de fabricación</span>
+                                                    <span className="col-span-8 font-mono font-bold text-slate-900 border-b border-dotted border-slate-300 pb-0.5">
+                                                        {invoiceForm.equipment_year || '2021 / Reciente (Inspeccionado)'}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-12 gap-2">
+                                                    <span className="col-span-4 font-bold text-slate-800">N° de serie / VIN</span>
+                                                    <span className="col-span-8 font-mono font-bold text-slate-900 border-b border-dotted border-slate-300 pb-0.5">
+                                                        {invoiceForm.equipment_vin || (invoiceForm.payment_reference ? `CAT-${invoiceForm.payment_reference}` : 'CAT0320CL089124')}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Sección: PRECIO — CONDICIÓN DDP (ENTREGADO EN DESTINO) */}
+                                            <div className="border border-slate-300 rounded-xs overflow-hidden">
+                                                <div className="bg-[#0E1C33] text-white font-black text-xs uppercase px-3 py-1.5 tracking-wider">
+                                                    PRECIO — CONDICIÓN DDP (ENTREGADO EN DESTINO)
+                                                </div>
+                                                <div className="text-xs bg-white">
+                                                    {invoiceForm.items.map((it, idx) => (
+                                                        <div key={idx} className="flex justify-between px-3 py-2 border-b border-slate-200">
+                                                            <span className="font-medium text-slate-800">
+                                                                {it.description || 'Equipo (FOB China)'} {it.quantity > 1 ? `(${it.quantity} ${it.unit})` : ''}
                                                             </span>
-                                                        )}
-                                                    </td>
-                                                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
-                                                        {it.quantity} {it.unit}
-                                                    </td>
-                                                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                                                        ${Number(it.unit_price || 0).toFixed(2)} {it.unit && <span className="text-[10px] text-slate-500 font-normal">/{it.unit}</span>}
-                                                    </td>
-                                                    <td className="py-3 px-3 text-right font-mono font-black text-slate-950">
-                                                        ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
-                                                        {it.is_tax_exempt && (
-                                                            <span className="text-[10px] text-blue-900 font-black ml-1">(E)</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {/* Línea Divisoria Inferior de Tabla */}
-                                    <div className="border-b border-slate-300"></div>
-                                </div>
+                                                            <span className="font-mono font-bold text-slate-900">
+                                                                USD {Number(it.quantity * it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    {Number(invoiceForm.shipping_cost || 0) > 0 && (
+                                                        <div className="flex justify-between px-3 py-2 border-b border-slate-200 bg-[#F4F5F7]">
+                                                            <span className="font-medium text-slate-800">Flete y seguro internacional</span>
+                                                            <span className="font-mono font-bold text-slate-900">
+                                                                USD {Number(invoiceForm.shipping_cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex justify-between px-3 py-2 border-b border-slate-200">
+                                                        <span className="font-medium text-slate-800">Nacionalización, aranceles y aduana en Venezuela</span>
+                                                        <span className="font-mono font-bold text-slate-900">
+                                                            {invoiceForm.customs_text || (taxAmount > 0 ? `USD ${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'INCLUIDO')}
+                                                        </span>
+                                                    </div>
 
-                                {/* 4. FORMA DE PAGO Y LIQUIDACIÓN DE TOTALES */}
-                                <div className="grid grid-cols-2 gap-8 text-xs mb-8 items-start">
-                                    {/* Columna Izquierda: Forma de Pago y Nota Legal con Barra Lateral */}
-                                    <div>
-                                        <h3 className="font-black uppercase text-slate-950 text-xs mb-2 tracking-wide">
-                                            FORMA DE PAGO
-                                        </h3>
-                                        <p className="text-slate-800">
-                                            <span className="text-slate-600 font-bold">Medio:</span>{' '}
-                                            <span className="font-black text-slate-950 uppercase">{invoiceForm.payment_method || 'PAGO MOVIL'}</span>
-                                        </p>
-                                        {invoiceForm.payment_reference && (
-                                            <p className="text-slate-800 mt-1">
-                                                <span className="text-slate-600 font-bold">Ref:</span>{' '}
-                                                <span className="font-mono font-bold text-slate-950">{invoiceForm.payment_reference}</span>
-                                            </p>
-                                        )}
-                                        {/* Barra vertical de acento 1:1 como en la factura original */}
-                                        <div className="border-l-2 border-slate-400 pl-2.5 mt-3 py-0.5 text-[10px] text-slate-600 italic leading-snug">
-                                            Monto en Bolívares (VES) calculado según la Tasa BS indicada a la fecha de la transacción.
-                                        </div>
-                                    </div>
-
-                                    {/* Columna Derecha: Desglose de Totales */}
-                                    <div className="space-y-1.5 font-mono text-right text-xs">
-                                        <div className="flex justify-between py-1 border-b border-slate-200">
-                                            <span className="font-sans font-bold text-slate-700">Subtotal:</span>
-                                            <span className="font-bold text-slate-900">${itemsSubtotal.toFixed(2)}</span>
-                                        </div>
-                                        {Number(invoiceForm.shipping_cost || 0) > 0 && (
-                                            <div className="flex justify-between py-1 border-b border-slate-200">
-                                                <span className="font-sans font-bold text-slate-700">Flete / Delivery:</span>
-                                                <span className="font-bold text-slate-900">${Number(invoiceForm.shipping_cost).toFixed(2)}</span>
+                                                    {/* Fila Total DDP en Navy Blue */}
+                                                    <div className="bg-[#0E1C33] text-white px-3 py-2.5 flex justify-between items-center font-black text-xs uppercase tracking-wide">
+                                                        <span>TOTAL DDP — Puesto en destino, Venezuela</span>
+                                                        <span className="font-mono text-base text-white">
+                                                            USD {totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        )}
-                                        <div className="flex justify-between py-1 border-b-2 border-slate-950">
-                                            <span className="font-sans font-bold text-slate-700">IVA ({Number(invoiceForm.tax_percentage)}%):</span>
-                                            <span className="font-bold text-slate-900">${taxAmount.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between pt-2 text-sm font-black">
-                                            <span className="font-sans">TOTAL USD:</span>
-                                            <span className="text-slate-950">${totalUsd.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs font-bold text-blue-900 pt-0.5">
-                                            <span className="font-sans font-bold text-slate-700">TOTAL VES:</span>
-                                            <span>Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                    </div>
-                                </div>
 
-                                {/* 5. TÉRMINOS Y CONDICIONES DE ENTREGA & FIRMAS CON LÍNEAS GUÍA */}
-                                <div className="pt-4 border-t border-slate-300 text-xs">
-                                    <div className="grid grid-cols-2 gap-8 items-end">
-                                        {/* Términos a la Izquierda */}
-                                        <div>
-                                            <h3 className="font-black uppercase text-slate-950 text-xs mb-1 tracking-wide">
-                                                TÉRMINOS Y CONDICIONES DE ENTREGA
-                                            </h3>
-                                            <p className="text-[10px] text-slate-600 leading-relaxed">
-                                                {invoiceForm.terms_conditions || activeCompany.default_terms || 'Comprobante generado por el sistema. Para devoluciones o reclamos conserve este documento. Plazo máximo de reclamación: 3 días hábiles desde la fecha de emisión.'}
-                                            </p>
-                                        </div>
-
-                                        {/* Líneas de Firma a la Derecha */}
-                                        <div className="grid grid-cols-2 gap-4 text-center text-[10px] font-black uppercase text-slate-900">
-                                            <div>
-                                                <div className="border-t border-dashed border-slate-400 pt-2 mb-1"></div>
-                                                <span>FIRMA Y SELLO EMISOR</span>
+                                            {/* Sección: CONDICIONES DE PAGO */}
+                                            <div className="border border-slate-300 rounded-xs overflow-hidden">
+                                                <div className="bg-[#0E1C33] text-white font-black text-xs uppercase px-3 py-1.5 tracking-wider">
+                                                    CONDICIONES DE PAGO
+                                                </div>
+                                                <div className="text-xs">
+                                                    <div className="grid grid-cols-12 px-3 py-2.5 border-b border-slate-200 bg-white items-center">
+                                                        <div className="col-span-2 font-black text-sm text-[#0E1C33]">{invoiceForm.payment_milestone_1_pct || 70}%</div>
+                                                        <div className="col-span-10 text-slate-800">
+                                                            <span className="font-mono font-black text-black">
+                                                                USD {(totalUsd * (Number(invoiceForm.payment_milestone_1_pct || 70) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                            </span>{' '}
+                                                            — {invoiceForm.payment_milestone_1_text || 'Al momento de firmar el contrato, para iniciar la verificación, compra del equipo y proceso de envío.'}
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-12 px-3 py-2.5 bg-[#F4F5F7] items-center">
+                                                        <div className="col-span-2 font-black text-sm text-[#0E1C33]">{invoiceForm.payment_milestone_2_pct || 30}%</div>
+                                                        <div className="col-span-10 text-slate-800">
+                                                            <span className="font-mono font-black text-black">
+                                                                USD {(totalUsd * (Number(invoiceForm.payment_milestone_2_pct || 30) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                            </span>{' '}
+                                                            — {invoiceForm.payment_milestone_2_text || '15 días antes de la llegada del equipo al puerto de destino en Venezuela.'}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div className="border-t border-dashed border-slate-400 pt-2 mb-1"></div>
-                                                <span>RECIBIDO CONFORME</span>
+
+                                            {/* Sección: CONDICIONES DE ENVÍO */}
+                                            <div className="border border-slate-300 rounded-xs overflow-hidden">
+                                                <div className="bg-[#0E1C33] text-white font-black text-xs uppercase px-3 py-1.5 tracking-wider">
+                                                    CONDICIONES DE ENVÍO
+                                                </div>
+                                                <div className="p-3 text-xs text-slate-700 leading-relaxed bg-white">
+                                                    {invoiceForm.shipping_terms_notes || 'Tiempo de carga: una vez confirmada la compra del equipo en China, el mismo cuenta con un plazo de hasta veinte (20) días hábiles para ser cargado en puerto, sujeto a la disponibilidad de espacio (booking) ofrecida por la naviera.'}
+                                                </div>
+                                            </div>
+
+                                            {/* Firmas de Aceptación */}
+                                            <div className="grid grid-cols-2 gap-12 text-center text-xs pt-8">
+                                                <div>
+                                                    <div className="border-t border-slate-900 pt-2 mb-1"></div>
+                                                    <span className="font-bold text-slate-900">
+                                                        Firma autorizada — {activeCompany.name}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <div className="border-t border-slate-900 pt-2 mb-1"></div>
+                                                    <span className="font-bold text-slate-900">
+                                                        Firma / aceptación del cliente
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Pie de página 2 */}
+                                            <div className="text-right text-[10px] text-slate-400 pt-4 border-t border-slate-200">
+                                                Página 2 de 2 • Proforma Comercial {projectedCorrelative}
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Pie Institucional Final */}
-                                    <div className="border-t border-slate-200 mt-6 pt-3 text-center text-[10px] text-slate-500">
-                                        {activeCompany.name} • RIF: {activeCompany.tax_id} • Barinitas, Edo. Barinas • Sistema de Gestión y Facturación
-                                    </div>
-                                </div>
+                                )}
 
                             </div>
                         </div>

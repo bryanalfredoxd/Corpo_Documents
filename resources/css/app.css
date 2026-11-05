@@ -30,7 +30,7 @@ input[type="number"] {
     background: #94a3b8;
 }
 
-/* Configuración de Hoja A4 para Impresión y PDF (Copia 1:1 Estructura Agrosuministros) */
+/* Configuración de Hoja A4 para Impresión y PDF */
 @page {
     size: A4 portrait;
     margin: 15mm 16mm 15mm 16mm;
@@ -79,6 +79,16 @@ input[type="number"] {
         border: none !important;
         border-radius: 0 !important;
         display: block !important;
-        page-break-inside: avoid !important;
+    }
+
+    /* Salto de página para documentos multi-página (Formato 2 Moaiven) */
+    .print-page-break {
+        page-break-after: always !important;
+        break-after: page !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        display: block !important;
     }
 }
