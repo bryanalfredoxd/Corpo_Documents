@@ -30,7 +30,25 @@ class CompanyController extends Controller
 
         $logoPath = null;
         if ($request->hasFile('logo')) {
-            $logoPath = $request->file('logo')->store('companies/logos', 'public');
+            $file = $request->file('logo');
+            $filename = $file->hashName();
+
+            // 1. Guardar en storage/app/public/companies/logos (estándar de Laravel)
+            $file->storeAs('companies/logos', $filename, 'public');
+
+            // 2. Garantizar sincronización física directa en public/storage para cPanel
+            $publicFolder = public_path('storage/companies/logos');
+            if (! file_exists($publicFolder)) {
+                @mkdir($publicFolder, 0755, true);
+            }
+
+            $storageSource = storage_path('app/public/companies/logos/' . $filename);
+            $publicTarget = $publicFolder . DIRECTORY_SEPARATOR . $filename;
+            if (file_exists($storageSource) && ! file_exists($publicTarget)) {
+                @copy($storageSource, $publicTarget);
+            }
+
+            $logoPath = 'companies/logos/' . $filename;
         }
 
         Company::create([

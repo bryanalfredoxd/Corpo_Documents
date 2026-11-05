@@ -51,7 +51,11 @@ class Company extends Model
             return null;
         }
 
-        return Storage::disk('public')->url($this->logo_path);
+        if (str_starts_with($this->logo_path, 'http://') || str_starts_with($this->logo_path, 'https://')) {
+            return $this->logo_path;
+        }
+
+        return asset('storage/' . ltrim($this->logo_path, '/'));
     }
 
     /**
