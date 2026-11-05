@@ -1,3 +1,84 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Eliminar flechas de incremento/decremento en inputs numéricos */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield !important;
+    appearance: textfield !important;
+}
+
+/* Scrollbar sutil y moderno */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Configuración de Hoja A4 para Impresión y PDF (Copia 1:1 Estructura Agrosuministros) */
+@page {
+    size: A4 portrait;
+    margin: 15mm 16mm 15mm 16mm;
+}
+
+@media print {
+    html, body {
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        zoom: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Ocultar elementos no imprimibles */
+    .no-print {
+        display: none !important;
+    }
+
+    /* Ocultar el resto del árbol DOM y mostrar únicamente la hoja física A4 */
+    body * {
+        visibility: hidden;
+    }
+
+    .printable-sheet,
+    .printable-sheet * {
+        visibility: visible;
+    }
+
+    .printable-sheet {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        display: block !important;
+        page-break-inside: avoid !important;
+    }
+}

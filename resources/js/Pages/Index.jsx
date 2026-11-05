@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Building2,
     User,
@@ -43,21 +44,48 @@ import {
     Trash2,
     Save,
     ZoomIn,
-    Type
+    Type,
+    Image,
+    Globe,
+    LogOut,
+    X,
+    UploadCloud,
+    Loader2,
+    Sparkles
 } from 'lucide-react';
 
-export default function Index() {
+export default function Index({ companies = [], clients = [], invoices = [], stats = {} }) {
+    const { flash = {} } = usePage().props;
+
     // Vistas principales: 'libro-fiscal' | 'directorio' | 'generador-pdf'
     const [currentView, setCurrentView] = useState('libro-fiscal');
-    
+
     // Filtros de directorio
     const [directoryType, setDirectoryType] = useState('todos'); // todos | empresas | personas
-    
-    // Búsqueda
     const [searchQuery, setSearchQuery] = useState('');
 
+    // Modales de creación
+    const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
+    const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+
+    // Empresa activa seleccionada para facturación (multi-empresa con logos)
+    const [selectedCompanyId, setSelectedCompanyId] = useState(
+        companies.length > 0 ? companies[0].id : null
+    );
+
     // Control de tamaño / zoom para accesibilidad y alta legibilidad (+15%, +25%, +35%, +45%)
-    const [zoomLevel, setZoomLevel] = useState('115'); // 100, 115, 125, 135, 145
+    const [zoomLevel, setZoomLevel] = useState('115');
+    const [isZoomOpen, setIsZoomOpen] = useState(false);
+
+    const zoomOptions = [
+        { value: '100', label: 'Normal (100%)', desc: 'Tamaño estándar del sistema' },
+        { value: '115', label: 'Grande (+15%)', desc: 'Recomendado para lectura cómoda' },
+        { value: '125', label: 'Muy Grande (+25%)', desc: 'Mayor tamaño y visibilidad' },
+        { value: '135', label: 'Extra Grande (+35%)', desc: 'Textos y botones ampliados' },
+        { value: '145', label: 'Máximo (+45%)', desc: 'Máxima escala visual' },
+    ];
+
+    const currentZoomOption = zoomOptions.find(o => o.value === zoomLevel) || zoomOptions[1];
 
     useEffect(() => {
         const savedZoom = localStorage.getItem('corpo_zoom_setting');
@@ -71,492 +99,780 @@ export default function Index() {
         localStorage.setItem('corpo_zoom_setting', level);
     };
 
-    // Datos simulados de la empresa emisora
-    const issuerCompany = {
+    // Obtener la empresa actualmente activa
+    const activeCompany = companies.find(c => c.id === Number(selectedCompanyId)) || companies[0] || {
+        id: 1,
         name: 'CORPO ASIA SYSTEMS, C.A.',
-        taxId: 'J-50123998-0',
-        fiscalAddress: 'Av. Francisco de Miranda, Torre Empresarial, Piso 12, Ofic. 12-A, Caracas',
-        phone: '+58 (212) 999-8888',
+        tax_id: 'J-50123998-0',
+        phone: '+58 212 999 8888',
         email: 'facturacion@corpoasia.com',
-        correlativeCurrent: 'F-003891',
-        controlNumber: '00-089123'
+        address: 'Caracas, Venezuela',
+        logo_url: null,
+        invoice_prefix: 'F-',
+        next_correlative: 1,
+        next_control_number: 1,
+        default_terms: 'Comprobante fiscal válido. Conserve este documento para efectos legales y de garantía.'
     };
 
-    // Datos maestros de empresas y personas registradas (Textos de alto contraste)
-    const directoryData = [
-        {
-            id: 'DIR-01',
-            type: 'empresa',
-            name: 'Inversiones & Logística Corpo Asia, C.A.',
-            tradeName: 'Corpo Asia Logística',
-            taxId: 'J-50192834-1',
-            email: 'administracion@corpoasia.com',
-            phone: '+58 (212) 740-9100',
-            address: 'Av. Libertador, Edif. Torre Financiera, Piso 14, Chacao, Miranda',
-            taxCategory: 'Contribuyente Especial',
-            representative: 'Carlos Eduardo Mendoza',
-            invoicesCount: 42,
-            totalBilled: '$52,400.00',
-            lastInvoiceDate: '04/11/2026'
-        },
-        {
-            id: 'DIR-02',
-            type: 'empresa',
-            name: 'Distribuidora Agroindustrial El Roble, S.A.',
-            tradeName: 'Agro El Roble',
-            taxId: 'J-31294819-0',
-            email: 'pagos@elrobleagro.com',
-            phone: '+58 (241) 823-4411',
-            address: 'Zona Industrial Sur II, Parcela 45, Valencia, Carabobo',
-            taxCategory: 'Contribuyente Ordinario',
-            representative: 'Ing. Roberto Gómez',
-            invoicesCount: 16,
-            totalBilled: '$19,850.00',
-            lastInvoiceDate: '02/11/2026'
-        },
-        {
-            id: 'DIR-03',
-            type: 'persona',
-            name: 'Dra. Mariana Valenzuela Castro',
-            tradeName: 'Servicios Médicos Ocupacionales',
-            taxId: 'V-18.904.321',
-            email: 'm.valenzuela@asesoriasalud.com',
-            phone: '+58 (414) 332-1189',
-            address: 'Av. Principal Las Mercedes, Centro Profesional, Ofic. 4-A, Caracas',
-            taxCategory: 'Profesional Independiente',
-            representative: 'Titular Directo',
-            invoicesCount: 9,
-            totalBilled: '$8,400.00',
-            lastInvoiceDate: '03/11/2026'
-        },
-        {
-            id: 'DIR-04',
-            type: 'empresa',
-            name: 'Servicios Tecnológicos Soluciones Web, C.A.',
-            tradeName: 'Soluciones Web Latam',
-            taxId: 'J-41289102-8',
-            email: 'contacto@solucionesweb.net',
-            phone: '+58 (212) 902-1144',
-            address: 'Av. Francisco Solano, Edif. Centro Solano, Piso 5, Sabana Grande',
-            taxCategory: 'Contribuyente Ordinario',
-            representative: 'Lic. Fernando Rojas',
-            invoicesCount: 24,
-            totalBilled: '$34,120.00',
-            lastInvoiceDate: '01/11/2026'
-        },
-        {
-            id: 'DIR-05',
-            type: 'persona',
-            name: 'Ing. Alejandro Morales Mendoza',
-            tradeName: 'Consultoría Estructural & Obras',
-            taxId: 'V-14.892.301',
-            email: 'morales.ingenieria@gmail.com',
-            phone: '+58 (412) 289-9943',
-            address: 'Calle Real de Sabana Grande, Residencias La Floresta, Apto. 8-B',
-            taxCategory: 'Honorarios Profesionales',
-            representative: 'Titular Directo',
-            invoicesCount: 7,
-            totalBilled: '$6,200.00',
-            lastInvoiceDate: '28/10/2026'
-        }
-    ];
+    // Plantilla de factura completamente limpia a la espera de ser llenada
+    const getEmptyInvoice = (company) => ({
+        company_id: company?.id || (companies.length > 0 ? companies[0].id : ''),
+        client_id: '',
+        document_type: 'factura',
+        document_subtitle: '',
+        order_number: '#' + (company?.next_control_number || 1),
+        issue_date: new Date().toISOString().split('T')[0],
+        due_date: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+        offer_validity_days: 15,
+        sale_condition: 'Venta de Contado',
+        sales_channel: 'Oficina / Presencial',
+        bcv_exchange_rate: 876.80,
+        currency: 'USD',
+        payment_method: 'PAGO MOVIL',
+        payment_reference: '',
+        shipping_cost: 0,
+        discount: 0,
+        tax_percentage: 16.00,
+        terms_conditions: company?.default_terms || '',
+        items: [
+            { description: '', details: '', quantity: 1, unit: 'unid', unit_price: '', is_tax_exempt: false }
+        ]
+    });
 
-    // Registro de facturas y documentos emitidos (Alto contraste)
-    const invoicesLedger = [
-        {
-            correlative: 'F-003891',
-            controlNumber: '00-089123',
-            client: 'Inversiones & Logística Corpo Asia, C.A.',
-            taxId: 'J-50192834-1',
-            date: '04/11/2026',
-            dueDate: '19/11/2026',
-            concept: 'Servicios de Auditoría & Consultoría Fiscal Corporativa Q4',
-            taxBase: '$3,850.00',
-            vat: '$616.00',
-            total: '$4,466.00',
-            status: 'Emitida',
-            currency: 'USD'
-        },
-        {
-            correlative: 'F-003890',
-            controlNumber: '00-089122',
-            client: 'Dra. Mariana Valenzuela Castro',
-            taxId: 'V-18.904.321',
-            date: '03/11/2026',
-            dueDate: '10/11/2026',
-            concept: 'Servicios de Asesoría en Salud y Bioseguridad Laboral',
-            taxBase: '$1,200.00',
-            vat: '$192.00',
-            total: '$1,392.00',
-            status: 'Emitida',
-            currency: 'USD'
-        },
-        {
-            correlative: 'F-003889',
-            controlNumber: '00-089121',
-            client: 'Distribuidora Agroindustrial El Roble, S.A.',
-            taxId: 'J-31294819-0',
-            date: '02/11/2026',
-            dueDate: '17/11/2026',
-            concept: 'Suministro de Componentes y Licenciamiento Operativo',
-            taxBase: '$5,400.00',
-            vat: '$864.00',
-            total: '$6,264.00',
-            status: 'Emitida',
-            currency: 'USD'
-        },
-        {
-            correlative: 'F-003888',
-            controlNumber: '00-089120',
-            client: 'Servicios Tecnológicos Soluciones Web, C.A.',
-            taxId: 'J-41289102-8',
-            date: '01/11/2026',
-            dueDate: '15/11/2026',
-            concept: 'Mantenimiento Preventivo Servidores y Red Troncal',
-            taxBase: '$2,150.00',
-            vat: '$344.00',
-            total: '$2,494.00',
-            status: 'Emitida',
-            currency: 'USD'
-        },
-        {
-            correlative: 'BORR-0041',
-            controlNumber: 'Pendiente',
-            client: 'Ing. Alejandro Morales Mendoza',
-            taxId: 'V-14.892.301',
-            date: '04/11/2026',
-            dueDate: '18/11/2026',
-            concept: 'Cálculo y Elaboración de Planos Estructurales Fase II',
-            taxBase: '$1,800.00',
-            vat: '$288.00',
-            total: '$2,088.00',
-            status: 'Borrador',
-            currency: 'USD'
-        }
-    ];
+    // Estado del formulario de factura (SINCRONIZADO EN TIEMPO REAL CON LA VISTA PREVIA)
+    const [invoiceForm, setInvoiceForm] = useState(getEmptyInvoice(activeCompany));
 
-    const filteredDirectory = directoryData.filter(item => {
-        if (directoryType === 'empresas') return item.type === 'empresa';
-        if (directoryType === 'personas') return item.type === 'persona';
+    // Acción para iniciar una nueva factura limpia
+    const handleNewInvoice = () => {
+        setInvoiceForm(getEmptyInvoice(activeCompany));
+        setCurrentView('generador-pdf');
+    };
+
+    // Actualizar company_id y términos cuando cambia activeCompany
+    useEffect(() => {
+        if (activeCompany) {
+            setInvoiceForm(prev => ({
+                ...prev,
+                company_id: activeCompany.id,
+                terms_conditions: activeCompany.default_terms || prev.terms_conditions,
+                order_number: '#' + (activeCompany.next_control_number || 1)
+            }));
+        }
+    }, [activeCompany?.id]);
+
+    // Cliente actualmente seleccionado en el formulario (null si no se ha seleccionado ninguno)
+    const currentSelectedClient = invoiceForm.client_id
+        ? clients.find(c => c.id === Number(invoiceForm.client_id)) || null
+        : null;
+
+    // Cálculos en tiempo real de la factura
+    const itemsSubtotal = invoiceForm.items.reduce((acc, it) => acc + (Number(it.quantity || 0) * Number(it.unit_price || 0)), 0);
+    const taxableBase = invoiceForm.items.filter(it => !it.is_tax_exempt).reduce((acc, it) => acc + (Number(it.quantity || 0) * Number(it.unit_price || 0)), 0);
+    const taxAmount = (taxableBase * Number(invoiceForm.tax_percentage || 0)) / 100;
+    const totalUsd = itemsSubtotal + Number(invoiceForm.shipping_cost || 0) - Number(invoiceForm.discount || 0) + taxAmount;
+    const totalVes = totalUsd * Number(invoiceForm.bcv_exchange_rate || 1);
+
+    // Correlativo proyectado en tiempo real
+    const projectedCorrelative = sprintfCorrelative(activeCompany.invoice_prefix || 'F-', activeCompany.next_correlative || 1);
+    const projectedControlNumber = sprintfControl(0, activeCompany.next_control_number || 1);
+
+    function sprintfCorrelative(prefix, num) {
+        return `${prefix}${String(num).padStart(7, '0')}`;
+    }
+    function sprintfControl(series, num) {
+        return `${String(series).padStart(2, '0')}-${String(num).padStart(6, '0')}`;
+    }
+
+    // Manejar ítems dinámicos
+    const handleAddItem = () => {
+        setInvoiceForm(prev => ({
+            ...prev,
+            items: [...prev.items, { description: '', details: '', quantity: 1, unit: 'unid', unit_price: 0, is_tax_exempt: false }]
+        }));
+    };
+
+    const handleRemoveItem = (index) => {
+        if (invoiceForm.items.length === 1) return;
+        setInvoiceForm(prev => ({
+            ...prev,
+            items: prev.items.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleItemChange = (index, field, value) => {
+        setInvoiceForm(prev => {
+            const newItems = [...prev.items];
+            newItems[index] = { ...newItems[index], [field]: value };
+            return { ...prev, items: newItems };
+        });
+    };
+
+    // Envío del formulario de factura a Laravel
+    const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
+    const handleSubmitInvoice = (e) => {
+        e.preventDefault();
+        if (!invoiceForm.client_id) {
+            alert('Por favor seleccione un cliente antes de guardar la factura, o regístrelo mediante el botón "+ Nuevo Cliente".');
+            return;
+        }
+        setIsSubmittingInvoice(true);
+        router.post('/invoices', invoiceForm, {
+            onSuccess: () => {
+                setIsSubmittingInvoice(false);
+                setCurrentView('libro-fiscal');
+            },
+            onError: (err) => {
+                setIsSubmittingInvoice(false);
+                alert('Por favor verifica los campos obligatorios: ' + Object.values(err).join(', '));
+            }
+        });
+    };
+
+    // Cargar una factura pasada en el formulario y sincronizarla en tiempo real
+    const handleLoadInvoiceToEditor = (inv) => {
+        setSelectedCompanyId(inv.company_id);
+        setInvoiceForm({
+            company_id: inv.company_id,
+            client_id: inv.client_id,
+            document_type: inv.document_type || 'factura',
+            document_subtitle: inv.document_subtitle || '',
+            order_number: inv.order_number || '',
+            issue_date: inv.issue_date ? inv.issue_date.split('T')[0] : new Date().toISOString().split('T')[0],
+            due_date: inv.due_date ? inv.due_date.split('T')[0] : '',
+            offer_validity_days: inv.offer_validity_days || 15,
+            sale_condition: inv.sale_condition || 'Venta de Contado',
+            sales_channel: inv.sales_channel || 'Oficina',
+            bcv_exchange_rate: Number(inv.bcv_exchange_rate || 876.80),
+            currency: inv.currency || 'USD',
+            payment_method: inv.payment_method || 'PAGO MOVIL',
+            payment_reference: inv.payment_reference || '',
+            shipping_cost: Number(inv.shipping_cost || 0),
+            discount: Number(inv.discount || 0),
+            tax_percentage: Number(inv.tax_percentage || 16),
+            terms_conditions: inv.terms_conditions || '',
+            items: (inv.items && inv.items.length > 0)
+                ? inv.items.map(it => ({
+                    description: it.description,
+                    details: it.details || '',
+                    quantity: Number(it.quantity),
+                    unit: it.unit,
+                    unit_price: Number(it.unit_price),
+                    is_tax_exempt: !!it.is_tax_exempt
+                }))
+                : [{ description: 'Servicio general', details: '', quantity: 1, unit: 'unid', unit_price: 100, is_tax_exempt: false }]
+        });
+        setCurrentView('generador-pdf');
+    };
+
+    // Estado para nueva empresa
+    const [newCompany, setNewCompany] = useState({
+        name: '',
+        trade_name: '',
+        tax_id: '',
+        phone: '',
+        email: '',
+        address: '',
+        city: '',
+        state: '',
+        invoice_prefix: 'F-',
+        default_terms: '',
+        logo: null
+    });
+    const [logoPreview, setLogoPreview] = useState(null);
+    const [isSavingCompany, setIsSavingCompany] = useState(false);
+
+    const handleCompanyLogoChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setNewCompany(prev => ({ ...prev, logo: file }));
+            setLogoPreview(URL.createObjectURL(file));
+        }
+    };
+
+    const handleSubmitCompany = (e) => {
+        e.preventDefault();
+        setIsSavingCompany(true);
+        const formData = new FormData();
+        Object.keys(newCompany).forEach(key => {
+            if (newCompany[key] !== null && newCompany[key] !== '') {
+                formData.append(key, newCompany[key]);
+            }
+        });
+
+        router.post('/companies', formData, {
+            forceFormData: true,
+            onSuccess: () => {
+                setIsSavingCompany(false);
+                setIsCompanyModalOpen(false);
+                setNewCompany({
+                    name: '', trade_name: '', tax_id: '', phone: '', email: '',
+                    address: '', city: '', state: '', invoice_prefix: 'F-', default_terms: '', logo: null
+                });
+                setLogoPreview(null);
+            },
+            onError: () => setIsSavingCompany(false)
+        });
+    };
+
+    // Estado para nuevo cliente y consulta CNE
+    const [newClient, setNewClient] = useState({
+        type: 'persona',
+        nacionalidad: 'V',
+        cedulaNumber: '',
+        tax_id: '',
+        name: '',
+        phone: '',
+        email: '',
+        address: '',
+        notes: ''
+    });
+    const [isSavingClient, setIsSavingClient] = useState(false);
+    const [isConsultingCne, setIsConsultingCne] = useState(false);
+    const [cneAlert, setCneAlert] = useState(null); // { type: 'success' | 'error', message: string }
+
+    // Función para consultar API CNE
+    const handleConsultCne = async () => {
+        const cedula = newClient.cedulaNumber.trim().replace(/\D/g, '');
+        if (!cedula) {
+            setCneAlert({ type: 'error', message: 'Por favor ingrese el número de cédula para consultar.' });
+            return;
+        }
+
+        setIsConsultingCne(true);
+        setCneAlert(null);
+
+        try {
+            const response = await axios.post('/clients/consult-cne', {
+                nacionalidad: newClient.nacionalidad || 'V',
+                cedula: cedula
+            });
+
+            if (response.data.success) {
+                const fullName = response.data.full_name;
+                const formattedId = response.data.rif || `${newClient.nacionalidad}-${cedula}`;
+                const autoAddress = response.data.address || '';
+
+                setNewClient(prev => ({
+                    ...prev,
+                    name: fullName || prev.name,
+                    tax_id: formattedId,
+                    address: autoAddress ? `${autoAddress}` : prev.address
+                }));
+
+                setCneAlert({
+                    type: 'success',
+                    message: `¡CNE Verificado! Nombre: ${fullName}`
+                });
+            } else {
+                setCneAlert({
+                    type: 'error',
+                    message: response.data.message || 'Cédula no encontrada en el registro electoral.'
+                });
+            }
+        } catch (err) {
+            setCneAlert({
+                type: 'error',
+                message: err.response?.data?.message || 'Error de conexión al consultar el CNE.'
+            });
+        } finally {
+            setIsConsultingCne(false);
+        }
+    };
+
+    // Guardar nuevo cliente en la base de datos
+    const handleSubmitClient = (e) => {
+        e.preventDefault();
+        setIsSavingClient(true);
+        router.post('/clients', {
+            type: newClient.type,
+            name: newClient.name,
+            tax_id: newClient.tax_id,
+            phone: newClient.phone,
+            email: newClient.email,
+            address: newClient.address,
+            notes: newClient.notes
+        }, {
+            onSuccess: () => {
+                setIsSavingClient(false);
+                setIsClientModalOpen(false);
+                setCneAlert(null);
+                setNewClient({
+                    type: 'persona',
+                    nacionalidad: 'V',
+                    cedulaNumber: '',
+                    tax_id: '',
+                    name: '',
+                    phone: '',
+                    email: '',
+                    address: '',
+                    notes: ''
+                });
+            },
+            onError: (err) => {
+                setIsSavingClient(false);
+                setCneAlert({
+                    type: 'error',
+                    message: 'Error al registrar cliente: ' + Object.values(err).join(', ')
+                });
+            }
+        });
+    };
+
+    // Cerrar sesión
+    const handleLogout = () => {
+        if (confirm('¿Desea cerrar la sesión del sistema?')) {
+            router.post('/logout');
+        }
+    };
+
+    // Filtrar clientes
+    const filteredClients = clients.filter(c => {
+        const matchesSearch = searchQuery === '' ||
+            c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.tax_id.toLowerCase().includes(searchQuery.toLowerCase());
+
+        if (!matchesSearch) return false;
+        if (directoryType === 'empresas') return c.type === 'empresa';
+        if (directoryType === 'personas') return c.type === 'persona';
         return true;
+    });
+
+    // Filtrar facturas
+    const filteredInvoices = invoices.filter(inv => {
+        if (!searchQuery) return true;
+        return (
+            inv.correlative_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            inv.client?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            inv.client?.tax_id.toLowerCase().includes(searchQuery.toLowerCase())
+        );
     });
 
     return (
         <div
-            className="min-h-screen bg-[#F1F5F9] text-black flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white"
+            className="min-h-screen bg-[#F1F5F9] print:bg-white print:min-h-0 text-black flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white"
             style={{ zoom: `${zoomLevel}%` }}
         >
-            <Head title="Corpo Documents | Sistema de Facturación y Registro" />
+            <Head title="Corpo Documents | Sistema de Facturación y Registro Multi-Empresa" />
 
-            {/* TOP BAR CON ACCESIBILIDAD Y CONTROL DE ZOOM */}
-            <div className="bg-white border-b-2 border-slate-300 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-40 shadow-sm">
-                
-                {/* Logo & Emisor */}
+            {/* TOP BAR CON ALINEACIÓN SIMÉTRICA Y PERFECTO ESPACIADO */}
+            <header className="bg-white border-b-2 border-slate-300 px-6 py-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-40 shadow-xs no-print">
+
+                {/* Logo & Marca del Sistema */}
                 <div className="flex items-center space-x-3">
-                    <div className="h-10 w-10 bg-black rounded-lg flex items-center justify-center text-white shadow-sm">
-                        <BookOpen className="w-6 h-6 text-sky-400" />
+                    <div className="h-10 w-10 bg-black text-white rounded-xl flex items-center justify-center font-black text-sm shadow-xs">
+                        <BookOpen className="w-5 h-5 text-sky-400" />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base font-black tracking-tight text-black uppercase">
+                            <h1 className="text-sm font-black tracking-tight text-black uppercase leading-none">
                                 Corpo<span className="text-blue-700">Documents</span>
                             </h1>
-                            <span className="bg-black text-white text-xs font-mono font-bold px-2 py-0.5 rounded">
-                                SISTEMA FISCAL
-                            </span>
                         </div>
-                        <p className="text-xs font-bold text-slate-900">
-                            Emisor: <span className="text-black">{issuerCompany.name}</span> • RIF: <span className="text-black font-mono font-black">{issuerCompany.taxId}</span>
-                        </p>
+                        <span className="text-[11px] font-bold text-slate-600 block mt-0.5">
+                            Sistema de Facturación & Control Fiscal
+                        </span>
                     </div>
                 </div>
 
-                {/* SELECTOR DE TAMAÑO DE LETRA / ZOOM (SUPER VISIBLE PARA EL JEFE) */}
-                <div className="flex items-center gap-2 bg-amber-100/80 border-2 border-amber-400 px-3.5 py-1.5 rounded-xl shadow-xs">
-                    <div className="flex items-center gap-1.5 text-black font-black text-xs uppercase tracking-tight">
-                        <Type className="w-4 h-4 text-amber-900" />
-                        <span>Tamaño de Pantalla:</span>
-                    </div>
+                {/* SELECTOR DE TAMAÑO DE PANTALLA (DESPLEGABLE COMPACTO SIMÉTRICO) */}
+                <div className="relative">
+                    <button
+                        type="button"
+                        onClick={() => setIsZoomOpen(!isZoomOpen)}
+                        className="h-9 flex items-center gap-2 bg-white hover:bg-slate-100 border-2 border-slate-300 text-black px-3 rounded-lg shadow-xs transition-colors font-black text-xs cursor-pointer"
+                        title="Ajustar tamaño de letra y pantalla"
+                    >
+                        <Type className="w-4 h-4 text-slate-700 shrink-0" />
+                        <span>Tamaño: <strong>{currentZoomOption.value}%</strong></span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-black transition-transform ${isZoomOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
-                    <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-amber-300">
-                        {[
-                            { label: 'Normal', value: '100' },
-                            { label: '+15%', value: '115' },
-                            { label: '+25%', value: '125' },
-                            { label: '+35%', value: '135' },
-                            { label: '+45%', value: '145' },
-                        ].map((btn) => (
-                            <button
-                                key={btn.value}
-                                onClick={() => handleZoomChange(btn.value)}
-                                className={`px-2.5 py-1 rounded text-xs font-black transition-all ${
-                                    zoomLevel === btn.value
-                                        ? 'bg-black text-white shadow-xs scale-105'
-                                        : 'text-black hover:bg-slate-100'
-                                }`}
-                                title={`Ajustar tamaño a ${btn.label}`}
-                            >
-                                {btn.label}
-                            </button>
-                        ))}
-                    </div>
+                    {isZoomOpen && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setIsZoomOpen(false)} />
+                            <div className="absolute right-0 mt-1.5 w-60 bg-white border-2 border-black rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-200">
+                                <div className="p-2.5 bg-slate-100 flex items-center justify-between border-b border-slate-300">
+                                    <span className="text-[11px] font-black uppercase text-black">
+                                        Tamaño de Pantalla
+                                    </span>
+                                    <span className="text-[10px] font-mono font-bold bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded">
+                                        Zoom
+                                    </span>
+                                </div>
+                                <div className="p-1.5 space-y-1">
+                                    {zoomOptions.map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => {
+                                                handleZoomChange(opt.value);
+                                                setIsZoomOpen(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 rounded-lg flex items-center justify-between text-xs font-black transition-colors ${zoomLevel === opt.value
+                                                ? 'bg-black text-white'
+                                                : 'text-black hover:bg-slate-100'
+                                                }`}
+                                        >
+                                            <div>
+                                                <span className="block">{opt.label}</span>
+                                                <span className={`block text-[10px] font-bold ${zoomLevel === opt.value ? 'text-slate-300' : 'text-slate-700'
+                                                    }`}>
+                                                    {opt.desc}
+                                                </span>
+                                            </div>
+                                            {zoomLevel === opt.value && (
+                                                <Check className="w-4 h-4 text-emerald-400 shrink-0 ml-2" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
 
-                {/* Botón de Emisión Principal */}
+                {/* Acciones de la Cabecera & Cerrar Sesión (Simétricos) */}
                 <div className="flex items-center space-x-3">
                     <button
-                        onClick={() => setCurrentView('generador-pdf')}
-                        className="bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-transform active:scale-95"
+                        onClick={handleNewInvoice}
+                        className="h-9 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 rounded-lg flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer"
                     >
                         <FilePlus2 className="w-4 h-4" />
                         <span>NUEVA FACTURA / PDF</span>
                     </button>
 
-                    <div className="h-8 w-px bg-slate-300 hidden sm:block"></div>
+                    <div className="h-6 w-px bg-slate-300 hidden sm:block"></div>
 
-                    <div className="hidden sm:flex items-center space-x-2">
-                        <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-xs">
-                            AD
-                        </div>
-                        <div className="text-left">
-                            <span className="block font-black text-black text-xs leading-tight">Admin Fiscal</span>
-                            <span className="block text-[11px] font-bold text-slate-800">Sesión Activa</span>
-                        </div>
-                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="h-9 bg-white hover:bg-red-50 border-2 border-slate-300 hover:border-red-500 text-black hover:text-red-900 px-3.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Cerrar Sesión del Sistema"
+                    >
+                        <LogOut className="w-4 h-4 text-red-700" />
+                        <span>Salir</span>
+                    </button>
                 </div>
-            </div>
+            </header>
 
-            {/* SEGUNDA BARRA: PESTAÑAS DE TRABAJO (TEXTOS NEGROS DE ALTO CONTRASTE) */}
-            <div className="bg-white border-b-2 border-slate-300 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
+            {/* BARRA DE NAVEGACIÓN SECUNDARIA */}
+            <div className="bg-white border-b-2 border-slate-300 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 no-print">
                 <div className="flex items-center space-x-2">
                     <button
                         onClick={() => setCurrentView('libro-fiscal')}
-                        className={`px-4 py-2 rounded-lg text-xs font-black flex items-center gap-2 transition-all ${
-                            currentView === 'libro-fiscal'
-                                ? 'bg-black text-white shadow-sm ring-2 ring-blue-600'
-                                : 'text-black hover:bg-slate-200 border border-slate-300'
-                        }`}
+                        className={`h-9 px-4 rounded-lg text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${currentView === 'libro-fiscal'
+                            ? 'bg-black text-white shadow-xs ring-2 ring-blue-600'
+                            : 'text-black hover:bg-slate-200 border-2 border-slate-300'
+                            }`}
                     >
                         <Receipt className="w-4 h-4 text-blue-400" />
                         <span>1. LIBRO FISCAL & FACTURAS</span>
-                        <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${
-                            currentView === 'libro-fiscal' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
-                        }`}>
-                            1,420
+                        <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${currentView === 'libro-fiscal' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
+                            }`}>
+                            {invoices.length}
                         </span>
                     </button>
 
                     <button
                         onClick={() => setCurrentView('directorio')}
-                        className={`px-4 py-2 rounded-lg text-xs font-black flex items-center gap-2 transition-all ${
-                            currentView === 'directorio'
-                                ? 'bg-black text-white shadow-sm ring-2 ring-blue-600'
-                                : 'text-black hover:bg-slate-200 border border-slate-300'
-                        }`}
+                        className={`h-9 px-4 rounded-lg text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${currentView === 'directorio'
+                            ? 'bg-black text-white shadow-xs ring-2 ring-blue-600'
+                            : 'text-black hover:bg-slate-200 border-2 border-slate-300'
+                            }`}
                     >
                         <Users2 className="w-4 h-4 text-emerald-400" />
-                        <span>2. DIRECTORIO (EMPRESAS & PERSONAS)</span>
-                        <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${
-                            currentView === 'directorio' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
-                        }`}>
-                            184
+                        <span>2. DIRECTORIO DE CLIENTES</span>
+                        <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${currentView === 'directorio' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
+                            }`}>
+                            {clients.length}
                         </span>
                     </button>
 
                     <button
                         onClick={() => setCurrentView('generador-pdf')}
-                        className={`px-4 py-2 rounded-lg text-xs font-black flex items-center gap-2 transition-all ${
-                            currentView === 'generador-pdf'
-                                ? 'bg-black text-white shadow-sm ring-2 ring-blue-600'
-                                : 'text-black hover:bg-slate-200 border border-slate-300'
-                        }`}
+                        className={`h-9 px-4 rounded-lg text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${currentView === 'generador-pdf'
+                            ? 'bg-black text-white shadow-xs ring-2 ring-blue-600'
+                            : 'text-black hover:bg-slate-200 border-2 border-slate-300'
+                            }`}
                     >
                         <FileText className="w-4 h-4 text-amber-400" />
-                        <span>3. EMISOR DE FACTURA & PLANTILLA PDF</span>
+                        <span>3. TALLER DE EMISIÓN & PDF EN VIVO</span>
                     </button>
                 </div>
 
-                {/* Búsqueda clara */}
-                <div className="relative">
-                    <Search className="w-4 h-4 text-slate-800 absolute left-3 top-1/2 -translate-y-1/2 font-bold" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por RIF, Cédula o Nombre..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-white border-2 border-slate-400 text-xs font-bold rounded-lg pl-9 pr-3 py-1.5 w-72 text-black placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                    />
-                </div>
+                {/* Búsqueda solo cuando esté en libro-fiscal o directorio */}
+                {currentView !== 'generador-pdf' ? (
+                    <div className="relative">
+                        <Search className="w-4 h-4 text-slate-800 absolute left-3 top-1/2 -translate-y-1/2 font-bold" />
+                        <input
+                            type="text"
+                            placeholder="Buscar por RIF, Cédula o Nombre..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="h-9 bg-white border-2 border-slate-400 text-xs font-bold rounded-lg pl-9 pr-3 w-72 text-black placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                        />
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-700">Documento Activo:</span>
+                        <span className="text-xs font-mono font-black text-blue-900 bg-blue-50 border border-blue-300 px-2.5 py-1 rounded-md uppercase">
+                            {invoiceForm.document_type} • N° {projectedCorrelative}
+                        </span>
+                    </div>
+                )}
             </div>
 
-            {/* CONTENIDO PRINCIPAL */}
-            <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-
-                {/* 4 TARJETAS DE RESUMEN CONTABLE (TEXTO NEGRO GRUESO) */}
-                <div className="bg-white rounded-xl border-2 border-slate-300 shadow-sm p-5 grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x-2 divide-slate-200">
-                    <div className="px-4 py-2">
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-900 block">
-                            TOTAL FACTURADO
-                        </span>
-                        <div className="flex items-baseline gap-2 mt-1">
-                            <span className="text-2xl font-black text-black font-mono">$184,920.00</span>
-                        </div>
-                        <span className="text-xs font-bold text-slate-800 block mt-1">Moneda base USD / Referencia</span>
-                    </div>
-
-                    <div className="px-4 py-2">
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-900 block">
-                            FACTURAS EMITIDAS
-                        </span>
-                        <div className="flex items-baseline gap-2 mt-1">
-                            <span className="text-2xl font-black text-blue-900 font-mono">1,420</span>
-                            <span className="text-xs font-black bg-blue-100 text-blue-950 px-2 py-0.5 rounded border border-blue-400">
-                                Serie A
-                            </span>
-                        </div>
-                        <span className="text-xs font-bold text-slate-800 block mt-1">Comprobantes válidos</span>
-                    </div>
-
-                    <div className="px-4 py-2">
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-900 block">
-                            EMPRESAS / JURÍDICOS
-                        </span>
-                        <div className="flex items-baseline gap-2 mt-1">
-                            <span className="text-2xl font-black text-black font-mono">128</span>
-                            <span className="text-xs font-black bg-slate-200 text-black px-2 py-0.5 rounded">
-                                RIF J-
-                            </span>
-                        </div>
-                        <span className="text-xs font-bold text-slate-800 block mt-1">Contribuyentes activos</span>
-                    </div>
-
-                    <div className="px-4 py-2">
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-900 block">
-                            PERSONAS NATURALES
-                        </span>
-                        <div className="flex items-baseline gap-2 mt-1">
-                            <span className="text-2xl font-black text-black font-mono">56</span>
-                            <span className="text-xs font-black bg-slate-200 text-black px-2 py-0.5 rounded">
-                                C.I. V-/E-
-                            </span>
-                        </div>
-                        <span className="text-xs font-bold text-slate-800 block mt-1">Profesionales registrados</span>
+            {/* BANNER DE NOTIFICACIÓN FLASH */}
+            {flash?.success && (
+                <div className="bg-emerald-100 border-b-2 border-emerald-500 px-6 py-2.5 flex items-center justify-between text-xs font-black text-emerald-950 no-print">
+                    <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                        <span>{flash.success}</span>
                     </div>
                 </div>
+            )}
+
+            {/* CONTENIDO PRINCIPAL */}
+            <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full print:space-y-0 print:bg-white">
+
+                {/* MÉTRICAS CONTABLES: SOLO EN LIBRO FISCAL Y DIRECTORIO PARA NO COLAPSAR EL TALLER DE EMISIÓN */}
+                {currentView !== 'generador-pdf' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 no-print">
+                        {/* Tarjeta 1: Total Facturado */}
+                        <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                                        Total Facturado (DB)
+                                    </span>
+                                    <span className="text-2xl font-black text-black font-mono mt-1 block">
+                                        ${Number(stats.total_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                                <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 shrink-0">
+                                    <DollarSign className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <span className="font-bold text-slate-600">Acumulado en BD</span>
+                                <span className="font-mono font-black text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded text-[11px]">
+                                    USD ($)
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Tarjeta 2: Documentos Emitidos */}
+                        <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                                        Documentos Emitidos
+                                    </span>
+                                    <span className="text-2xl font-black text-blue-900 font-mono mt-1 block">
+                                        {stats.invoices_count || invoices.length}
+                                    </span>
+                                </div>
+                                <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl border border-blue-200 shrink-0">
+                                    <Receipt className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <span className="font-bold text-slate-600">Comprobantes válidos</span>
+                                <span className="font-mono font-black text-blue-900 bg-blue-100/80 px-2 py-0.5 rounded text-[11px]">
+                                    Registros
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Tarjeta 3: Empresas Emisoras */}
+                        <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between">
+                            <div className="flex items-start justify-between gap-2">
+                                <div>
+                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                                        Empresas Emisoras
+                                    </span>
+                                    <span className="text-2xl font-black text-black font-mono mt-1 block">
+                                        {stats.companies_count || companies.length}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setIsCompanyModalOpen(true)}
+                                    className="h-7 px-2.5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-xs cursor-pointer transition-transform active:scale-95 shrink-0"
+                                    title="Añadir nueva empresa emisora"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Empresa</span>
+                                </button>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <span className="font-bold text-slate-600">Emisores en BD</span>
+                                <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                                    Con Logo
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Tarjeta 4: Clientes Registrados */}
+                        <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between">
+                            <div className="flex items-start justify-between gap-2">
+                                <div>
+                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                                        Clientes Registrados
+                                    </span>
+                                    <span className="text-2xl font-black text-black font-mono mt-1 block">
+                                        {stats.clients_count || clients.length}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setIsClientModalOpen(true)}
+                                    className="h-7 px-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-xs cursor-pointer transition-transform active:scale-95 shrink-0"
+                                    title="Añadir nuevo cliente"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Cliente</span>
+                                </button>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <span className="font-bold text-slate-600">Directorio en BD</span>
+                                <span className="font-mono font-black text-emerald-900 bg-emerald-100/80 px-2 py-0.5 rounded text-[11px]">
+                                    Activos
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* VISTA 1: LIBRO DE FACTURACIÓN Y ARCHIVO */}
                 {currentView === 'libro-fiscal' && (
                     <div className="bg-white rounded-xl border-2 border-slate-300 shadow-sm overflow-hidden">
-                        
+
                         {/* Cabecera de la tabla */}
                         <div className="p-5 border-b-2 border-slate-300 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-100/70">
                             <div>
                                 <h2 className="text-sm font-black text-black uppercase tracking-tight">
-                                    Libro de Ventas & Registro Histórico de Facturas
+                                    Libro de Ventas & Registro Histórico de Facturas (Base de Datos)
                                 </h2>
                                 <p className="text-xs font-bold text-slate-800 mt-0.5">
-                                    Secuencia legal correlativa de todos los documentos y facturas generadas
+                                    Facturas y proformas registradas con sus empresas emisoras, clientes y montos
                                 </p>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                <button className="px-3.5 py-2 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs transition-colors">
-                                    <Download className="w-4 h-4 text-black" />
-                                    Descargar Libro Excel
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    onClick={() => window.print()}
+                                    className="h-9 px-3.5 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                                >
+                                    <Printer className="w-4 h-4 text-black" />
+                                    <span>Imprimir Libro</span>
                                 </button>
                                 <button
-                                    onClick={() => setCurrentView('generador-pdf')}
-                                    className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
+                                    onClick={handleNewInvoice}
+                                    className="h-9 px-4 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                                 >
                                     <Plus className="w-4 h-4 text-white" />
-                                    Emitir Factura
+                                    <span>Emitir Factura</span>
                                 </button>
                             </div>
                         </div>
 
-                        {/* Tabla con Textos Negros y Bordes Gruesos */}
+                        {/* Tabla */}
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs border-collapse">
                                 <thead className="bg-slate-200 text-black uppercase text-xs font-black tracking-wider border-b-2 border-slate-400">
                                     <tr>
                                         <th className="px-5 py-3.5">Correlativo</th>
-                                        <th className="px-4 py-3.5">N° Control</th>
-                                        <th className="px-4 py-3.5">Receptor / Razón Social</th>
-                                        <th className="px-4 py-3.5">RIF / C.I.</th>
+                                        <th className="px-4 py-3.5">Empresa Emisora</th>
+                                        <th className="px-4 py-3.5">Cliente / Receptor</th>
+                                        <th className="px-4 py-3.5">Tipo</th>
                                         <th className="px-4 py-3.5">Fecha</th>
-                                        <th className="px-4 py-3.5">Base Imponible</th>
-                                        <th className="px-4 py-3.5">IVA (16%)</th>
-                                        <th className="px-4 py-3.5">Total Factura</th>
+                                        <th className="px-4 py-3.5">Tasa BS</th>
+                                        <th className="px-4 py-3.5">Total USD</th>
+                                        <th className="px-4 py-3.5">Total VES</th>
                                         <th className="px-4 py-3.5">Estado</th>
-                                        <th className="px-5 py-3.5 text-right">Acción PDF</th>
+                                        <th className="px-5 py-3.5 text-right">Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y-2 divide-slate-200 font-medium">
-                                    {invoicesLedger.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
+                                    {filteredInvoices.map((inv) => (
+                                        <tr key={inv.id} className="hover:bg-amber-50/50 transition-colors">
                                             <td className="px-5 py-4 font-mono font-black text-blue-900 text-sm">
-                                                {row.correlative}
-                                            </td>
-                                            <td className="px-4 py-4 font-mono font-bold text-slate-900">
-                                                {row.controlNumber}
-                                            </td>
-                                            <td className="px-4 py-4 max-w-[240px]">
-                                                <span className="font-black text-black block text-xs">
-                                                    {row.client}
+                                                {inv.correlative_number}
+                                                <span className="block text-[10px] font-bold text-slate-800">
+                                                    Control: {inv.control_number || 'N/A'}
                                                 </span>
-                                                <span className="block text-[11px] font-bold text-slate-800 truncate">
-                                                    {row.concept}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4 font-mono text-black font-black">
-                                                {row.taxId}
-                                            </td>
-                                            <td className="px-4 py-4 font-mono font-bold text-slate-900">
-                                                {row.date}
-                                            </td>
-                                            <td className="px-4 py-4 font-mono text-black font-bold text-xs">
-                                                {row.taxBase}
-                                            </td>
-                                            <td className="px-4 py-4 font-mono text-black font-bold text-xs">
-                                                {row.vat}
-                                            </td>
-                                            <td className="px-4 py-4 font-mono font-black text-black text-sm">
-                                                {row.total}
                                             </td>
                                             <td className="px-4 py-4">
-                                                {row.status === 'Emitida' ? (
-                                                    <span className="inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded bg-emerald-100 text-emerald-950 border border-emerald-500">
-                                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-800" />
-                                                        Emitida
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded bg-amber-100 text-amber-950 border border-amber-500">
-                                                        <Clock className="w-3.5 h-3.5 text-amber-800" />
-                                                        Borrador
-                                                    </span>
-                                                )}
+                                                <div className="flex items-center gap-2.5">
+                                                    {inv.company?.logo_url && (
+                                                        <img
+                                                            src={inv.company.logo_url}
+                                                            alt=""
+                                                            className="h-7 w-7 object-contain rounded-md shrink-0 bg-white border border-slate-300 p-0.5 shadow-xs"
+                                                        />
+                                                    )}
+                                                    <div>
+                                                        <span className="font-black text-black block text-xs">
+                                                            {inv.company?.name}
+                                                        </span>
+                                                        <span className="text-[10px] font-mono text-slate-800 font-bold">
+                                                            {inv.company?.tax_id}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 max-w-[200px]">
+                                                <span className="font-black text-black block text-xs">
+                                                    {inv.client?.name}
+                                                </span>
+                                                <span className="text-[10px] font-mono text-slate-800 font-bold">
+                                                    {inv.client?.tax_id}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-4 uppercase font-bold text-xs">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black ${inv.document_type === 'factura'
+                                                    ? 'bg-blue-100 text-blue-900 border border-blue-400'
+                                                    : 'bg-purple-100 text-purple-900 border border-purple-400'
+                                                    }`}>
+                                                    {inv.document_type}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-4 font-mono font-bold text-slate-900">
+                                                {new Date(inv.issue_date).toLocaleDateString('es-VE')}
+                                            </td>
+                                            <td className="px-4 py-4 font-mono text-xs font-bold text-slate-900">
+                                                Bs. {Number(inv.bcv_exchange_rate).toFixed(2)}
+                                            </td>
+                                            <td className="px-4 py-4 font-mono font-black text-black text-sm">
+                                                ${Number(inv.total_usd).toFixed(2)}
+                                            </td>
+                                            <td className="px-4 py-4 font-mono font-bold text-slate-900 text-xs">
+                                                Bs. {Number(inv.total_ves).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <span className="inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded bg-emerald-100 text-emerald-950 border border-emerald-500">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-800" />
+                                                    {inv.status}
+                                                </span>
                                             </td>
                                             <td className="px-5 py-4 text-right">
                                                 <div className="flex items-center justify-end space-x-2">
                                                     <button
-                                                        onClick={() => setCurrentView('generador-pdf')}
-                                                        className="px-2.5 py-1.5 rounded-md bg-slate-100 hover:bg-slate-300 text-black font-black border border-slate-400 flex items-center gap-1 transition-colors"
-                                                        title="Ver PDF Oficial"
+                                                        onClick={() => handleLoadInvoiceToEditor(inv)}
+                                                        className="h-8 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-300 text-black font-black border-2 border-slate-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                                        title="Cargar y Ver en Visor A4"
                                                     >
                                                         <Eye className="w-3.5 h-3.5" />
                                                         <span>Ver</span>
                                                     </button>
                                                     <button
-                                                        className="p-1.5 rounded-md bg-blue-700 hover:bg-blue-800 text-white transition-colors"
-                                                        title="Descargar PDF"
+                                                        onClick={() => {
+                                                            handleLoadInvoiceToEditor(inv);
+                                                            setTimeout(() => window.print(), 350);
+                                                        }}
+                                                        className="h-8 px-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black flex items-center gap-1 transition-colors cursor-pointer"
+                                                        title="Imprimir / Descargar PDF"
                                                     >
-                                                        <Download className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        className="p-1.5 rounded-md bg-white hover:bg-slate-200 text-black border border-slate-400 transition-colors"
-                                                        title="Imprimir"
-                                                    >
-                                                        <Printer className="w-4 h-4" />
+                                                        <Printer className="w-3.5 h-3.5" />
+                                                        <span>PDF</span>
                                                     </button>
                                                 </div>
                                             </td>
@@ -565,128 +881,114 @@ export default function Index() {
                                 </tbody>
                             </table>
                         </div>
-
-                        {/* Pie de tabla con datos claros */}
-                        <div className="p-4 border-t-2 border-slate-300 flex items-center justify-between text-xs font-bold text-black bg-slate-100">
-                            <span>Mostrando 5 de 1,420 registros fiscales emitidos</span>
-                            <div className="flex items-center space-x-2">
-                                <button className="px-3 py-1.5 bg-white border-2 border-slate-400 rounded-md text-black font-black hover:bg-slate-200">
-                                    Anterior
-                                </button>
-                                <span className="px-3 py-1 font-black text-black">Página 1 de 284</span>
-                                <button className="px-3 py-1.5 bg-white border-2 border-slate-400 rounded-md text-black font-black hover:bg-slate-200">
-                                    Siguiente
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 )}
 
-                {/* VISTA 2: DIRECTORIO MAESTRO DE EMPRESAS Y PERSONAS */}
+                {/* VISTA 2: DIRECTORIO DE CLIENTES (DESDE LA BASE DE DATOS) */}
                 {currentView === 'directorio' && (
                     <div className="space-y-4">
-                        {/* Filtros del directorio */}
+                        {/* Filtros */}
                         <div className="bg-white p-4 rounded-xl border-2 border-slate-300 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div className="flex items-center space-x-3">
-                                <span className="text-xs font-black uppercase text-black">Filtrar Contribuyentes:</span>
-                                <div className="flex bg-slate-200 p-1 rounded-lg border border-slate-400 text-xs">
+                                <span className="text-xs font-black uppercase text-black">Filtrar:</span>
+                                <div className="flex bg-slate-200 p-1 rounded-lg border-2 border-slate-300 text-xs">
                                     <button
                                         onClick={() => setDirectoryType('todos')}
-                                        className={`px-3.5 py-1.5 rounded font-black transition-all ${
-                                            directoryType === 'todos' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
-                                        }`}
+                                        className={`h-8 px-3.5 rounded-md font-black transition-all cursor-pointer ${directoryType === 'todos' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
+                                            }`}
                                     >
-                                        Todos (184)
+                                        Todos ({clients.length})
                                     </button>
                                     <button
                                         onClick={() => setDirectoryType('empresas')}
-                                        className={`px-3.5 py-1.5 rounded font-black transition-all ${
-                                            directoryType === 'empresas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
-                                        }`}
+                                        className={`h-8 px-3.5 rounded-md font-black transition-all cursor-pointer ${directoryType === 'empresas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
+                                            }`}
                                     >
-                                        Empresas / Jurídicos (128)
+                                        Empresas ({clients.filter(c => c.type === 'empresa').length})
                                     </button>
                                     <button
                                         onClick={() => setDirectoryType('personas')}
-                                        className={`px-3.5 py-1.5 rounded font-black transition-all ${
-                                            directoryType === 'personas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
-                                        }`}
+                                        className={`h-8 px-3.5 rounded-md font-black transition-all cursor-pointer ${directoryType === 'personas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
+                                            }`}
                                     >
-                                        Personas Naturales (56)
+                                        Personas ({clients.filter(c => c.type === 'persona').length})
                                     </button>
                                 </div>
                             </div>
 
-                            <button className="bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-xs transition-colors">
+                            <button
+                                onClick={() => setIsClientModalOpen(true)}
+                                className="h-9 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 rounded-lg flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                            >
                                 <Plus className="w-4 h-4 text-white" />
-                                Registrar Nueva Empresa o Persona
+                                <span>Registrar Nuevo Cliente / Empresa</span>
                             </button>
                         </div>
 
-                        {/* Cuadrícula de Fichas Fiscales */}
+                        {/* Fichas de Clientes */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {filteredDirectory.map((card) => (
+                            {filteredClients.map((client) => (
                                 <div
-                                    key={card.id}
-                                    className="bg-white rounded-xl border-2 border-slate-300 shadow-sm p-5 flex flex-col justify-between hover:border-black transition-all"
+                                    key={client.id}
+                                    className="bg-white rounded-2xl border-2 border-slate-300 shadow-xs p-5 flex flex-col justify-between hover:border-slate-400 hover:shadow-sm transition-all"
                                 >
                                     <div>
-                                        {/* Cabecera de la ficha */}
                                         <div className="flex items-start justify-between">
                                             <div className="flex items-center space-x-3">
-                                                <div className={`p-3 rounded-lg border-2 ${
-                                                    card.type === 'empresa'
-                                                        ? 'bg-blue-100 text-blue-900 border-blue-400'
-                                                        : 'bg-emerald-100 text-emerald-950 border-emerald-400'
-                                                }`}>
-                                                    {card.type === 'empresa' ? <Building2 className="w-6 h-6" /> : <User className="w-6 h-6" />}
+                                                <div className={`p-3 rounded-xl border ${client.type === 'empresa'
+                                                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                                    }`}>
+                                                    {client.type === 'empresa' ? <Building2 className="w-6 h-6" /> : <User className="w-6 h-6" />}
                                                 </div>
                                                 <div>
-                                                    <span className="text-xs font-black uppercase text-slate-800 block">
-                                                        {card.type === 'empresa' ? 'Persona Jurídica' : 'Persona Natural'}
+                                                    <span className="text-[11px] font-black uppercase text-slate-600 block">
+                                                        {client.type === 'empresa' ? 'Persona Jurídica' : 'Persona Natural'}
                                                     </span>
                                                     <h3 className="text-sm font-black text-black leading-tight mt-0.5">
-                                                        {card.name}
+                                                        {client.name}
                                                     </h3>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* RIF o Cédula bien visible */}
-                                        <div className="mt-4 flex items-center justify-between bg-amber-50 p-2.5 rounded-lg border-2 border-amber-300 font-mono text-xs">
-                                            <span className="text-black font-black text-xs">ID FISCAL / RIF:</span>
-                                            <strong className="text-black text-sm font-black">{card.taxId}</strong>
+                                        <div className="mt-4 flex items-center justify-between bg-slate-100 p-2.5 rounded-xl border border-slate-200 font-mono text-xs">
+                                            <span className="text-slate-700 font-black text-xs">CÉDULA / RIF:</span>
+                                            <strong className="text-black text-sm font-black">{client.tax_id}</strong>
                                         </div>
 
-                                        {/* Datos de contacto con texto negro */}
                                         <div className="mt-4 space-y-2 text-xs font-bold text-black">
                                             <div className="flex items-center gap-2">
-                                                <Mail className="w-4 h-4 text-blue-700 shrink-0" />
-                                                <span className="truncate">{card.email}</span>
+                                                <Mail className="w-4 h-4 text-slate-600 shrink-0" />
+                                                <span className="truncate">{client.email || 'Sin correo registrado'}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Phone className="w-4 h-4 text-blue-700 shrink-0" />
-                                                <span>{card.phone}</span>
+                                                <Phone className="w-4 h-4 text-slate-600 shrink-0" />
+                                                <span>{client.phone}</span>
                                             </div>
                                             <div className="flex items-start gap-2">
-                                                <MapPin className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
-                                                <span className="text-slate-900">{card.address}</span>
+                                                <MapPin className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+                                                <span className="text-slate-800">{client.address || 'Sin dirección fiscal'}</span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Pie de la ficha */}
-                                    <div className="mt-5 pt-3 border-t-2 border-slate-200 flex items-center justify-between">
-                                        <div>
-                                            <span className="text-xs font-black text-slate-900 block">Total Facturado</span>
-                                            <span className="font-mono font-black text-black text-sm">{card.totalBilled}</span>
-                                        </div>
+                                    <div className="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between">
+                                        <span className="text-xs font-bold text-slate-600">
+                                            {client.notes || 'Cliente Registrado'}
+                                        </span>
                                         <button
-                                            onClick={() => setCurrentView('generador-pdf')}
-                                            className="px-3.5 py-2 rounded-lg bg-black hover:bg-slate-800 text-white font-black text-xs flex items-center gap-1.5 transition-colors"
+                                            onClick={() => {
+                                                setInvoiceForm({
+                                                    ...getEmptyInvoice(activeCompany),
+                                                    client_id: client.id
+                                                });
+                                                setCurrentView('generador-pdf');
+                                            }}
+                                            className="h-8 px-3.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black text-xs flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-2xs"
                                         >
-                                            <Receipt className="w-4 h-4 text-sky-400" />
-                                            Facturar
+                                            <Receipt className="w-4 h-4 text-sky-200" />
+                                            <span>Facturar</span>
                                         </button>
                                     </div>
                                 </div>
@@ -695,323 +997,766 @@ export default function Index() {
                     </div>
                 )}
 
-                {/* VISTA 3: EMISOR DE FACTURA & GENERADOR PDF */}
+                {/* VISTA 3: TALLER DE EMISIÓN 100% SINCRONIZADO EN TIEMPO REAL CON LA HOJA A4 */}
                 {currentView === 'generador-pdf' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start print:block print:w-full print:m-0 print:p-0">
 
-                        {/* LADO IZQUIERDO (5 cols): FORMULARIO DE CARGA */}
-                        <div className="lg:col-span-5 bg-white rounded-xl border-2 border-slate-300 shadow-sm p-6 space-y-5">
-                            <div className="border-b-2 border-slate-300 pb-3">
-                                <h3 className="text-sm font-black text-black uppercase">
-                                    Datos de la Factura a Emitir
-                                </h3>
-                                <p className="text-xs font-bold text-slate-800 mt-0.5">
-                                    Selecciona el receptor y agrega los conceptos a facturar
-                                </p>
-                            </div>
-
-                            {/* Receptor */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-black text-black block">
-                                    Empresa o Persona Receptora
-                                </label>
-                                <select className="w-full bg-white border-2 border-slate-400 rounded-lg px-3 py-2 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600">
-                                    <option value="1">Inversiones & Logística Corpo Asia, C.A. (J-50192834-1)</option>
-                                    <option value="2">Distribuidora Agroindustrial El Roble, S.A. (J-31294819-0)</option>
-                                    <option value="3">Dra. Mariana Valenzuela Castro (V-18.904.321)</option>
-                                    <option value="4">Servicios Tecnológicos Soluciones Web, C.A. (J-41289102-8)</option>
-                                    <option value="5">Ing. Alejandro Morales Mendoza (V-14.892.301)</option>
-                                </select>
-                            </div>
-
-                            {/* Correlativo y Control */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-black text-black block mb-1">
-                                        N° Correlativo Fiscal
-                                    </label>
-                                    <input
-                                        type="text"
-                                        disabled
-                                        value="F-003891"
-                                        className="w-full bg-slate-100 border-2 border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono font-black text-blue-900 cursor-not-allowed"
-                                    />
+                        {/* COLUMNA IZQUIERDA (5 cols): FORMULARIO DE CARGA */}
+                        <form onSubmit={handleSubmitInvoice} className="lg:col-span-5 bg-white rounded-xl border-2 border-slate-300 shadow-sm p-6 space-y-5 no-print">
+                            {/* Cabecera del Formulario con Selector Segmentado de Tipo de Documento */}
+                            <div className="border-b-2 border-slate-200 pb-3.5 space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 bg-blue-100 text-blue-800 rounded-lg">
+                                            <FileText className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black text-black uppercase tracking-tight">
+                                                Generar Factura o Proforma
+                                            </h3>
+                                            <p className="text-[11px] font-bold text-slate-600">
+                                                Edición en vivo sincronizada con la hoja física A4
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-mono font-black bg-blue-100 text-blue-900 border border-blue-400 px-2 py-0.5 rounded uppercase">
+                                        {invoiceForm.document_type}
+                                    </span>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-black text-black block mb-1">
-                                        N° Control Tributario
-                                    </label>
-                                    <input
-                                        type="text"
-                                        disabled
-                                        value="00-089123"
-                                        className="w-full bg-slate-100 border-2 border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono font-black text-black cursor-not-allowed"
-                                    />
+
+                                {/* Selector Segmentado de Tipo de Documento */}
+                                <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-300 text-xs font-black">
+                                    {[
+                                        { id: 'factura', label: 'Factura' },
+                                        { id: 'proforma', label: 'Proforma' },
+                                        { id: 'cotizacion', label: 'Cotización' },
+                                        { id: 'nota_entrega', label: 'Nota Entrega' },
+                                    ].map((t) => (
+                                        <button
+                                            key={t.id}
+                                            type="button"
+                                            onClick={() => setInvoiceForm(prev => ({ ...prev, document_type: t.id }))}
+                                            className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer font-black text-xs ${invoiceForm.document_type === t.id
+                                                ? 'bg-blue-700 text-white shadow-xs'
+                                                : 'text-slate-800 hover:text-black hover:bg-slate-200'
+                                                }`}
+                                        >
+                                            {t.label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            {/* SECCIÓN 1: EMPRESA EMISORA & CLIENTE */}
+                            <div className="space-y-3 p-4 bg-slate-50/80 rounded-xl border border-slate-300">
+                                {/* Empresa Emisora */}
                                 <div>
                                     <label className="text-xs font-black text-black block mb-1">
-                                        Fecha de Emisión
+                                        Empresa Emisora (Logo y Membrete Oficial) *
                                     </label>
-                                    <input
-                                        type="date"
-                                        defaultValue="2026-11-04"
-                                        className="w-full bg-white border-2 border-slate-400 rounded-lg px-3 py-1.5 text-xs font-black text-black"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-black text-black block mb-1">
-                                        Condición de Pago
-                                    </label>
-                                    <select className="w-full bg-white border-2 border-slate-400 rounded-lg px-3 py-1.5 text-xs font-black text-black">
-                                        <option>Contado / Transferencia</option>
-                                        <option>Crédito 15 Días</option>
-                                        <option>Crédito 30 Días</option>
+                                    <select
+                                        value={invoiceForm.company_id}
+                                        onChange={(e) => {
+                                            const cid = Number(e.target.value);
+                                            setSelectedCompanyId(cid);
+                                            setInvoiceForm(prev => ({ ...prev, company_id: cid }));
+                                        }}
+                                        className="h-9 w-full bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                    >
+                                        {companies.map(c => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.name} — RIF: {c.tax_id}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
+
+                                {/* Cliente Receptor */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-xs font-black text-black">
+                                            Cliente / Adquiriente *
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsClientModalOpen(true)}
+                                            className="text-xs font-black text-blue-700 hover:text-blue-900 flex items-center gap-1 cursor-pointer transition-colors"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            <span>Nuevo Cliente (CNE)</span>
+                                        </button>
+                                    </div>
+                                    <select
+                                        value={invoiceForm.client_id || ''}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, client_id: e.target.value ? Number(e.target.value) : '' }))}
+                                        className="h-9 w-full bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                    >
+                                        <option value="">-- Seleccionar Cliente Registrado --</option>
+                                        {clients.map(cl => (
+                                            <option key={cl.id} value={cl.id}>
+                                                {cl.name} ({cl.tax_id})
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    {/* Chip resumen del cliente seleccionado o aviso si está vacío */}
+                                    {currentSelectedClient ? (
+                                        <div className="mt-2 p-2 bg-white rounded-lg border border-slate-200 text-xs flex items-center justify-between shadow-2xs">
+                                            <div className="flex items-center gap-2 truncate">
+                                                <span className="font-mono font-black text-blue-900 bg-blue-50 px-1.5 py-0.5 rounded text-[11px] shrink-0">
+                                                    {currentSelectedClient.tax_id}
+                                                </span>
+                                                <span className="font-bold text-slate-700 truncate text-[11px]">
+                                                    {currentSelectedClient.address || currentSelectedClient.phone || 'Cliente Registrado'}
+                                                </span>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded shrink-0 uppercase">
+                                                {currentSelectedClient.type === 'empresa' ? 'Jurídico' : 'Natural'}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="mt-2 p-2 bg-white rounded-lg border border-dashed border-slate-300 text-xs text-slate-500 flex items-center justify-between">
+                                            <span className="text-[11px] font-bold italic">Sin cliente seleccionado para esta factura.</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentView('directorio')}
+                                                className="text-[11px] font-black text-blue-700 hover:text-blue-900 cursor-pointer"
+                                            >
+                                                Abrir Directorio →
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Conceptos */}
-                            <div className="space-y-3 pt-2">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-xs font-black text-black">
-                                        Conceptos e Ítems a Facturar
+                            {/* SECCIÓN 2: CONDICIONES COMERCIALES & TASA BS */}
+                            <div className="space-y-3 p-4 bg-slate-50/80 rounded-xl border border-slate-300">
+                                <span className="text-xs font-black uppercase text-slate-700 tracking-wider block">
+                                    Condiciones Comerciales & Tasa BS
+                                </span>
+
+                                {/* Fila 1: Fecha de Emisión y Tasa BS */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="min-w-0">
+                                        <label className="text-xs font-black text-black block mb-1 truncate">
+                                            Fecha de Emisión
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={invoiceForm.issue_date}
+                                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, issue_date: e.target.value }))}
+                                            className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                        />
+                                    </div>
+
+                                    <div className="min-w-0">
+                                        <label className="text-xs font-black text-black block mb-1 truncate">
+                                            Tasa BS *
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-700 select-none">
+                                                Bs.
+                                            </span>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="0.00"
+                                                value={invoiceForm.bcv_exchange_rate}
+                                                onChange={(e) => setInvoiceForm(prev => ({ ...prev, bcv_exchange_rate: e.target.value === '' ? '' : Number(e.target.value) }))}
+                                                className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg pl-8 pr-3 text-xs font-black text-black font-mono focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Fila 2: Condición de Venta y Canal de Venta */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="min-w-0">
+                                        <label className="text-xs font-black text-black block mb-1 truncate">
+                                            Condición de Venta
+                                        </label>
+                                        <input
+                                            type="text"
+                                            list="condiciones-list"
+                                            value={invoiceForm.sale_condition}
+                                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, sale_condition: e.target.value }))}
+                                            className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                            placeholder="Venta de Contado"
+                                        />
+                                        <datalist id="condiciones-list">
+                                            <option value="Venta de Contado" />
+                                            <option value="Crédito 7 días" />
+                                            <option value="Crédito 15 días" />
+                                            <option value="Crédito 30 días" />
+                                            <option value="Contra Entrega" />
+                                            <option value="Anticipo 50%" />
+                                        </datalist>
+                                    </div>
+
+                                    <div className="min-w-0">
+                                        <label className="text-xs font-black text-black block mb-1 truncate">
+                                            Canal de Venta
+                                        </label>
+                                        <input
+                                            type="text"
+                                            list="canales-list"
+                                            value={invoiceForm.sales_channel}
+                                            placeholder="Oficina / Presencial"
+                                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, sales_channel: e.target.value }))}
+                                            className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                        />
+                                        <datalist id="canales-list">
+                                            <option value="Oficina / Presencial" />
+                                            <option value="Tienda en Línea" />
+                                            <option value="WhatsApp / Directo" />
+                                            <option value="Distribuidor" />
+                                            <option value="Mercado Libre" />
+                                            <option value="Venta Telefónica" />
+                                        </datalist>
+                                    </div>
+                                </div>
+
+                                {/* Fila 3: Medio de Pago y N° Ref. de Pago */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="min-w-0">
+                                        <label className="text-xs font-black text-black block mb-1 truncate">
+                                            Medio de Pago
+                                        </label>
+                                        <input
+                                            type="text"
+                                            list="medios-pago-list"
+                                            value={invoiceForm.payment_method}
+                                            placeholder="PAGO MOVIL, ZELLE, ETC."
+                                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, payment_method: e.target.value.toUpperCase() }))}
+                                            className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black uppercase focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                        />
+                                        <datalist id="medios-pago-list">
+                                            <option value="PAGO MOVIL" />
+                                            <option value="TRANSFERENCIA BANCARIA" />
+                                            <option value="ZELLE" />
+                                            <option value="EFECTIVO (USD)" />
+                                            <option value="EFECTIVO (BS)" />
+                                            <option value="PUNTO DE VENTA" />
+                                            <option value="DIVISAS" />
+                                            <option value="MIXTO" />
+                                        </datalist>
+                                    </div>
+
+                                    <div className="min-w-0">
+                                        <label className="text-xs font-black text-black block mb-1 truncate">
+                                            N° Ref. de Pago (Opcional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ej: 161773827..."
+                                            value={invoiceForm.payment_reference || ''}
+                                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, payment_reference: e.target.value }))}
+                                            className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black font-mono placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Fila 4: Subtítulo / Línea del Documento */}
+                                <div>
+                                    <label className="text-xs font-black text-black block mb-1 truncate">
+                                        Subtítulo / Línea del Documento (Opcional)
                                     </label>
-                                    <button className="text-xs font-black text-blue-700 hover:text-blue-900 flex items-center gap-1">
-                                        <Plus className="w-4 h-4" /> Añadir Ítem
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: LÍNEA MÁQUINAS, REPUESTOS, SERVICIOS..."
+                                        value={invoiceForm.document_subtitle}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, document_subtitle: e.target.value }))}
+                                        className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* SECCIÓN 3: RENGLONES / ÍTEMS DINÁMICOS */}
+                            <div className="space-y-3 pt-1">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <label className="text-xs font-black text-black">
+                                            Renglones a Facturar
+                                        </label>
+                                        <span className="text-[11px] font-mono font-black bg-blue-100 text-blue-900 px-2 py-0.5 rounded-full">
+                                            {invoiceForm.items.length}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleAddItem}
+                                        className="h-8 px-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>Añadir Renglón</span>
                                     </button>
                                 </div>
 
-                                <div className="space-y-3">
-                                    <div className="p-3.5 bg-slate-100 rounded-lg border-2 border-slate-300 text-xs space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-black text-black text-xs">Ítem 01</span>
-                                            <button className="text-slate-600 hover:text-red-700 font-black">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            defaultValue="Auditoría y Consultoría Fiscal Corporativa Q4"
-                                            className="w-full bg-white border-2 border-slate-400 rounded px-3 py-1.5 text-xs font-black text-black"
-                                        />
-                                        <div className="grid grid-cols-3 gap-2 text-xs font-black">
-                                            <div>
-                                                <span className="text-black block mb-0.5">Cant.</span>
-                                                <input type="number" defaultValue="1" className="w-full bg-white border-2 border-slate-400 rounded px-2 py-1 text-center font-mono font-black" />
+                                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                                    {invoiceForm.items.map((it, idx) => (
+                                        <div key={idx} className="p-3.5 bg-slate-50 rounded-xl border border-slate-300 text-xs space-y-2.5 shadow-2xs hover:border-slate-400 transition-colors">
+                                            <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                                                <span className="font-black text-black text-xs flex items-center gap-1.5">
+                                                    <span className="h-5 w-5 rounded-full bg-slate-900 text-white flex items-center justify-center font-mono text-[11px]">
+                                                        {idx + 1}
+                                                    </span>
+                                                    <span>Renglón #{idx + 1}</span>
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] font-bold text-slate-700 select-none">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!it.is_tax_exempt}
+                                                            onChange={(e) => handleItemChange(idx, 'is_tax_exempt', e.target.checked)}
+                                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                                                        />
+                                                        <span>Exento IVA</span>
+                                                    </label>
+                                                    {invoiceForm.items.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveItem(idx)}
+                                                            className="h-6 px-2 bg-red-50 hover:bg-red-100 border border-red-300 text-red-800 rounded text-[11px] font-black flex items-center gap-1 cursor-pointer transition-colors"
+                                                            title="Eliminar este renglón"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                            <span>Quitar</span>
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div>
-                                                <span className="text-black block mb-0.5">P. Unit ($)</span>
-                                                <input type="text" defaultValue="2500.00" className="w-full bg-white border-2 border-slate-400 rounded px-2 py-1 text-right font-mono font-black" />
-                                            </div>
-                                            <div>
-                                                <span className="text-black block mb-0.5">Total ($)</span>
-                                                <input type="text" disabled defaultValue="2500.00" className="w-full bg-slate-200 border-2 border-slate-300 rounded px-2 py-1 text-right font-mono font-black text-blue-900" />
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <div className="p-3.5 bg-slate-100 rounded-lg border-2 border-slate-300 text-xs space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-black text-black text-xs">Ítem 02</span>
-                                            <button className="text-slate-600 hover:text-red-700 font-black">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            <div>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Descripción del producto o servicio *"
+                                                    required
+                                                    value={it.description}
+                                                    onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
+                                                    className="h-8 w-full bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black placeholder:text-slate-500"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Detalles técnicos / especificaciones (opcional)..."
+                                                    value={it.details || ''}
+                                                    onChange={(e) => handleItemChange(idx, 'details', e.target.value)}
+                                                    className="h-7 w-full bg-white border border-slate-200 rounded-md px-2.5 text-[11px] font-bold text-slate-800 placeholder:text-slate-400"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-4 gap-2 text-xs font-black">
+                                                <div>
+                                                    <span className="text-black block mb-0.5 text-[11px]">Cant.</span>
+                                                    <div className="flex items-center border border-slate-300 rounded-md bg-white overflow-hidden h-8">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleItemChange(idx, 'quantity', Math.max(1, Number(it.quantity || 1) - 1))}
+                                                            className="px-2 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            required
+                                                            value={it.quantity}
+                                                            onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                                                            className="w-full text-center font-mono font-black text-xs py-1 text-black border-0 focus:ring-0 p-0"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleItemChange(idx, 'quantity', Number(it.quantity || 0) + 1)}
+                                                            className="px-2 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
+                                                        >
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <span className="text-black block mb-0.5 text-[11px]">Unidad</span>
+                                                    <input
+                                                        type="text"
+                                                        value={it.unit}
+                                                        placeholder="unid"
+                                                        onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
+                                                        className="h-8 w-full bg-white border border-slate-300 rounded-md px-2 text-center font-mono font-black text-xs"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <span className="text-black block mb-0.5 text-[11px]">P. Unit ($)</span>
+                                                    <div className="relative">
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">$</span>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            required
+                                                            value={it.unit_price}
+                                                            onChange={(e) => handleItemChange(idx, 'unit_price', e.target.value)}
+                                                            className="h-8 w-full bg-white border border-slate-300 rounded-md pl-5 pr-2 text-right font-mono font-black text-xs text-black"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <span className="text-black block mb-0.5 text-[11px]">Total ($)</span>
+                                                    <div className="h-8 flex items-center justify-end px-2 bg-blue-50 border border-blue-200 rounded-md font-mono font-black text-blue-900 text-xs">
+                                                        ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* SECCIÓN 4: DESGLOSE FISCAL & LIQUIDACIÓN */}
+                            <div className="border-t-2 border-slate-200 pt-3 space-y-2 text-xs font-mono font-black">
+                                <div className="flex justify-between items-center text-black">
+                                    <span>Subtotal Renglones:</span>
+                                    <span>${itemsSubtotal.toFixed(2)}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center text-black">
+                                    <span>Flete / Delivery ($):</span>
+                                    <div className="relative w-28">
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">$</span>
                                         <input
-                                            type="text"
-                                            defaultValue="Licenciamiento de Software y Timbrado Digital"
-                                            className="w-full bg-white border-2 border-slate-400 rounded px-3 py-1.5 text-xs font-black text-black"
+                                            type="number"
+                                            step="0.01"
+                                            value={invoiceForm.shipping_cost}
+                                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, shipping_cost: Number(e.target.value) }))}
+                                            className="h-8 w-full bg-white border border-slate-300 rounded-md pl-6 pr-2 text-right font-mono font-black text-xs text-black"
                                         />
-                                        <div className="grid grid-cols-3 gap-2 text-xs font-black">
-                                            <div>
-                                                <span className="text-black block mb-0.5">Cant.</span>
-                                                <input type="number" defaultValue="1" className="w-full bg-white border-2 border-slate-400 rounded px-2 py-1 text-center font-mono font-black" />
-                                            </div>
-                                            <div>
-                                                <span className="text-black block mb-0.5">P. Unit ($)</span>
-                                                <input type="text" defaultValue="1350.00" className="w-full bg-white border-2 border-slate-400 rounded px-2 py-1 text-right font-mono font-black" />
-                                            </div>
-                                            <div>
-                                                <span className="text-black block mb-0.5">Total ($)</span>
-                                                <input type="text" disabled defaultValue="1350.00" className="w-full bg-slate-200 border-2 border-slate-300 rounded px-2 py-1 text-right font-mono font-black text-blue-900" />
-                                            </div>
-                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center text-black">
+                                    <span>Alícuota IVA (%):</span>
+                                    <div className="relative w-20">
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={invoiceForm.tax_percentage}
+                                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, tax_percentage: Number(e.target.value) }))}
+                                            className="h-8 w-full bg-white border border-slate-300 rounded-md pr-6 pl-2 text-right font-mono font-black text-xs text-black"
+                                        />
+                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">%</span>
+                                    </div>
+                                </div>
+
+                                {/* Banner de Gran Total */}
+                                <div className="p-4 bg-slate-900 text-white rounded-xl space-y-1.5 shadow-sm">
+                                    <div className="flex justify-between items-baseline">
+                                        <span className="text-xs font-black uppercase text-slate-300 tracking-wider">
+                                            TOTAL FACTURA (USD)
+                                        </span>
+                                        <span className="text-2xl font-mono font-black text-emerald-400">
+                                            ${totalUsd.toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-700 text-xs">
+                                        <span className="font-bold text-slate-300">Total en Bolívares (VES):</span>
+                                        <span className="font-mono font-black text-white text-base">
+                                            Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Resumen de liquidación */}
-                            <div className="border-t-2 border-slate-300 pt-3 space-y-2 text-xs font-mono font-black">
-                                <div className="flex justify-between text-black">
-                                    <span>Subtotal Base Imponible:</span>
-                                    <span>$3,850.00</span>
-                                </div>
-                                <div className="flex justify-between text-black">
-                                    <span>Alícuota I.V.A. (16%):</span>
-                                    <span>$616.00</span>
-                                </div>
-                                <div className="flex justify-between text-black border-t-2 border-black pt-2 text-base font-black">
-                                    <span>TOTAL FACTURA:</span>
-                                    <span className="text-blue-900 text-lg">$4,466.00</span>
-                                </div>
-                            </div>
-
-                            <button className="w-full bg-black hover:bg-slate-900 text-white font-black py-3 rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-98">
-                                <Save className="w-4 h-4 text-emerald-400" />
-                                Guardar en Libro & Generar PDF Oficial
+                            <button
+                                type="submit"
+                                disabled={isSubmittingInvoice}
+                                className="h-12 w-full bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer disabled:opacity-50"
+                            >
+                                <Save className="w-4 h-4 text-emerald-300" />
+                                <span>{isSubmittingInvoice ? 'Guardando en BD...' : 'GUARDAR FACTURA EN BASE DE DATOS'}</span>
                             </button>
-                        </div>
+                        </form>
 
-                        {/* LADO DERECHO (7 cols): HOJA PDF REALISTA A4 EN ALTO CONTRASTE */}
-                        <div className="lg:col-span-7 space-y-4">
-                            <div className="flex items-center justify-between">
+                        {/* COLUMNA DERECHA (7 cols): HOJA FÍSICA A4 100% SINCRONIZADA EN TIEMPO REAL */}
+                        <div className="lg:col-span-7 space-y-4 print:space-y-0 print:w-full print:m-0 print:p-0 print:block">
+                            <div className="flex items-center justify-between no-print">
                                 <div className="flex items-center gap-2 text-xs font-black text-black uppercase tracking-wider">
-                                    <Eye className="w-4 h-4 text-blue-700" />
-                                    <span>Vista Previa • Hoja Física A4</span>
+                                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span>Vista Previa • Hoja Física A4 Sincronizada en Vivo</span>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                    <button className="px-3.5 py-1.5 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs">
+                                    <button
+                                        onClick={() => window.print()}
+                                        className="h-9 px-3.5 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                                    >
                                         <Printer className="w-4 h-4 text-black" />
-                                        Imprimir
+                                        <span>Imprimir</span>
                                     </button>
-                                    <button className="px-3.5 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs">
+                                    <button
+                                        onClick={() => window.print()}
+                                        className="h-9 px-3.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                                    >
                                         <Download className="w-4 h-4 text-white" />
-                                        Descargar PDF
+                                        <span>Guardar PDF</span>
                                     </button>
                                 </div>
                             </div>
 
-                            {/* HOJA IMPRESA FISCAL */}
-                            <div className="bg-white rounded-xl border-2 border-black shadow-lg p-8 text-black text-xs font-sans relative">
+                            {/* DOCUMENTO FÍSICO A4 EN VIVO (ESTRUCTURA 1:1 SEGÚN FACTURA AGROSUMINISTROS RODRÍGUEZ) */}
+                            <div className="bg-white rounded-lg shadow-sm p-8 sm:p-10 text-slate-900 text-xs font-sans relative printable-sheet border border-slate-200 print:bg-white print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:w-full">
 
-                                {/* Membrete */}
-                                <div className="border-b-4 border-black pb-5 mb-5 flex justify-between items-start">
-                                    <div>
-                                        <div className="flex items-center gap-2.5 mb-1.5">
-                                            <div className="h-8 w-8 rounded bg-black text-white flex items-center justify-center font-black text-sm">
-                                                CA
+                                {/* 1. CABECERA / MEMBRETE INSTITUCIONAL */}
+                                <div className="flex justify-between items-start gap-6 pb-4">
+                                    {/* Lado Izquierdo: Logo y Datos de la Empresa Emisora */}
+                                    <div className="flex items-start gap-4 min-w-0">
+                                        {activeCompany.logo_url ? (
+                                            <div className="w-20 h-20 shrink-0 flex items-center justify-start">
+                                                <img
+                                                    src={activeCompany.logo_url}
+                                                    alt={activeCompany.name}
+                                                    className="max-h-20 max-w-full w-auto h-auto object-contain object-left"
+                                                />
                                             </div>
-                                            <h2 className="text-base font-black text-black tracking-tight">
-                                                CORPO ASIA SYSTEMS, C.A.
-                                            </h2>
+                                        ) : (
+                                            <div className="w-16 h-16 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xl shrink-0">
+                                                {activeCompany.name.substring(0, 2).toUpperCase()}
+                                            </div>
+                                        )}
+
+                                        <div className="min-w-0 space-y-0.5">
+                                            <h1 className="text-base font-black text-slate-900 uppercase tracking-tight leading-snug">
+                                                {activeCompany.name}
+                                            </h1>
+                                            <p className="text-xs font-bold text-slate-900">
+                                                RIF: {activeCompany.tax_id}
+                                            </p>
+                                            <p className="text-xs text-slate-700 leading-tight">
+                                                {activeCompany.address}
+                                            </p>
+                                            <p className="text-xs text-slate-700">
+                                                Teléfono / WhatsApp: {activeCompany.phone}
+                                            </p>
+                                            {activeCompany.email && (
+                                                <p className="text-xs text-slate-700">
+                                                    Email: {activeCompany.email}
+                                                </p>
+                                            )}
                                         </div>
-                                        <p className="text-xs font-black text-black">R.I.F. J-50123998-0 • Nit: 900.281.912</p>
-                                        <p className="text-xs font-bold text-slate-900">Av. Francisco de Miranda, Torre Empresarial, Piso 12, Ofic. 12-A</p>
-                                        <p className="text-xs font-bold text-slate-900">contacto@corpoasia.com • Tel: +58 (212) 999-8888</p>
                                     </div>
 
-                                    <div className="border-4 border-black rounded-lg p-3 text-center bg-slate-50 min-w-[160px]">
-                                        <span className="text-xs font-black uppercase text-black tracking-wider block">
-                                            FACTURA FISCAL
-                                        </span>
-                                        <span className="text-lg font-mono font-black text-blue-900 block my-0.5">
-                                            N° F-003891
-                                        </span>
-                                        <span className="text-xs font-black text-black block">
-                                            Control: <strong>00-089123</strong>
-                                        </span>
+                                    {/* Lado Derecho: Título de Factura, Correlativo, Fecha y Control */}
+                                    <div className="text-right shrink-0">
+                                        <h2 className="text-2xl font-black text-slate-950 uppercase tracking-wide leading-none">
+                                            {invoiceForm.document_type === 'factura' ? 'FACTURA' : invoiceForm.document_type.toUpperCase()}
+                                        </h2>
+                                        {invoiceForm.document_subtitle && (
+                                            <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 mt-0.5">
+                                                {invoiceForm.document_subtitle}
+                                            </p>
+                                        )}
+                                        <p className="text-base font-mono font-black text-slate-900 mt-1.5 leading-none">
+                                            N° {projectedCorrelative}
+                                        </p>
+                                        <p className="text-xs text-slate-800 mt-2">
+                                            <span className="font-bold">Fecha:</span> {invoiceForm.issue_date}
+                                        </p>
+                                        <p className="text-xs text-slate-800 mt-0.5">
+                                            <span className="font-bold">Control:</span> {projectedControlNumber}
+                                        </p>
                                     </div>
                                 </div>
 
-                                {/* Receptor */}
-                                <div className="grid grid-cols-2 gap-4 p-4 bg-slate-100 rounded-lg border-2 border-slate-300 mb-5 text-xs">
+                                {/* Línea Divisoria Sólida Superior */}
+                                <div className="border-b-2 border-slate-950 mb-5"></div>
+
+                                {/* 2. DATOS DEL CLIENTE Y CONDICIONES DE LA VENTA (2 COLUMNAS 1:1) */}
+                                <div className="grid grid-cols-2 gap-8 text-xs pb-4 mb-4 border-b border-slate-300">
+                                    {/* Columna Izquierda: Datos del Adquiriente */}
                                     <div>
-                                        <span className="text-xs font-black uppercase text-black block mb-1">
-                                            DATOS DEL RECEPTOR (CLIENTE)
-                                        </span>
-                                        <p className="font-black text-black text-sm">Inversiones & Logística Corpo Asia, C.A.</p>
-                                        <p className="text-black font-mono font-black text-xs mt-0.5">RIF: J-50192834-1</p>
-                                        <p className="text-slate-900 font-bold text-xs mt-1">Av. Libertador, Edif. Torre Financiera, Piso 14, Chacao</p>
+                                        <h3 className="font-black uppercase text-slate-950 text-xs mb-2 tracking-wide">
+                                            DATOS DEL ADQUIRIENTE / CLIENTE
+                                        </h3>
+                                        {currentSelectedClient ? (
+                                            <div className="space-y-1">
+                                                <div className="grid grid-cols-12 gap-1">
+                                                    <span className="col-span-4 text-slate-600 font-bold">Cliente:</span>
+                                                    <span className="col-span-8 font-bold text-slate-950 uppercase">{currentSelectedClient.name}</span>
+                                                </div>
+                                                <div className="grid grid-cols-12 gap-1">
+                                                    <span className="col-span-4 text-slate-600 font-bold">Cédula / RIF:</span>
+                                                    <span className="col-span-8 font-mono font-bold text-slate-950">{currentSelectedClient.tax_id}</span>
+                                                </div>
+                                                <div className="grid grid-cols-12 gap-1">
+                                                    <span className="col-span-4 text-slate-600 font-bold">Teléfono:</span>
+                                                    <span className="col-span-8 text-slate-900">{currentSelectedClient.phone || 'N/A'}</span>
+                                                </div>
+                                                {currentSelectedClient.address && (
+                                                    <div className="grid grid-cols-12 gap-1">
+                                                        <span className="col-span-4 text-slate-600 font-bold">Dirección:</span>
+                                                        <span className="col-span-8 text-slate-800">{currentSelectedClient.address}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="py-1 text-slate-500 italic">
+                                                [ Cliente no seleccionado en el formulario ]
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="border-l-2 border-slate-300 pl-4 space-y-1 text-xs font-bold text-black">
-                                        <div className="flex justify-between">
-                                            <span>Fecha de Emisión:</span>
-                                            <span className="font-mono font-black">04/11/2026</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Fecha de Vencimiento:</span>
-                                            <span className="font-mono font-black">19/11/2026</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Condición de Pago:</span>
-                                            <span className="font-black">Crédito 15 Días</span>
+
+                                    {/* Columna Derecha: Condiciones de la Venta */}
+                                    <div>
+                                        <h3 className="font-black uppercase text-slate-950 text-xs mb-2 tracking-wide">
+                                            CONDICIONES DE LA VENTA
+                                        </h3>
+                                        <div className="space-y-1">
+                                            <div className="grid grid-cols-12 gap-1">
+                                                <span className="col-span-4 text-slate-600 font-bold">Condición:</span>
+                                                <span className="col-span-8 font-bold text-slate-950">{invoiceForm.sale_condition}</span>
+                                            </div>
+                                            <div className="grid grid-cols-12 gap-1">
+                                                <span className="col-span-4 text-slate-600 font-bold">Canal:</span>
+                                                <span className="col-span-8 font-bold text-slate-950">{invoiceForm.sales_channel || 'Oficina / Presencial'}</span>
+                                            </div>
+                                            <div className="grid grid-cols-12 gap-1">
+                                                <span className="col-span-4 text-slate-600 font-bold">Tasa BS:</span>
+                                                <span className="col-span-8 font-mono font-bold text-slate-950">
+                                                    Bs. {Number(invoiceForm.bcv_exchange_rate || 876.80).toFixed(2)} / USD
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Tabla de Ítems */}
-                                <div className="border-2 border-black rounded-lg overflow-hidden mb-5">
-                                    <table className="w-full text-left text-xs">
-                                        <thead className="bg-slate-200 text-black uppercase font-black text-xs border-b-2 border-black">
+                                {/* 3. TABLA DE RENGLONES Y PRODUCTOS (ENCABEZADO CON DOBLE LÍNEA SÓLIDA) */}
+                                <div className="mb-6">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead className="border-t-2 border-b-2 border-slate-950 uppercase font-black text-slate-950 text-xs">
                                             <tr>
-                                                <th className="p-3 w-10 text-center">N°</th>
-                                                <th className="p-3">Descripción del Concepto</th>
-                                                <th className="p-3 text-center w-16">Cant.</th>
-                                                <th className="p-3 text-right w-28">P. Unitario</th>
-                                                <th className="p-3 text-right w-28">Total</th>
+                                                <th className="py-2.5 px-2 w-8 text-center">#</th>
+                                                <th className="py-2.5 px-3">DESCRIPCIÓN DEL PRODUCTO</th>
+                                                <th className="py-2.5 px-3 text-center w-24">CANT.</th>
+                                                <th className="py-2.5 px-3 text-right w-28">PRECIO UNIT. ($)</th>
+                                                <th className="py-2.5 px-3 text-right w-28">TOTAL ($)</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y-2 divide-slate-200 text-xs font-medium">
-                                            <tr>
-                                                <td className="p-3 text-center font-mono font-black">01</td>
-                                                <td className="p-3 font-black text-black">
-                                                    Auditoría y Consultoría Fiscal Corporativa Q4
-                                                    <span className="block font-bold text-slate-800 text-[11px]">
-                                                        Revisión contable general y cierre tributario
-                                                    </span>
-                                                </td>
-                                                <td className="p-3 text-center font-mono font-black">1.00</td>
-                                                <td className="p-3 text-right font-mono font-bold">$2,500.00</td>
-                                                <td className="p-3 text-right font-mono font-black">$2,500.00</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="p-3 text-center font-mono font-black">02</td>
-                                                <td className="p-3 font-black text-black">
-                                                    Licenciamiento de Software y Timbrado Digital
-                                                    <span className="block font-bold text-slate-800 text-[11px]">
-                                                        Módulo corporativo para 1,000 emisiones
-                                                    </span>
-                                                </td>
-                                                <td className="p-3 text-center font-mono font-black">1.00</td>
-                                                <td className="p-3 text-right font-mono font-bold">$1,350.00</td>
-                                                <td className="p-3 text-right font-mono font-black">$1,350.00</td>
-                                            </tr>
+                                        <tbody className="divide-y divide-slate-200">
+                                            {invoiceForm.items.map((it, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="py-3 px-2 text-center font-mono font-bold text-slate-800">{idx + 1}</td>
+                                                    <td className="py-3 px-3">
+                                                        <span className="font-bold text-slate-950 block">
+                                                            {it.description || '[ Renglón pendiente por describir ]'}
+                                                        </span>
+                                                        {it.details && (
+                                                            <span className="text-[11px] text-slate-600 block mt-0.5">
+                                                                {it.details}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
+                                                        {it.quantity} {it.unit}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
+                                                        ${Number(it.unit_price || 0).toFixed(2)} {it.unit && <span className="text-[10px] text-slate-500 font-normal">/{it.unit}</span>}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right font-mono font-black text-slate-950">
+                                                        ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
+                                                        {it.is_tax_exempt && (
+                                                            <span className="text-[10px] text-blue-900 font-black ml-1">(E)</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
                                         </tbody>
                                     </table>
+                                    {/* Línea Divisoria Inferior de Tabla */}
+                                    <div className="border-b border-slate-300"></div>
                                 </div>
 
-                                {/* QR y Totales */}
-                                <div className="grid grid-cols-12 gap-4 pt-1">
-                                    <div className="col-span-5 flex items-center gap-3 p-3 bg-slate-100 rounded-lg border-2 border-slate-300">
-                                        <QrCode className="w-14 h-14 text-black shrink-0" />
-                                        <div className="text-xs text-black font-bold leading-tight">
-                                            <p className="font-black text-black">TIMBRE FISCAL DIGITAL</p>
-                                            <p className="text-[11px]">Comprobante oficial válido con verificación QR legal.</p>
+                                {/* 4. FORMA DE PAGO Y LIQUIDACIÓN DE TOTALES */}
+                                <div className="grid grid-cols-2 gap-8 text-xs mb-8 items-start">
+                                    {/* Columna Izquierda: Forma de Pago y Nota Legal con Barra Lateral */}
+                                    <div>
+                                        <h3 className="font-black uppercase text-slate-950 text-xs mb-2 tracking-wide">
+                                            FORMA DE PAGO
+                                        </h3>
+                                        <p className="text-slate-800">
+                                            <span className="text-slate-600 font-bold">Medio:</span>{' '}
+                                            <span className="font-black text-slate-950 uppercase">{invoiceForm.payment_method || 'PAGO MOVIL'}</span>
+                                        </p>
+                                        {invoiceForm.payment_reference && (
+                                            <p className="text-slate-800 mt-1">
+                                                <span className="text-slate-600 font-bold">Ref:</span>{' '}
+                                                <span className="font-mono font-bold text-slate-950">{invoiceForm.payment_reference}</span>
+                                            </p>
+                                        )}
+                                        {/* Barra vertical de acento 1:1 como en la factura original */}
+                                        <div className="border-l-2 border-slate-400 pl-2.5 mt-3 py-0.5 text-[10px] text-slate-600 italic leading-snug">
+                                            Monto en Bolívares (VES) calculado según la Tasa BS indicada a la fecha de la transacción.
                                         </div>
                                     </div>
 
-                                    <div className="col-span-7 space-y-1.5 text-xs font-mono font-black text-right">
-                                        <div className="flex justify-between text-black">
-                                            <span>Subtotal Base Imponible:</span>
-                                            <span>$3,850.00</span>
+                                    {/* Columna Derecha: Desglose de Totales */}
+                                    <div className="space-y-1.5 font-mono text-right text-xs">
+                                        <div className="flex justify-between py-1 border-b border-slate-200">
+                                            <span className="font-sans font-bold text-slate-700">Subtotal:</span>
+                                            <span className="font-bold text-slate-900">${itemsSubtotal.toFixed(2)}</span>
                                         </div>
-                                        <div className="flex justify-between text-black">
-                                            <span>I.V.A. Débito Fiscal (16%):</span>
-                                            <span>$616.00</span>
+                                        {Number(invoiceForm.shipping_cost || 0) > 0 && (
+                                            <div className="flex justify-between py-1 border-b border-slate-200">
+                                                <span className="font-sans font-bold text-slate-700">Flete / Delivery:</span>
+                                                <span className="font-bold text-slate-900">${Number(invoiceForm.shipping_cost).toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between py-1 border-b-2 border-slate-950">
+                                            <span className="font-sans font-bold text-slate-700">IVA ({Number(invoiceForm.tax_percentage)}%):</span>
+                                            <span className="font-bold text-slate-900">${taxAmount.toFixed(2)}</span>
                                         </div>
-                                        <div className="border-t-4 border-black pt-2 flex justify-between text-black font-black text-sm">
-                                            <span>TOTAL A PAGAR:</span>
-                                            <span className="font-black text-blue-900 text-base">$4,466.00</span>
+                                        <div className="flex justify-between pt-2 text-sm font-black">
+                                            <span className="font-sans">TOTAL USD:</span>
+                                            <span className="text-slate-950">${totalUsd.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs font-bold text-blue-900 pt-0.5">
+                                            <span className="font-sans font-bold text-slate-700">TOTAL VES:</span>
+                                            <span>Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="mt-6 pt-3 border-t-2 border-slate-300 text-center text-xs font-bold text-slate-900">
-                                    Documento generado legalmente por el Sistema Corpo_Documents • Todos los derechos reservados © 2026
+                                {/* 5. TÉRMINOS Y CONDICIONES DE ENTREGA & FIRMAS CON LÍNEAS GUÍA */}
+                                <div className="pt-4 border-t border-slate-300 text-xs">
+                                    <div className="grid grid-cols-2 gap-8 items-end">
+                                        {/* Términos a la Izquierda */}
+                                        <div>
+                                            <h3 className="font-black uppercase text-slate-950 text-xs mb-1 tracking-wide">
+                                                TÉRMINOS Y CONDICIONES DE ENTREGA
+                                            </h3>
+                                            <p className="text-[10px] text-slate-600 leading-relaxed">
+                                                {invoiceForm.terms_conditions || activeCompany.default_terms || 'Comprobante generado por el sistema. Para devoluciones o reclamos conserve este documento. Plazo máximo de reclamación: 3 días hábiles desde la fecha de emisión.'}
+                                            </p>
+                                        </div>
+
+                                        {/* Líneas de Firma a la Derecha */}
+                                        <div className="grid grid-cols-2 gap-4 text-center text-[10px] font-black uppercase text-slate-900">
+                                            <div>
+                                                <div className="border-t border-dashed border-slate-400 pt-2 mb-1"></div>
+                                                <span>FIRMA Y SELLO EMISOR</span>
+                                            </div>
+                                            <div>
+                                                <div className="border-t border-dashed border-slate-400 pt-2 mb-1"></div>
+                                                <span>RECIBIDO CONFORME</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Pie Institucional Final */}
+                                    <div className="border-t border-slate-200 mt-6 pt-3 text-center text-[10px] text-slate-500">
+                                        {activeCompany.name} • RIF: {activeCompany.tax_id} • Barinitas, Edo. Barinas • Sistema de Gestión y Facturación
+                                    </div>
                                 </div>
+
                             </div>
                         </div>
 
@@ -1020,21 +1765,336 @@ export default function Index() {
 
             </main>
 
-            {/* PIE INSTITUCIONAL */}
-            <footer className="bg-white border-t-2 border-slate-300 py-4 px-6 mt-auto">
-                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs font-bold text-black gap-2">
-                    <div className="flex items-center space-x-2">
-                        <strong className="text-black font-black">Corpo Documents ERP</strong>
-                        <span>·</span>
-                        <span>Corpo Asia Systems, C.A.</span>
-                        <span>·</span>
-                        <span>Sistema de Gestión y Facturación Fiscal</span>
-                    </div>
-                    <div className="text-xs font-mono font-bold text-slate-900">
-                        Modo Accesibilidad & Alto Contraste Activo • Zoom {zoomLevel}%
+            {/* MODAL 1: REGISTRAR EMPRESA EMISORA (CON LOGO) */}
+            {isCompanyModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+                    <div className="bg-white rounded-2xl border-4 border-black shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center border-b-2 border-slate-300 pb-3">
+                            <div className="flex items-center gap-2">
+                                <Building2 className="w-5 h-5 text-blue-700" />
+                                <h3 className="text-sm font-black text-black uppercase">Registrar Nueva Empresa Emisora</h3>
+                            </div>
+                            <button
+                                onClick={() => setIsCompanyModalOpen(false)}
+                                className="h-8 w-8 rounded-lg hover:bg-slate-200 text-black flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmitCompany} className="space-y-4">
+                            <div>
+                                <label className="text-xs font-black text-black block mb-1">Razón Social *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Ej: Agrosuministros Rodríguez C.A."
+                                    value={newCompany.name}
+                                    onChange={(e) => setNewCompany(prev => ({ ...prev, name: e.target.value }))}
+                                    className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-black text-black block mb-1">RIF / ID Fiscal *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="J-50493821-4"
+                                        value={newCompany.tax_id}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, tax_id: e.target.value }))}
+                                        className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black font-mono uppercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-black text-black block mb-1">Prefijo de Factura</label>
+                                    <input
+                                        type="text"
+                                        placeholder="F- o PROF-"
+                                        value={newCompany.invoice_prefix}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, invoice_prefix: e.target.value }))}
+                                        className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black font-mono"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-black text-black block mb-1">Teléfono / WhatsApp *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="+58 412 9614615"
+                                        value={newCompany.phone}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, phone: e.target.value }))}
+                                        className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-black text-black block mb-1">Email *</label>
+                                    <input
+                                        type="email"
+                                        required
+                                        placeholder="empresa@correo.com"
+                                        value={newCompany.email}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, email: e.target.value }))}
+                                        className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-black text-black block mb-1">Dirección Fiscal Completa *</label>
+                                <textarea
+                                    required
+                                    rows="2"
+                                    placeholder="Ciudad, Estado, Dirección..."
+                                    value={newCompany.address}
+                                    onChange={(e) => setNewCompany(prev => ({ ...prev, address: e.target.value }))}
+                                    className="w-full bg-white border-2 border-slate-400 rounded-lg p-2.5 text-xs font-black text-black"
+                                />
+                            </div>
+
+                            {/* SUBIR LOGO DE LA EMPRESA */}
+                            <div className="p-3.5 bg-amber-50 rounded-xl border-2 border-amber-300 space-y-2">
+                                <label className="text-xs font-black text-black flex items-center gap-1.5">
+                                    <UploadCloud className="w-4 h-4 text-amber-900" />
+                                    <span>Logo de la Empresa (PNG, JPG o SVG)</span>
+                                </label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleCompanyLogoChange}
+                                    className="w-full text-xs font-bold text-black file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-2 file:border-black file:text-xs file:font-black file:bg-white file:text-black cursor-pointer"
+                                />
+                                {logoPreview && (
+                                    <div className="flex items-center gap-2 mt-2 p-2 bg-white rounded-lg border border-amber-400">
+                                        <img src={logoPreview} alt="Preview" className="h-10 w-10 object-contain" />
+                                        <span className="text-[11px] font-bold text-black">Vista previa del logo seleccionado</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end gap-2.5 pt-2 border-t-2 border-slate-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCompanyModalOpen(false)}
+                                    className="h-9 px-4 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-black text-black cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingCompany}
+                                    className="h-9 px-5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                    <Save className="w-4 h-4 text-emerald-400" />
+                                    <span>{isSavingCompany ? 'Guardando...' : 'Guardar Empresa'}</span>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
-            </footer>
+            )}
+
+            {/* MODAL 2: REGISTRAR CLIENTE CON BOTÓN CNE AUTOCOMPLETE */}
+            {isClientModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+                    <div className="bg-white rounded-2xl border-4 border-black shadow-2xl max-w-lg w-full p-6 space-y-4">
+                        <div className="flex justify-between items-center border-b-2 border-slate-300 pb-3">
+                            <div className="flex items-center gap-2">
+                                <User className="w-5 h-5 text-emerald-700" />
+                                <h3 className="text-sm font-black text-black uppercase">Registrar Nuevo Cliente / Adquiriente</h3>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setIsClientModalOpen(false);
+                                    setCneAlert(null);
+                                }}
+                                className="h-8 w-8 rounded-lg hover:bg-slate-200 text-black flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Alerta de resultado CNE */}
+                        {cneAlert && (
+                            <div className={`p-3 rounded-lg border-2 text-xs font-black flex items-center gap-2 ${cneAlert.type === 'success'
+                                ? 'bg-emerald-100 border-emerald-500 text-emerald-950'
+                                : 'bg-red-100 border-red-500 text-red-950'
+                                }`}>
+                                {cneAlert.type === 'success' ? (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                                ) : (
+                                    <AlertCircle className="w-4 h-4 text-red-700 shrink-0" />
+                                )}
+                                <span>{cneAlert.message}</span>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmitClient} className="space-y-4">
+                            {/* TIPO Y CONSULTA CNE */}
+                            <div>
+                                <label className="text-xs font-black text-black block mb-1">
+                                    Cédula / DNI del Cliente (Consulta CNE) *
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={newClient.nacionalidad}
+                                        onChange={(e) => {
+                                            const nac = e.target.value;
+                                            setNewClient(prev => ({
+                                                ...prev,
+                                                nacionalidad: nac,
+                                                tax_id: prev.cedulaNumber ? `${nac}-${prev.cedulaNumber}` : prev.tax_id
+                                            }));
+                                        }}
+                                        className="h-9 w-20 bg-white border-2 border-slate-400 rounded-lg px-2 text-xs font-black text-black"
+                                    >
+                                        <option value="V">V -</option>
+                                        <option value="E">E -</option>
+                                        <option value="J">J -</option>
+                                        <option value="G">G -</option>
+                                    </select>
+
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: 29923421 (solo dígitos)"
+                                        value={newClient.cedulaNumber}
+                                        onChange={(e) => {
+                                            const digits = e.target.value.replace(/\D/g, '');
+                                            setNewClient(prev => ({
+                                                ...prev,
+                                                cedulaNumber: digits,
+                                                tax_id: digits ? `${prev.nacionalidad}-${digits}` : ''
+                                            }));
+                                        }}
+                                        className="h-9 flex-1 bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black font-mono placeholder:text-slate-500"
+                                    />
+
+                                    {/* BOTÓN CNE SOLICITADO */}
+                                    <button
+                                        type="button"
+                                        onClick={handleConsultCne}
+                                        disabled={isConsultingCne}
+                                        className="h-9 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-lg flex items-center gap-1.5 shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
+                                        title="Consultar datos oficiales en CNE y autocompletar"
+                                    >
+                                        {isConsultingCne ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                <span>Buscando...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="w-4 h-4 text-amber-300" />
+                                                <span>CNE</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-800 block mt-1">
+                                    Presiona <strong>CNE</strong> para autocompletar el nombre completo y datos oficiales de la persona.
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-black text-black block mb-1">Tipo de Cliente</label>
+                                    <select
+                                        value={newClient.type}
+                                        onChange={(e) => setNewClient(prev => ({ ...prev, type: e.target.value }))}
+                                        className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black"
+                                    >
+                                        <option value="persona">Persona Natural</option>
+                                        <option value="empresa">Empresa / Jurídico</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-black text-black block mb-1">Identificación Fiscal / RIF *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="V-29923421"
+                                        value={newClient.tax_id}
+                                        onChange={(e) => setNewClient(prev => ({ ...prev, tax_id: e.target.value }))}
+                                        className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black font-mono uppercase"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-black text-black block mb-1">Nombre Completo o Razón Social *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Nombre completo (se autocompleta con CNE)"
+                                    value={newClient.name}
+                                    onChange={(e) => setNewClient(prev => ({ ...prev, name: e.target.value }))}
+                                    className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-black text-black block mb-1">Teléfono / WhatsApp *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="+58 424 2438916"
+                                        value={newClient.phone}
+                                        onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
+                                        className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-black text-black block mb-1">Correo Electrónico</label>
+                                    <input
+                                        type="email"
+                                        placeholder="cliente@correo.com"
+                                        value={newClient.email}
+                                        onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
+                                        className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-black text-black block mb-1">Dirección Fiscal / Entrega</label>
+                                <textarea
+                                    rows="2"
+                                    placeholder="Dirección fiscal o de despacho..."
+                                    value={newClient.address}
+                                    onChange={(e) => setNewClient(prev => ({ ...prev, address: e.target.value }))}
+                                    className="w-full bg-white border-2 border-slate-400 rounded-lg p-2.5 text-xs font-black text-black"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2.5 pt-2 border-t-2 border-slate-200">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsClientModalOpen(false);
+                                        setCneAlert(null);
+                                    }}
+                                    className="h-9 px-4 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-black text-black cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingClient}
+                                    className="h-9 px-5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                    <Save className="w-4 h-4 text-emerald-400" />
+                                    <span>{isSavingClient ? 'Guardando...' : 'Guardar Cliente'}</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
