@@ -51,44 +51,69 @@ input[type="number"] {
 /* Configuración de Hoja A4 para Impresión y PDF */
 @page {
     size: A4 portrait;
-    margin: 15mm 16mm 15mm 16mm;
+    margin: 10mm 12mm 10mm 12mm;
 }
 
 @media print {
+    *, *::before, *::after {
+        box-sizing: border-box !important;
+    }
+
     html, body {
         background: #ffffff !important;
         background-color: #ffffff !important;
         color: #000000 !important;
-        zoom: 100% !important;
+        zoom: 1 !important;
         margin: 0 !important;
         padding: 0 !important;
         width: 100% !important;
+        min-height: 100% !important;
         height: auto !important;
+        overflow: visible !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
 
-    /* Ocultar elementos no imprimibles */
+    /* Resetear zoom inline y forzar visibilidad en contenedores raíz */
+    #app, #app > div {
+        zoom: 1 !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+
+    /* Ocultar todos los elementos con la clase no-print */
     .no-print {
         display: none !important;
     }
 
-    /* Ocultar el resto del árbol DOM y mostrar únicamente la hoja física A4 */
-    body * {
-        visibility: hidden;
+    /* Asegurar que los contenedores no recorten contenido */
+    main {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow: visible !important;
     }
 
-    .printable-sheet,
-    .printable-sheet * {
-        visibility: visible;
+    .overflow-x-auto {
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
     }
 
+    /* Hoja imprimible en flujo normal, ancho completo y sin bordes de pantalla */
     .printable-sheet {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
+        position: relative !important;
+        left: auto !important;
+        top: auto !important;
         width: 100% !important;
         max-width: 100% !important;
+        min-width: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #ffffff !important;
@@ -97,6 +122,12 @@ input[type="number"] {
         border: none !important;
         border-radius: 0 !important;
         display: block !important;
+        visibility: visible !important;
+        overflow: visible !important;
+    }
+
+    .printable-sheet * {
+        visibility: visible !important;
     }
 
     /* Salto de página para documentos multi-página (Formato 2 Moaiven) */

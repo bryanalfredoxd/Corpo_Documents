@@ -44,6 +44,7 @@ class InvoiceController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
             'items.*.unit' => ['required', 'string', 'max:50'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.image_url' => ['nullable', 'string'],
             'items.*.is_tax_exempt' => ['nullable', 'boolean'],
         ]);
 
@@ -116,11 +117,34 @@ class InvoiceController extends Controller
             foreach ($validated['items'] as $index => $itemData) {
                 $itemTotal = round((float) $itemData['quantity'] * (float) $itemData['unit_price'], 2);
 
+                $imageUrl = $itemData['image_url'] ?? null;
+                if ($imageUrl && str_starts_with($imageUrl, 'data:image/')) {
+                    if (preg_match('/^data:image\/(\w+);base64,/', $imageUrl, $matches)) {
+                        $ext = strtolower($matches[1]);
+                        if ($ext === 'jpeg') {
+                            $ext = 'jpg';
+                        }
+                        $base64Data = substr($imageUrl, strpos($imageUrl, ',') + 1);
+                        $decoded = base64_decode($base64Data);
+                        if ($decoded !== false) {
+                            $filename = \Illuminate\Support\Str::random(40) . '.' . $ext;
+                            \Illuminate\Support\Facades\Storage::disk('public')->put('items/' . $filename, $decoded);
+                            $publicFolder = public_path('storage/items');
+                            if (! file_exists($publicFolder)) {
+                                @mkdir($publicFolder, 0755, true);
+                            }
+                            @file_put_contents($publicFolder . DIRECTORY_SEPARATOR . $filename, $decoded);
+                            $imageUrl = '/storage/items/' . $filename;
+                        }
+                    }
+                }
+
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'item_order' => $index + 1,
                     'description' => $itemData['description'],
                     'details' => $itemData['details'] ?? null,
+                    'image_url' => $imageUrl,
                     'quantity' => (float) $itemData['quantity'],
                     'unit' => $itemData['unit'],
                     'unit_price' => (float) $itemData['unit_price'],

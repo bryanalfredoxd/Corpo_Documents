@@ -39,7 +39,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Rutas operativas del sistema
     Route::post('/companies', [CompanyController::class, 'store'])->name('companies.store');
+    Route::put('/companies/{company}', [CompanyController::class, 'update'])->name('companies.update');
     Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
+    Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
     Route::post('/clients/consult-cne', [ClientController::class, 'consultCne'])->name('clients.consult-cne');
     Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
     Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');

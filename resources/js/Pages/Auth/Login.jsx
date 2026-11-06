@@ -24,11 +24,11 @@ export default function Login({ status, canResetPassword }) {
             <div className="w-full max-w-md">
                 {/* Brand Header */}
                 <div className="text-center mb-6">
-                    <div className="inline-flex items-center justify-center bg-white p-3 rounded-2xl border-2 border-slate-300 shadow-sm mb-3">
+                    <div className="inline-flex items-center justify-center bg-white p-2 rounded-full border-2 border-slate-300 shadow-sm mb-3">
                         <img
-                            src="/images/CorpoAsia.jpg"
+                            src="/images/corpoasia-round.png"
                             alt="Inversiones CorpoAsia C.A."
-                            className="h-10 sm:h-12 w-auto object-contain"
+                            className="h-16 w-16 sm:h-20 sm:w-20 rounded-full object-contain"
                         />
                     </div>
                     <h1 className="text-2xl font-black tracking-tight text-black uppercase">

@@ -71,5 +71,41 @@ class CompanyController extends Controller
 
         return redirect()->back()->with('success', '¡Empresa emisora registrada exitosamente!');
     }
+
+    /**
+     * Actualizar los datos de una empresa emisora existente.
+     */
+    public function update(Request $request, Company $company): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'trade_name' => ['nullable', 'string', 'max:255'],
+            'tax_id' => ['required', 'string', 'max:50', 'unique:companies,tax_id,' . $company->id],
+            'address' => ['required', 'string'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'phone' => ['required', 'string', 'max:50'],
+            'email' => ['required', 'email', 'max:255'],
+            'website' => ['nullable', 'string', 'max:255'],
+            'invoice_prefix' => ['nullable', 'string', 'max:10'],
+            'default_terms' => ['nullable', 'string'],
+        ]);
+
+        $company->update([
+            'name' => $validated['name'],
+            'trade_name' => $validated['trade_name'] ?? null,
+            'tax_id' => strtoupper(trim($validated['tax_id'])),
+            'address' => $validated['address'],
+            'city' => $validated['city'] ?? null,
+            'state' => $validated['state'] ?? null,
+            'phone' => $validated['phone'],
+            'email' => $validated['email'],
+            'website' => $validated['website'] ?? null,
+            'invoice_prefix' => $validated['invoice_prefix'] ?: 'F-',
+            'default_terms' => $validated['default_terms'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', '¡Información de la empresa actualizada exitosamente!');
+    }
 }
 

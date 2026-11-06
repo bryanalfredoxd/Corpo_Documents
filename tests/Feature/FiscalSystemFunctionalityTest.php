@@ -180,5 +180,73 @@ class FiscalSystemFunctionalityTest extends TestCase
                 'rif' => 'V299234211',
             ]);
     }
+
+    public function test_authenticated_user_can_update_company(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::create([
+            'name' => 'Original Company Name',
+            'tax_id' => 'J-12345678-9',
+            'phone' => '+58 412 0000000',
+            'email' => 'original@empresa.com',
+            'address' => 'Caracas, Venezuela',
+            'invoice_prefix' => 'F-',
+            'next_correlative' => 1,
+            'next_control_number' => 1,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->put("/companies/{$company->id}", [
+            'name' => 'Updated Company Name',
+            'tax_id' => 'J-12345678-9',
+            'phone' => '+58 414 9999999',
+            'email' => 'updated@empresa.com',
+            'address' => 'Valencia, Venezuela',
+            'city' => 'Valencia',
+            'state' => 'Carabobo',
+            'invoice_prefix' => 'F-',
+        ]);
+
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('companies', [
+            'id' => $company->id,
+            'name' => 'Updated Company Name',
+            'phone' => '+58 414 9999999',
+            'city' => 'Valencia',
+        ]);
+    }
+
+    public function test_authenticated_user_can_update_client(): void
+    {
+        $user = User::factory()->create();
+        $client = Client::create([
+            'type' => 'persona',
+            'name' => 'Juan Perez',
+            'tax_id' => 'V-11223344',
+            'phone' => '+58 412 3333333',
+            'email' => 'juan@gmail.com',
+            'address' => 'Barinas',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->put("/clients/{$client->id}", [
+            'type' => 'persona',
+            'name' => 'Juan Carlos Perez',
+            'tax_id' => 'V-11223344',
+            'phone' => '+58 412 8888888',
+            'email' => 'juancarlos@gmail.com',
+            'address' => 'Barinitas',
+        ]);
+
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('clients', [
+            'id' => $client->id,
+            'name' => 'Juan Carlos Perez',
+            'phone' => '+58 412 8888888',
+            'address' => 'Barinitas',
+        ]);
+    }
 }
 

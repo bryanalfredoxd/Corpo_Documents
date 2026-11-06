@@ -51,7 +51,9 @@ import {
     LogOut,
     X,
     Loader2,
-    Sparkles
+    Sparkles,
+    Edit3,
+    Camera
 } from 'lucide-react';
 
 export default function Index({ companies = [], clients = [], invoices = [], stats = {} }) {
@@ -231,7 +233,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         company_social_handle: '',
         technical_specs: defaultTechnicalSpecs.map(s => ({ ...s })),
         items: [
-            { description: '', details: '', quantity: 1, unit: 'unid', unit_price: '', is_tax_exempt: false }
+            { description: '', details: '', quantity: 1, unit: 'unid', unit_price: '', is_tax_exempt: false, image_url: null }
         ]
     });
 
@@ -321,7 +323,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
     const handleAddItem = () => {
         setInvoiceForm(prev => ({
             ...prev,
-            items: [...prev.items, { description: '', details: '', quantity: 1, unit: 'unid', unit_price: 0, is_tax_exempt: false }]
+            items: [...prev.items, { description: '', details: '', quantity: 1, unit: 'unid', unit_price: 0, is_tax_exempt: false, image_url: null }]
         }));
     };
 
@@ -443,14 +445,24 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                     quantity: Number(it.quantity),
                     unit: it.unit,
                     unit_price: Number(it.unit_price),
-                    is_tax_exempt: !!it.is_tax_exempt
+                    is_tax_exempt: !!it.is_tax_exempt,
+                    image_url: it.image_url || null
                 }))
-                : [{ description: 'Servicio general', details: '', quantity: 1, unit: 'unid', unit_price: 100, is_tax_exempt: false }]
+                : [{ description: 'Servicio general', details: '', quantity: 1, unit: 'unid', unit_price: 100, is_tax_exempt: false, image_url: null }]
         });
         setCurrentView('generador-pdf');
     };
 
-    // Estado para nueva empresa
+    // Función de impresión y exportación a PDF garantizada
+    const handlePrintDocument = () => {
+        setMobileEditorTab('preview');
+        setTimeout(() => {
+            window.print();
+        }, 120);
+    };
+
+    // Estado para nueva empresa y edición
+    const [editingCompany, setEditingCompany] = useState(null);
     const [newCompany, setNewCompany] = useState({
         name: '',
         trade_name: '',
@@ -465,24 +477,62 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
     });
     const [isSavingCompany, setIsSavingCompany] = useState(false);
 
+    const handleOpenCreateCompany = () => {
+        setEditingCompany(null);
+        setNewCompany({
+            name: '', trade_name: '', tax_id: '', phone: '', email: '',
+            address: '', city: '', state: '', invoice_prefix: 'F-', default_terms: ''
+        });
+        setIsCompanyModalOpen(true);
+    };
+
+    const handleOpenEditCompany = (comp) => {
+        setEditingCompany(comp);
+        setNewCompany({
+            name: comp.name || '',
+            trade_name: comp.trade_name || '',
+            tax_id: comp.tax_id || '',
+            phone: comp.phone || '',
+            email: comp.email || '',
+            address: comp.address || '',
+            city: comp.city || '',
+            state: comp.state || '',
+            invoice_prefix: comp.invoice_prefix || 'F-',
+            default_terms: comp.default_terms || ''
+        });
+        setIsCompanyModalOpen(true);
+    };
+
     const handleSubmitCompany = (e) => {
         e.preventDefault();
         setIsSavingCompany(true);
 
-        router.post('/companies', newCompany, {
-            onSuccess: () => {
-                setIsSavingCompany(false);
-                setIsCompanyModalOpen(false);
-                setNewCompany({
-                    name: '', trade_name: '', tax_id: '', phone: '', email: '',
-                    address: '', city: '', state: '', invoice_prefix: 'F-', default_terms: ''
-                });
-            },
-            onError: () => setIsSavingCompany(false)
-        });
+        if (editingCompany) {
+            router.put(`/companies/${editingCompany.id}`, newCompany, {
+                onSuccess: () => {
+                    setIsSavingCompany(false);
+                    setIsCompanyModalOpen(false);
+                    setEditingCompany(null);
+                },
+                onError: () => setIsSavingCompany(false)
+            });
+        } else {
+            router.post('/companies', newCompany, {
+                onSuccess: () => {
+                    setIsSavingCompany(false);
+                    setIsCompanyModalOpen(false);
+                    setNewCompany({
+                        name: '', trade_name: '', tax_id: '', phone: '', email: '',
+                        address: '', city: '', state: '', invoice_prefix: 'F-', default_terms: ''
+                    });
+                },
+                onError: () => setIsSavingCompany(false)
+            });
+        }
     };
 
-    // Estado para nuevo cliente y consulta CNE
+    // Estado para nuevo cliente y edición
+    const [editingClient, setEditingClient] = useState(null);
     const [newClient, setNewClient] = useState({
         type: 'persona',
         nacionalidad: 'V',
@@ -490,13 +540,60 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         tax_id: '',
         name: '',
         phone: '',
+        phone_secondary: '',
         email: '',
         address: '',
+        contact_person: '',
         notes: ''
     });
     const [isSavingClient, setIsSavingClient] = useState(false);
     const [isConsultingCne, setIsConsultingCne] = useState(false);
     const [cneAlert, setCneAlert] = useState(null); // { type: 'success' | 'error', message: string }
+
+    const handleOpenCreateClient = () => {
+        setEditingClient(null);
+        setCneAlert(null);
+        setNewClient({
+            type: 'persona',
+            nacionalidad: 'V',
+            cedulaNumber: '',
+            tax_id: '',
+            name: '',
+            phone: '',
+            phone_secondary: '',
+            email: '',
+            address: '',
+            contact_person: '',
+            notes: ''
+        });
+        setIsClientModalOpen(true);
+    };
+
+    const handleOpenEditClient = (client) => {
+        setEditingClient(client);
+        setCneAlert(null);
+        let nac = 'V';
+        let num = client.tax_id || '';
+        if (client.tax_id && client.tax_id.includes('-')) {
+            const parts = client.tax_id.split('-');
+            nac = parts[0];
+            num = parts.slice(1).join('');
+        }
+        setNewClient({
+            type: client.type || 'persona',
+            nacionalidad: nac,
+            cedulaNumber: num,
+            tax_id: client.tax_id || '',
+            name: client.name || '',
+            phone: client.phone || '',
+            phone_secondary: client.phone_secondary || '',
+            email: client.email || '',
+            address: client.address || '',
+            contact_person: client.contact_person || '',
+            notes: client.notes || ''
+        });
+        setIsClientModalOpen(true);
+    };
 
     // Función para consultar API CNE
     const handleConsultCne = async () => {
@@ -547,43 +644,68 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         }
     };
 
-    // Guardar nuevo cliente en la base de datos
+    // Guardar o actualizar cliente en la base de datos
     const handleSubmitClient = (e) => {
         e.preventDefault();
         setIsSavingClient(true);
-        router.post('/clients', {
+
+        const payload = {
             type: newClient.type,
             name: newClient.name,
             tax_id: newClient.tax_id,
             phone: newClient.phone,
+            phone_secondary: newClient.phone_secondary || null,
             email: newClient.email,
             address: newClient.address,
+            contact_person: newClient.contact_person || null,
             notes: newClient.notes
-        }, {
-            onSuccess: () => {
-                setIsSavingClient(false);
-                setIsClientModalOpen(false);
-                setCneAlert(null);
-                setNewClient({
-                    type: 'persona',
-                    nacionalidad: 'V',
-                    cedulaNumber: '',
-                    tax_id: '',
-                    name: '',
-                    phone: '',
-                    email: '',
-                    address: '',
-                    notes: ''
-                });
-            },
-            onError: (err) => {
-                setIsSavingClient(false);
-                setCneAlert({
-                    type: 'error',
-                    message: 'Error al registrar cliente: ' + Object.values(err).join(', ')
-                });
-            }
-        });
+        };
+
+        if (editingClient) {
+            router.put(`/clients/${editingClient.id}`, payload, {
+                onSuccess: () => {
+                    setIsSavingClient(false);
+                    setIsClientModalOpen(false);
+                    setEditingClient(null);
+                    setCneAlert(null);
+                },
+                onError: (err) => {
+                    setIsSavingClient(false);
+                    setCneAlert({
+                        type: 'error',
+                        message: 'Error al actualizar cliente: ' + Object.values(err).join(', ')
+                    });
+                }
+            });
+        } else {
+            router.post('/clients', payload, {
+                onSuccess: () => {
+                    setIsSavingClient(false);
+                    setIsClientModalOpen(false);
+                    setCneAlert(null);
+                    setNewClient({
+                        type: 'persona',
+                        nacionalidad: 'V',
+                        cedulaNumber: '',
+                        tax_id: '',
+                        name: '',
+                        phone: '',
+                        phone_secondary: '',
+                        email: '',
+                        address: '',
+                        contact_person: '',
+                        notes: ''
+                    });
+                },
+                onError: (err) => {
+                    setIsSavingClient(false);
+                    setCneAlert({
+                        type: 'error',
+                        message: 'Error al registrar cliente: ' + Object.values(err).join(', ')
+                    });
+                }
+            });
+        }
     };
 
     // Cerrar sesión
@@ -654,9 +776,9 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                 {/* Logo & Marca del Sistema */}
                 <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
                     <img
-                        src="/images/CorpoAsia.jpg"
+                        src="/images/corpoasia-round.png"
                         alt="Inversiones CorpoAsia C.A."
-                        className="h-7 sm:h-9 w-auto object-contain shrink-0"
+                        className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-contain shrink-0 shadow-2xs border border-slate-200"
                     />
                     <div className="hidden xs:block h-6 w-px bg-slate-300"></div>
                     <div>
@@ -892,7 +1014,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         Empresas Emisoras
                                     </span>
                                     <button
-                                        onClick={() => setIsCompanyModalOpen(true)}
+                                        onClick={handleOpenCreateCompany}
                                         className="h-6 sm:h-7 px-1.5 sm:px-2.5 bg-black hover:bg-slate-800 text-white rounded-md sm:rounded-lg text-[10px] sm:text-xs font-black flex items-center justify-center gap-1 shadow-xs cursor-pointer transition-transform active:scale-95 shrink-0"
                                         title="Añadir nueva empresa emisora"
                                     >
@@ -920,7 +1042,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         Clientes Registrados
                                     </span>
                                     <button
-                                        onClick={() => setIsClientModalOpen(true)}
+                                        onClick={handleOpenCreateClient}
                                         className="h-6 sm:h-7 px-1.5 sm:px-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-md sm:rounded-lg text-[10px] sm:text-xs font-black flex items-center justify-center gap-1 shadow-xs cursor-pointer transition-transform active:scale-95 shrink-0"
                                         title="Añadir nuevo cliente"
                                     >
@@ -1086,7 +1208,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                         <button
                                                             onClick={() => {
                                                                 handleLoadInvoiceToEditor(inv);
-                                                                setTimeout(() => window.print(), 350);
+                                                                setTimeout(() => handlePrintDocument(), 350);
                                                             }}
                                                             className="h-8 px-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black flex items-center gap-1 transition-colors cursor-pointer"
                                                             title="Imprimir / Descargar PDF"
@@ -1206,7 +1328,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                             {directorySection === 'empresas-emisoras' ? (
                                 <button
                                     type="button"
-                                    onClick={() => setIsCompanyModalOpen(true)}
+                                    onClick={handleOpenCreateCompany}
                                     className="h-9 w-full lg:w-auto bg-black hover:bg-slate-800 text-white text-xs font-black px-4 rounded-lg flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
                                 >
                                     <Plus className="w-4 h-4 text-emerald-400" />
@@ -1246,7 +1368,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                                     <button
                                         type="button"
-                                        onClick={() => setIsClientModalOpen(true)}
+                                        onClick={handleOpenCreateClient}
                                         className="h-9 w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 rounded-lg flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
                                     >
                                         <Plus className="w-4 h-4 text-white" />
@@ -1292,7 +1414,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         </p>
                                         <button
                                             type="button"
-                                            onClick={() => setIsCompanyModalOpen(true)}
+                                            onClick={handleOpenCreateCompany}
                                             className="inline-flex items-center gap-2 h-9 px-4 bg-black text-white text-xs font-black rounded-lg hover:bg-slate-800 cursor-pointer"
                                         >
                                             <Plus className="w-4 h-4 text-emerald-400" />
@@ -1395,24 +1517,35 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                     </div>
 
                                                     {/* Botones de acción */}
-                                                    <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
-                                                        {!isCurrentActive ? (
+                                                    <div className="mt-4 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-1.5">
+                                                            {!isCurrentActive ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setSelectedCompanyId(comp.id);
+                                                                        setInvoiceForm(prev => ({ ...prev, company_id: comp.id }));
+                                                                    }}
+                                                                    className="h-8 px-2.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-black text-xs font-black cursor-pointer transition-colors"
+                                                                >
+                                                                    Seleccionar
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-[11px] font-black text-emerald-700 flex items-center gap-1">
+                                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                                    Activa
+                                                                </span>
+                                                            )}
                                                             <button
                                                                 type="button"
-                                                                onClick={() => {
-                                                                    setSelectedCompanyId(comp.id);
-                                                                    setInvoiceForm(prev => ({ ...prev, company_id: comp.id }));
-                                                                }}
-                                                                className="h-8 px-2.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-black text-xs font-black cursor-pointer transition-colors"
+                                                                onClick={() => handleOpenEditCompany(comp)}
+                                                                className="h-8 px-2.5 rounded-lg border-2 border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-black flex items-center gap-1 cursor-pointer transition-colors"
+                                                                title="Editar datos de esta empresa"
                                                             >
-                                                                Seleccionar Emisor
+                                                                <Edit3 className="w-3.5 h-3.5 text-blue-700" />
+                                                                <span>Editar</span>
                                                             </button>
-                                                        ) : (
-                                                            <span className="text-[11px] font-black text-emerald-700 flex items-center gap-1">
-                                                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                                                Emisor Seleccionado
-                                                            </span>
-                                                        )}
+                                                        </div>
 
                                                         <button
                                                             type="button"
@@ -1447,7 +1580,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         </p>
                                         <button
                                             type="button"
-                                            onClick={() => setIsClientModalOpen(true)}
+                                            onClick={handleOpenCreateClient}
                                             className="inline-flex items-center gap-2 h-9 px-4 bg-blue-700 text-white text-xs font-black rounded-lg hover:bg-blue-800 cursor-pointer"
                                         >
                                             <Plus className="w-4 h-4 text-white" />
@@ -1502,10 +1635,21 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                     </div>
                                                 </div>
 
-                                                <div className="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between">
-                                                    <span className="text-xs font-bold text-slate-600">
-                                                        {client.notes || 'Cliente Registrado'}
-                                                    </span>
+                                                <div className="mt-5 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenEditClient(client)}
+                                                            className="h-8 px-2.5 rounded-lg border-2 border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-black flex items-center gap-1 cursor-pointer transition-colors"
+                                                            title="Editar datos del cliente"
+                                                        >
+                                                            <Edit3 className="w-3.5 h-3.5 text-blue-700" />
+                                                            <span>Editar</span>
+                                                        </button>
+                                                        <span className="text-xs font-bold text-slate-600 truncate max-w-[130px]" title={client.notes || 'Cliente Registrado'}>
+                                                            {client.notes || 'Cliente Registrado'}
+                                                        </span>
+                                                    </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -1515,7 +1659,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                             });
                                                             setCurrentView('generador-pdf');
                                                         }}
-                                                        className="h-8 px-3.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black text-xs flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-2xs"
+                                                        className="h-8 px-3.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black text-xs flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-2xs shrink-0"
                                                     >
                                                         <Receipt className="w-4 h-4 text-sky-200" />
                                                         <span>Facturar</span>
@@ -1643,7 +1787,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         </label>
                                         <button
                                             type="button"
-                                            onClick={() => setIsClientModalOpen(true)}
+                                            onClick={handleOpenCreateClient}
                                             className="text-xs font-black text-blue-700 hover:text-blue-900 flex items-center gap-1 cursor-pointer transition-colors"
                                         >
                                             <Plus className="w-3.5 h-3.5" />
@@ -1936,6 +2080,63 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                     onChange={(e) => handleItemChange(idx, 'details', e.target.value)}
                                                     className="h-7 w-full bg-white border border-slate-200 rounded-md px-2.5 text-[11px] font-bold text-slate-800 placeholder:text-slate-400"
                                                 />
+                                            </div>
+
+                                            {/* Foto / Imagen del Producto (Opcional según solicitud del cliente) */}
+                                            <div className="pt-0.5">
+                                                {it.image_url ? (
+                                                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200">
+                                                        <div className="w-12 h-12 rounded-md border border-slate-300 bg-slate-50 p-0.5 flex items-center justify-center shrink-0">
+                                                            <img
+                                                                src={it.image_url}
+                                                                alt="Foto del producto"
+                                                                className="max-h-full max-w-full object-contain rounded"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-1.5 text-[11px] font-black text-emerald-800">
+                                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                                                <span>Foto cargada para el PDF</span>
+                                                            </div>
+                                                            <p className="text-[10px] text-slate-500 truncate">
+                                                                Se mostrará junto a la descripción del renglón en la cotización/proforma.
+                                                            </p>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleItemChange(idx, 'image_url', null)}
+                                                            className="text-[11px] font-black text-red-600 hover:text-red-800 px-2 py-1 bg-red-50 hover:bg-red-100 rounded border border-red-200 cursor-pointer shrink-0 transition-colors"
+                                                            title="Eliminar foto de este producto"
+                                                        >
+                                                            Quitar
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 rounded-lg text-[11px] font-bold text-slate-700 cursor-pointer transition-colors shadow-2xs">
+                                                            <Camera className="w-3.5 h-3.5 text-blue-700" />
+                                                            <span>Añadir foto del producto (Opcional)</span>
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                className="hidden"
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) {
+                                                                        const reader = new FileReader();
+                                                                        reader.onload = (ev) => {
+                                                                            handleItemChange(idx, 'image_url', ev.target.result);
+                                                                        };
+                                                                        reader.readAsDataURL(file);
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </label>
+                                                        <span className="text-[10px] text-slate-500 italic hidden sm:inline">
+                                                            Ej: bicicleta, generador, ventilador, maquinaria...
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-black">
@@ -2367,7 +2568,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                         </form>
 
                         {/* COLUMNA DERECHA (7 cols): HOJA FÍSICA A4 100% SINCRONIZADA EN TIEMPO REAL */}
-                        <div className={`lg:col-span-7 space-y-4 print:space-y-0 print:w-full print:m-0 print:p-0 ${mobileEditorTab === 'preview' ? 'block' : 'hidden lg:block'}`}>
+                        <div className={`lg:col-span-7 space-y-4 print:space-y-0 print:!w-full print:!m-0 print:!p-0 print:!block ${mobileEditorTab === 'preview' ? 'block' : 'hidden lg:block'}`}>
                             {/* Botón Móvil para Regresar al Formulario */}
                             <div className="lg:hidden flex items-center justify-between pb-1 no-print">
                                 <button
@@ -2421,14 +2622,16 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                                 <div className="flex items-center space-x-2 w-full sm:w-auto">
                                     <button
-                                        onClick={() => window.print()}
+                                        type="button"
+                                        onClick={handlePrintDocument}
                                         className="h-8 sm:h-9 px-3.5 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors flex-1 sm:flex-initial"
                                     >
                                         <Printer className="w-4 h-4 text-black" />
                                         <span>Imprimir</span>
                                     </button>
                                     <button
-                                        onClick={() => window.print()}
+                                        type="button"
+                                        onClick={handlePrintDocument}
                                         className="h-8 sm:h-9 px-3.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors flex-1 sm:flex-initial"
                                     >
                                         <Download className="w-4 h-4 text-white" />
@@ -2438,8 +2641,8 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                             </div>
 
                             {/* CONTENEDOR DE HOJA FÍSICA A4 EN VIVO (CON SCROLL HORIZONTAL FLUIDO EN SMARTPHONES) */}
-                            <div className="overflow-x-auto -mx-2 sm:mx-0 p-1 sm:p-0">
-                                <div className="min-w-[620px] lg:min-w-0 bg-white rounded-lg shadow-sm p-4 sm:p-8 md:p-10 text-slate-900 text-xs font-sans relative printable-sheet border border-slate-200 print:bg-white print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:w-full">
+                            <div className="overflow-x-auto -mx-2 sm:mx-0 p-1 sm:p-0 print:overflow-visible print:!m-0 print:!p-0 print:!w-full">
+                                <div className="min-w-[620px] lg:min-w-0 bg-white rounded-lg shadow-sm p-4 sm:p-8 md:p-10 text-slate-900 text-xs font-sans relative printable-sheet border border-slate-200 print:min-w-0 print:!w-full print:!m-0 print:!p-0 print:!border-none print:!shadow-none print:!rounded-none print:!bg-white">
 
                                 {selectedPdfFormat === 'formato-1' ? (
                                     /* ========================================================================= */
@@ -2447,14 +2650,14 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     /* ========================================================================= */
                                     <div>
                                         {/* 1. CABECERA / MEMBRETE INSTITUCIONAL */}
-                                        <div className="flex justify-between items-start gap-6 pb-4">
-                                            {/* Lado Izquierdo: Logo Corporativo Oficial CorpoAsia y Datos de la Empresa Emisora (Alineados Verticalmente) */}
-                                            <div className="max-w-[360px] space-y-2">
-                                                <div className="flex items-center justify-start shrink-0 mb-1">
+                                        <div className="flex justify-between items-start gap-4 pb-4">
+                                            {/* Lado Izquierdo: Logo Redondo Oficial CorpoAsia y Datos de la Empresa Emisora */}
+                                            <div className="flex items-start gap-3.5 max-w-[380px]">
+                                                <div className="shrink-0 p-1 bg-white rounded-full border border-slate-300 shadow-2xs">
                                                     <img
-                                                        src="/images/CorpoAsia.jpg"
+                                                        src="/images/corpoasia-round.png"
                                                         alt="Inversiones CorpoAsia C.A."
-                                                        className="h-12 w-auto object-contain object-left"
+                                                        className="h-16 w-16 sm:h-20 sm:w-20 rounded-full object-contain"
                                                     />
                                                 </div>
 
@@ -2588,14 +2791,27 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                         <tr key={idx}>
                                                             <td className="py-3 px-2 text-center font-mono font-bold text-slate-800">{idx + 1}</td>
                                                             <td className="py-3 px-3">
-                                                                <span className="font-bold text-slate-950 block">
-                                                                    {it.description || '[ Renglón pendiente por describir ]'}
-                                                                </span>
-                                                                {it.details && (
-                                                                    <span className="text-[11px] text-slate-600 block mt-0.5">
-                                                                        {it.details}
-                                                                    </span>
-                                                                )}
+                                                                <div className="flex items-start gap-3">
+                                                                    {it.image_url && (
+                                                                        <div className="shrink-0 w-14 h-14 rounded-lg border border-slate-300 bg-white p-1 flex items-center justify-center shadow-2xs">
+                                                                            <img
+                                                                                src={it.image_url}
+                                                                                alt={it.description}
+                                                                                className="max-h-full max-w-full object-contain rounded"
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <span className="font-bold text-slate-950 block">
+                                                                            {it.description || '[ Renglón pendiente por describir ]'}
+                                                                        </span>
+                                                                        {it.details && (
+                                                                            <span className="text-[11px] text-slate-600 block mt-0.5 whitespace-pre-line">
+                                                                                {it.details}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             </td>
                                                             <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
                                                                 {it.quantity} {it.unit}
@@ -2698,39 +2914,42 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                                         {/* ---------- PÁGINA 1: FICHA TÉCNICA & DATOS DEL CLIENTE ---------- */}
                                         <div className="space-y-4">
-                                            {/* Cabecera Moaiven */}
-                                            <div className="flex justify-between items-start gap-4">
-                                                <div className="max-w-[340px] space-y-1">
-                                                    <div className="h-14 flex items-center justify-start mb-2 shrink-0">
+                                            {/* Cabecera Moaiven / Industrial */}
+                                            <div className="flex justify-between items-start gap-4 pb-1">
+                                                {/* Lado Izquierdo: Logo Redondo y Datos de la Empresa Emisora en Fila */}
+                                                <div className="flex items-start gap-3.5 max-w-[420px]">
+                                                    <div className="shrink-0 p-1 bg-white rounded-full border border-slate-300 shadow-2xs mt-0.5">
                                                         <img
-                                                            src="/images/CorpoAsia.jpg"
+                                                            src="/images/corpoasia-round.png"
                                                             alt="Inversiones CorpoAsia C.A."
-                                                            className="h-12 w-auto object-contain object-left"
+                                                            className="h-16 w-16 sm:h-20 sm:w-20 rounded-full object-contain"
                                                         />
                                                     </div>
-                                                    <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                                                        {activeCompany.name}
-                                                    </h1>
-                                                    <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">
-                                                        IMPORT & LOGISTICS · CHINA - VENEZUELA
-                                                    </p>
-                                                    <p className="text-xs font-bold text-slate-800">
-                                                        RIF: {activeCompany.tax_id}
-                                                    </p>
-                                                    <p className="text-xs text-slate-600 leading-tight">
-                                                        {activeCompany.address}
-                                                    </p>
-                                                    {activeCompany.email && (
-                                                        <p className="text-xs text-slate-600">
-                                                            {activeCompany.email}
+                                                    <div className="space-y-0.5 min-w-0">
+                                                        <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-snug">
+                                                            {activeCompany.name}
+                                                        </h1>
+                                                        <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">
+                                                            IMPORT & LOGISTICS · CHINA - VENEZUELA
                                                         </p>
-                                                    )}
-                                                    <p className="text-xs text-slate-600">
-                                                        WhatsApp: {activeCompany.phone}
-                                                    </p>
-                                                    <p className="text-xs text-slate-600">
-                                                        TikTok: {invoiceForm.company_social_handle || (`@${activeCompany.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.logistic`)}
-                                                    </p>
+                                                        <p className="text-xs font-bold text-slate-800">
+                                                            RIF: {activeCompany.tax_id}
+                                                        </p>
+                                                        <p className="text-xs text-slate-600 leading-tight">
+                                                            {activeCompany.address}
+                                                        </p>
+                                                        {activeCompany.email && (
+                                                            <p className="text-xs text-slate-600">
+                                                                {activeCompany.email}
+                                                            </p>
+                                                        )}
+                                                        <p className="text-xs text-slate-600">
+                                                            WhatsApp: {activeCompany.phone}
+                                                        </p>
+                                                        <p className="text-xs text-slate-600">
+                                                            TikTok: {invoiceForm.company_social_handle || (`@${activeCompany.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.logistic`)}
+                                                        </p>
+                                                    </div>
                                                 </div>
 
                                                 <div className="text-right shrink-0">
@@ -2804,13 +3023,24 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                 </div>
                                                 
                                                 {/* Título y Subtítulo del Equipo */}
-                                                <div className="p-3 border-b border-slate-200 bg-white">
-                                                    <h3 className="text-sm font-black text-[#0E1C33] uppercase">
-                                                        {invoiceForm.items[0]?.description || 'CATERPILLAR 320C L'}
-                                                        <span className="font-normal text-slate-600 text-xs lowercase ml-2">
-                                                            — {invoiceForm.items[0]?.details || 'Excavadora sobre orugas'}
-                                                        </span>
-                                                    </h3>
+                                                <div className="p-3 border-b border-slate-200 bg-white flex items-center justify-between gap-4">
+                                                    <div>
+                                                        <h3 className="text-sm font-black text-[#0E1C33] uppercase">
+                                                            {invoiceForm.items[0]?.description || 'CATERPILLAR 320C L'}
+                                                            <span className="font-normal text-slate-600 text-xs lowercase ml-2">
+                                                                — {invoiceForm.items[0]?.details || 'Excavadora sobre orugas'}
+                                                            </span>
+                                                        </h3>
+                                                    </div>
+                                                    {invoiceForm.items[0]?.image_url && (
+                                                        <div className="w-16 h-16 rounded-lg border border-slate-300 p-1 bg-white shrink-0 shadow-2xs flex items-center justify-center">
+                                                            <img
+                                                                src={invoiceForm.items[0].image_url}
+                                                                alt={invoiceForm.items[0].description}
+                                                                className="max-h-full max-w-full object-contain rounded"
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* Tabla Dinámica de Especificaciones Técnicas con Zebra Striping */}
@@ -2874,10 +3104,17 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                 </div>
                                                 <div className="text-xs bg-white">
                                                     {invoiceForm.items.map((it, idx) => (
-                                                        <div key={idx} className="flex justify-between px-3 py-2 border-b border-slate-200">
-                                                            <span className="font-medium text-slate-800">
-                                                                {it.description || 'Equipo (FOB China)'} {it.quantity > 1 ? `(${it.quantity} ${it.unit})` : ''}
-                                                            </span>
+                                                        <div key={idx} className="flex justify-between items-center px-3 py-2 border-b border-slate-200">
+                                                            <div className="flex items-center gap-2.5">
+                                                                {it.image_url && (
+                                                                    <div className="w-8 h-8 rounded border border-slate-300 p-0.5 bg-white shrink-0 flex items-center justify-center">
+                                                                        <img src={it.image_url} alt="" className="max-h-full max-w-full object-contain rounded" />
+                                                                    </div>
+                                                                )}
+                                                                <span className="font-medium text-slate-800">
+                                                                    {it.description || 'Equipo (FOB China)'} {it.quantity > 1 ? `(${it.quantity} ${it.unit})` : ''}
+                                                                </span>
+                                                            </div>
                                                             <span className="font-mono font-bold text-slate-900">
                                                                 USD {Number(it.quantity * it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                                             </span>
@@ -2980,12 +3217,14 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
             {/* MODAL 1: REGISTRAR EMPRESA EMISORA */}
             {isCompanyModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs no-print">
                     <div className="bg-white rounded-2xl border-4 border-black shadow-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center border-b-2 border-slate-300 pb-3">
                             <div className="flex items-center gap-2">
                                 <Building2 className="w-5 h-5 text-blue-700" />
-                                <h3 className="text-sm font-black text-black uppercase">Registrar Nueva Empresa Emisora</h3>
+                                <h3 className="text-sm font-black text-black uppercase">
+                                    {editingCompany ? 'Editar Empresa Emisora' : 'Registrar Nueva Empresa Emisora'}
+                                </h3>
                             </div>
                             <button
                                 onClick={() => setIsCompanyModalOpen(false)}
@@ -3091,7 +3330,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     className="h-9 px-5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 w-full sm:w-auto"
                                 >
                                     <Save className="w-4 h-4 text-emerald-400" />
-                                    <span>{isSavingCompany ? 'Guardando...' : 'Guardar Empresa'}</span>
+                                    <span>{isSavingCompany ? 'Guardando...' : (editingCompany ? 'Actualizar Empresa' : 'Guardar Empresa')}</span>
                                 </button>
                             </div>
                         </form>
@@ -3101,12 +3340,14 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
             {/* MODAL 2: REGISTRAR CLIENTE CON BOTÓN CNE AUTOCOMPLETE */}
             {isClientModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs no-print">
                     <div className="bg-white rounded-2xl border-4 border-black shadow-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center border-b-2 border-slate-300 pb-3">
                             <div className="flex items-center gap-2">
                                 <User className="w-5 h-5 text-emerald-700" />
-                                <h3 className="text-sm font-black text-black uppercase">Registrar Nuevo Cliente / Adquiriente</h3>
+                                <h3 className="text-sm font-black text-black uppercase">
+                                    {editingClient ? 'Editar Cliente / Adquiriente' : 'Registrar Nuevo Cliente / Adquiriente'}
+                                </h3>
                             </div>
                             <button
                                 onClick={() => {
@@ -3297,7 +3538,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     className="h-9 px-5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 w-full sm:w-auto"
                                 >
                                     <Save className="w-4 h-4 text-emerald-400" />
-                                    <span>{isSavingClient ? 'Guardando...' : 'Guardar Cliente'}</span>
+                                    <span>{isSavingClient ? 'Guardando...' : (editingClient ? 'Actualizar Cliente' : 'Guardar Cliente')}</span>
                                 </button>
                             </div>
                         </form>
