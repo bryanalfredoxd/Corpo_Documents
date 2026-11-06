@@ -36,7 +36,7 @@ export default function Login({ status, canResetPassword }) {
                 </div>
 
                 {/* Login Card */}
-                <div className="bg-white rounded-2xl border-2 border-slate-300 shadow-xl p-8">
+                <div className="bg-white rounded-2xl border-2 border-slate-300 shadow-xl p-5 sm:p-8">
                     <div className="mb-6 pb-4 border-b-2 border-slate-200 flex items-center justify-between">
                         <div>
                             <h2 className="text-base font-black text-black">

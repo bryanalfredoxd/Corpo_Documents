@@ -30,6 +30,24 @@ input[type="number"] {
     background: #94a3b8;
 }
 
+/* Ocultar barra de desplazamiento en elementos scrollables horizontales */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Prevención de desbordamiento horizontal en dispositivos móviles */
+@media screen and (max-width: 768px) {
+    html, body {
+        overflow-x: hidden;
+        width: 100%;
+        position: relative;
+    }
+}
+
 /* Configuración de Hoja A4 para Impresión y PDF */
 @page {
     size: A4 portrait;

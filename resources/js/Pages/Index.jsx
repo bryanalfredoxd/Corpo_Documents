@@ -129,6 +129,20 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         companies.length > 0 ? companies[0].id : null
     );
 
+    // Detección responsive para dispositivos móviles y tablets
+    const [isMobile, setIsMobile] = useState(false);
+    // Pestaña activa en pantalla móvil para el Taller de Emisión: 'formulario' | 'preview'
+    const [mobileEditorTab, setMobileEditorTab] = useState('formulario');
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 1024);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     // Control de tamaño / zoom para accesibilidad y alta legibilidad (+15%, +25%, +35%, +45%)
     const [zoomLevel, setZoomLevel] = useState('115');
     const [isZoomOpen, setIsZoomOpen] = useState(false);
@@ -611,123 +625,125 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
     return (
         <div
             className="min-h-screen bg-[#F1F5F9] print:bg-white print:min-h-0 text-black flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white"
-            style={{ zoom: `${zoomLevel}%` }}
+            style={{ zoom: isMobile ? '100%' : `${zoomLevel}%` }}
         >
             <Head title="Corpo Documents | Sistema de Facturación y Registro Multi-Empresa" />
 
-            {/* TOP BAR CON ALINEACIÓN SIMÉTRICA Y PERFECTO ESPACIADO */}
-            <header className="bg-white border-b-2 border-slate-300 px-6 py-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-40 shadow-xs no-print">
+            {/* TOP BAR CON ALINEACIÓN SIMÉTRICA Y PERFECTO ESPACIADO RESPONSIVE */}
+            <header className="bg-white border-b-2 border-slate-300 px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-40 shadow-xs no-print">
 
                 {/* Logo & Marca del Sistema */}
-                <div className="flex items-center space-x-3">
-                    <div className="h-10 w-10 bg-black text-white rounded-xl flex items-center justify-center font-black text-sm shadow-xs">
+                <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+                    <div className="h-9 w-9 sm:h-10 sm:w-10 bg-black text-white rounded-xl flex items-center justify-center font-black text-sm shadow-xs shrink-0">
                         <BookOpen className="w-5 h-5 text-sky-400" />
                     </div>
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-black tracking-tight text-black uppercase leading-none">
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                            <h1 className="text-xs sm:text-sm font-black tracking-tight text-black uppercase leading-none">
                                 Corpo<span className="text-blue-700">Documents</span>
                             </h1>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-600 block mt-0.5">
-                            Sistema de Facturación & Control Fiscal
+                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 hidden xs:block mt-0.5">
+                            Facturación & Control Fiscal
                         </span>
                     </div>
                 </div>
 
-                {/* SELECTOR DE TAMAÑO DE PANTALLA (DESPLEGABLE COMPACTO SIMÉTRICO) */}
-                <div className="relative">
-                    <button
-                        type="button"
-                        onClick={() => setIsZoomOpen(!isZoomOpen)}
-                        className="h-9 flex items-center gap-2 bg-white hover:bg-slate-100 border-2 border-slate-300 text-black px-3 rounded-lg shadow-xs transition-colors font-black text-xs cursor-pointer"
-                        title="Ajustar tamaño de letra y pantalla"
-                    >
-                        <Type className="w-4 h-4 text-slate-700 shrink-0" />
-                        <span>Tamaño: <strong>{currentZoomOption.value}%</strong></span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-black transition-transform ${isZoomOpen ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {isZoomOpen && (
-                        <>
-                            <div className="fixed inset-0 z-40" onClick={() => setIsZoomOpen(false)} />
-                            <div className="absolute right-0 mt-1.5 w-60 bg-white border-2 border-black rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-200">
-                                <div className="p-2.5 bg-slate-100 flex items-center justify-between border-b border-slate-300">
-                                    <span className="text-[11px] font-black uppercase text-black">
-                                        Tamaño de Pantalla
-                                    </span>
-                                    <span className="text-[10px] font-mono font-bold bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded">
-                                        Zoom
-                                    </span>
-                                </div>
-                                <div className="p-1.5 space-y-1">
-                                    {zoomOptions.map((opt) => (
-                                        <button
-                                            key={opt.value}
-                                            type="button"
-                                            onClick={() => {
-                                                handleZoomChange(opt.value);
-                                                setIsZoomOpen(false);
-                                            }}
-                                            className={`w-full text-left px-3 py-2 rounded-lg flex items-center justify-between text-xs font-black transition-colors ${zoomLevel === opt.value
-                                                ? 'bg-black text-white'
-                                                : 'text-black hover:bg-slate-100'
-                                                }`}
-                                        >
-                                            <div>
-                                                <span className="block">{opt.label}</span>
-                                                <span className={`block text-[10px] font-bold ${zoomLevel === opt.value ? 'text-slate-300' : 'text-slate-700'
-                                                    }`}>
-                                                    {opt.desc}
-                                                </span>
-                                            </div>
-                                            {zoomLevel === opt.value && (
-                                                <Check className="w-4 h-4 text-emerald-400 shrink-0 ml-2" />
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-
                 {/* Acciones de la Cabecera & Cerrar Sesión (Simétricos) */}
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-1.5 sm:space-x-3">
+                    {/* SELECTOR DE TAMAÑO DE PANTALLA (Visible en pantallas medianas y grandes) */}
+                    <div className="relative hidden md:block">
+                        <button
+                            type="button"
+                            onClick={() => setIsZoomOpen(!isZoomOpen)}
+                            className="h-9 flex items-center gap-2 bg-white hover:bg-slate-100 border-2 border-slate-300 text-black px-3 rounded-lg shadow-xs transition-colors font-black text-xs cursor-pointer"
+                            title="Ajustar tamaño de letra y pantalla"
+                        >
+                            <Type className="w-4 h-4 text-slate-700 shrink-0" />
+                            <span>Tamaño: <strong>{currentZoomOption.value}%</strong></span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-black transition-transform ${isZoomOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isZoomOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setIsZoomOpen(false)} />
+                                <div className="absolute right-0 mt-1.5 w-60 bg-white border-2 border-black rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-200">
+                                    <div className="p-2.5 bg-slate-100 flex items-center justify-between border-b border-slate-300">
+                                        <span className="text-[11px] font-black uppercase text-black">
+                                            Tamaño de Pantalla
+                                        </span>
+                                        <span className="text-[10px] font-mono font-bold bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded">
+                                            Zoom
+                                        </span>
+                                    </div>
+                                    <div className="p-1.5 space-y-1">
+                                        {zoomOptions.map((opt) => (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => {
+                                                    handleZoomChange(opt.value);
+                                                    setIsZoomOpen(false);
+                                                }}
+                                                className={`w-full text-left px-3 py-2 rounded-lg flex items-center justify-between text-xs font-black transition-colors ${zoomLevel === opt.value
+                                                    ? 'bg-black text-white'
+                                                    : 'text-black hover:bg-slate-100'
+                                                    }`}
+                                            >
+                                                <div>
+                                                    <span className="block">{opt.label}</span>
+                                                    <span className={`block text-[10px] font-bold ${zoomLevel === opt.value ? 'text-slate-300' : 'text-slate-700'
+                                                        }`}>
+                                                        {opt.desc}
+                                                    </span>
+                                                </div>
+                                                {zoomLevel === opt.value && (
+                                                    <Check className="w-4 h-4 text-emerald-400 shrink-0 ml-2" />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
                     <button
                         onClick={handleNewInvoice}
-                        className="h-9 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 rounded-lg flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                        className="h-8 sm:h-9 bg-blue-700 hover:bg-blue-800 text-white text-[11px] sm:text-xs font-black px-2.5 sm:px-4 rounded-lg flex items-center gap-1.5 shadow-xs transition-transform active:scale-95 cursor-pointer shrink-0"
                     >
-                        <FilePlus2 className="w-4 h-4" />
-                        <span>NUEVA FACTURA / PDF</span>
+                        <FilePlus2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">NUEVA FACTURA / PDF</span>
+                        <span className="sm:hidden">Nueva</span>
                     </button>
 
-                    <div className="h-6 w-px bg-slate-300 hidden sm:block"></div>
+                    <div className="h-5 sm:h-6 w-px bg-slate-300"></div>
 
                     <button
                         onClick={handleLogout}
-                        className="h-9 bg-white hover:bg-red-50 border-2 border-slate-300 hover:border-red-500 text-black hover:text-red-900 px-3.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="h-8 sm:h-9 bg-white hover:bg-red-50 border-2 border-slate-300 hover:border-red-500 text-black hover:text-red-900 px-2 sm:px-3 rounded-lg text-xs font-black flex items-center gap-1 transition-colors cursor-pointer shrink-0"
                         title="Cerrar Sesión del Sistema"
                     >
-                        <LogOut className="w-4 h-4 text-red-700" />
-                        <span>Salir</span>
+                        <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-700" />
+                        <span className="hidden sm:inline">Salir</span>
                     </button>
                 </div>
             </header>
 
-            {/* BARRA DE NAVEGACIÓN SECUNDARIA */}
-            <div className="bg-white border-b-2 border-slate-300 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 no-print">
-                <div className="flex items-center space-x-2">
+            {/* BARRA DE NAVEGACIÓN SECUNDARIA RESPONSIVE */}
+            <div className="bg-white border-b-2 border-slate-300 px-3 sm:px-6 py-2 sm:py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 no-print">
+                <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0 w-full sm:w-auto">
                     <button
                         onClick={() => setCurrentView('libro-fiscal')}
-                        className={`h-9 px-4 rounded-lg text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${currentView === 'libro-fiscal'
+                        className={`h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg text-xs font-black flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${currentView === 'libro-fiscal'
                             ? 'bg-black text-white shadow-xs ring-2 ring-blue-600'
                             : 'text-black hover:bg-slate-200 border-2 border-slate-300'
                             }`}
                     >
-                        <Receipt className="w-4 h-4 text-blue-400" />
-                        <span>1. LIBRO FISCAL & FACTURAS</span>
-                        <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${currentView === 'libro-fiscal' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
+                        <Receipt className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400 shrink-0" />
+                        <span className="hidden md:inline">1. LIBRO FISCAL & FACTURAS</span>
+                        <span className="md:hidden">1. Facturas</span>
+                        <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded font-mono font-bold ${currentView === 'libro-fiscal' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
                             }`}>
                             {invoices.length}
                         </span>
@@ -735,14 +751,15 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                     <button
                         onClick={() => setCurrentView('directorio')}
-                        className={`h-9 px-4 rounded-lg text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${currentView === 'directorio'
+                        className={`h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg text-xs font-black flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${currentView === 'directorio'
                             ? 'bg-black text-white shadow-xs ring-2 ring-blue-600'
                             : 'text-black hover:bg-slate-200 border-2 border-slate-300'
                             }`}
                     >
-                        <Users2 className="w-4 h-4 text-emerald-400" />
-                        <span>2. DIRECTORIO (EMPRESAS & CLIENTES)</span>
-                        <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${currentView === 'directorio' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
+                        <Users2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+                        <span className="hidden md:inline">2. DIRECTORIO (EMPRESAS & CLIENTES)</span>
+                        <span className="md:hidden">2. Directorio</span>
+                        <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded font-mono font-bold ${currentView === 'directorio' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
                             }`}>
                             {companies.length} Emp · {clients.length} Clie
                         </span>
@@ -750,32 +767,33 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                     <button
                         onClick={() => setCurrentView('generador-pdf')}
-                        className={`h-9 px-4 rounded-lg text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${currentView === 'generador-pdf'
+                        className={`h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg text-xs font-black flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${currentView === 'generador-pdf'
                             ? 'bg-black text-white shadow-xs ring-2 ring-blue-600'
                             : 'text-black hover:bg-slate-200 border-2 border-slate-300'
                             }`}
                     >
-                        <FileText className="w-4 h-4 text-amber-400" />
-                        <span>3. TALLER DE EMISIÓN & PDF EN VIVO</span>
+                        <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+                        <span className="hidden md:inline">3. TALLER DE EMISIÓN & PDF EN VIVO</span>
+                        <span className="md:hidden">3. Taller PDF</span>
                     </button>
                 </div>
 
                 {/* Búsqueda solo cuando esté en libro-fiscal o directorio */}
                 {currentView !== 'generador-pdf' ? (
-                    <div className="relative">
+                    <div className="relative w-full sm:w-72">
                         <Search className="w-4 h-4 text-slate-800 absolute left-3 top-1/2 -translate-y-1/2 font-bold" />
                         <input
                             type="text"
-                            placeholder="Buscar por RIF, Cédula o Nombre..."
+                            placeholder="Buscar RIF, Cédula o Nombre..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="h-9 bg-white border-2 border-slate-400 text-xs font-bold rounded-lg pl-9 pr-3 w-72 text-black placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                            className="h-8 sm:h-9 bg-white border-2 border-slate-400 text-xs font-bold rounded-lg pl-9 pr-3 w-full text-black placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                         />
                     </div>
                 ) : (
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-700">Documento Activo:</span>
-                        <span className="text-xs font-mono font-black text-blue-900 bg-blue-50 border border-blue-300 px-2.5 py-1 rounded-md uppercase">
+                    <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto text-xs shrink-0">
+                        <span className="text-xs font-bold text-slate-700 hidden sm:inline">Activo:</span>
+                        <span className="text-xs font-mono font-black text-blue-900 bg-blue-50 border border-blue-300 px-2 sm:px-2.5 py-1 rounded-md uppercase text-[11px] truncate">
                             {getDocumentTypeInfo(invoiceForm.document_type).badgeText} • N° {projectedCorrelative}
                         </span>
                     </div>
@@ -784,7 +802,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
             {/* BANNER DE NOTIFICACIÓN FLASH */}
             {flash?.success && (
-                <div className="bg-emerald-100 border-b-2 border-emerald-500 px-6 py-2.5 flex items-center justify-between text-xs font-black text-emerald-950 no-print">
+                <div className="bg-emerald-100 border-b-2 border-emerald-500 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs font-black text-emerald-950 no-print">
                     <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-700" />
                         <span>{flash.success}</span>
@@ -792,109 +810,109 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                 </div>
             )}
 
-            {/* CONTENIDO PRINCIPAL */}
-            <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full print:space-y-0 print:bg-white">
+            {/* CONTENIDO PRINCIPAL RESPONSIVE */}
+            <main className="flex-1 p-3 sm:p-4 md:p-6 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full print:space-y-0 print:bg-white">
 
-                {/* MÉTRICAS CONTABLES: SOLO EN LIBRO FISCAL Y DIRECTORIO PARA NO COLAPSAR EL TALLER DE EMISIÓN */}
+                {/* MÉTRICAS CONTABLES: EN DISPOSITIVOS MÓVILES SE MUESTRAN EN CUADRÍCULA 2x2 CÓMODA */}
                 {currentView !== 'generador-pdf' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 no-print">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 no-print">
                         {/* Tarjeta 1: Total Facturado */}
-                        <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                        <div className="bg-white rounded-xl sm:rounded-2xl border-2 border-slate-300 p-2.5 sm:p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between min-w-0 overflow-hidden">
+                            <div>
+                                <div className="flex items-center justify-between gap-1.5 min-w-0 mb-1">
+                                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 truncate min-w-0 flex-1">
                                         Total Facturado (DB)
                                     </span>
-                                    <span className="text-2xl font-black text-black font-mono mt-1 block">
-                                        ${Number(stats.total_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                    </span>
+                                    <div className="p-1 sm:p-2 bg-emerald-50 text-emerald-700 rounded-md sm:rounded-xl border border-emerald-200 shrink-0">
+                                        <DollarSign className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                                    </div>
                                 </div>
-                                <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 shrink-0">
-                                    <DollarSign className="w-5 h-5" />
-                                </div>
+                                <span className="text-base sm:text-2xl font-black text-black font-mono block truncate" title={`$${Number(stats.total_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}>
+                                    ${Number(stats.total_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
                             </div>
-                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                                <span className="font-bold text-slate-600">Acumulado en BD</span>
-                                <span className="font-mono font-black text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded text-[11px]">
+                            <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs">
+                                <span className="font-bold text-slate-600 hidden sm:inline">Acumulado en BD</span>
+                                <span className="font-mono font-black text-emerald-800 bg-emerald-100/80 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
                                     USD ($)
                                 </span>
                             </div>
                         </div>
 
                         {/* Tarjeta 2: Documentos Emitidos */}
-                        <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                        <div className="bg-white rounded-xl sm:rounded-2xl border-2 border-slate-300 p-2.5 sm:p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between min-w-0 overflow-hidden">
+                            <div>
+                                <div className="flex items-center justify-between gap-1.5 min-w-0 mb-1">
+                                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 truncate min-w-0 flex-1">
                                         Documentos Emitidos
                                     </span>
-                                    <span className="text-2xl font-black text-blue-900 font-mono mt-1 block">
-                                        {stats.invoices_count || invoices.length}
-                                    </span>
+                                    <div className="p-1 sm:p-2 bg-blue-50 text-blue-700 rounded-md sm:rounded-xl border border-blue-200 shrink-0">
+                                        <Receipt className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                                    </div>
                                 </div>
-                                <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl border border-blue-200 shrink-0">
-                                    <Receipt className="w-5 h-5" />
-                                </div>
+                                <span className="text-base sm:text-2xl font-black text-blue-900 font-mono block truncate">
+                                    {stats.invoices_count || invoices.length}
+                                </span>
                             </div>
-                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                                <span className="font-bold text-slate-600">Comprobantes válidos</span>
-                                <span className="font-mono font-black text-blue-900 bg-blue-100/80 px-2 py-0.5 rounded text-[11px]">
+                            <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs">
+                                <span className="font-bold text-slate-600 hidden sm:inline">Comprobantes válidos</span>
+                                <span className="font-mono font-black text-blue-900 bg-blue-100/80 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
                                     Registros
                                 </span>
                             </div>
                         </div>
 
                         {/* Tarjeta 3: Empresas Emisoras */}
-                        <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between">
-                            <div className="flex items-start justify-between gap-2">
-                                <div>
-                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                        <div className="bg-white rounded-xl sm:rounded-2xl border-2 border-slate-300 p-2.5 sm:p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between min-w-0 overflow-hidden">
+                            <div>
+                                <div className="flex items-center justify-between gap-1.5 min-w-0 mb-1">
+                                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 truncate min-w-0 flex-1">
                                         Empresas Emisoras
                                     </span>
-                                    <span className="text-2xl font-black text-black font-mono mt-1 block">
-                                        {stats.companies_count || companies.length}
-                                    </span>
+                                    <button
+                                        onClick={() => setIsCompanyModalOpen(true)}
+                                        className="h-6 sm:h-7 px-1.5 sm:px-2.5 bg-black hover:bg-slate-800 text-white rounded-md sm:rounded-lg text-[10px] sm:text-xs font-black flex items-center justify-center gap-1 shadow-xs cursor-pointer transition-transform active:scale-95 shrink-0"
+                                        title="Añadir nueva empresa emisora"
+                                    >
+                                        <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                        <span className="hidden sm:inline">Empresa</span>
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => setIsCompanyModalOpen(true)}
-                                    className="h-7 px-2.5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-xs cursor-pointer transition-transform active:scale-95 shrink-0"
-                                    title="Añadir nueva empresa emisora"
-                                >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    <span>Empresa</span>
-                                </button>
+                                <span className="text-base sm:text-2xl font-black text-black font-mono block truncate">
+                                    {stats.companies_count || companies.length}
+                                </span>
                             </div>
-                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                                <span className="font-bold text-slate-600">Emisores en BD</span>
-                                <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                            <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs">
+                                <span className="font-bold text-slate-600 hidden sm:inline">Emisores en BD</span>
+                                <span className="font-bold text-slate-800 bg-slate-100 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
                                     Con Logo
                                 </span>
                             </div>
                         </div>
 
                         {/* Tarjeta 4: Clientes Registrados */}
-                        <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between">
-                            <div className="flex items-start justify-between gap-2">
-                                <div>
-                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                        <div className="bg-white rounded-xl sm:rounded-2xl border-2 border-slate-300 p-2.5 sm:p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between min-w-0 overflow-hidden">
+                            <div>
+                                <div className="flex items-center justify-between gap-1.5 min-w-0 mb-1">
+                                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 truncate min-w-0 flex-1">
                                         Clientes Registrados
                                     </span>
-                                    <span className="text-2xl font-black text-black font-mono mt-1 block">
-                                        {stats.clients_count || clients.length}
-                                    </span>
+                                    <button
+                                        onClick={() => setIsClientModalOpen(true)}
+                                        className="h-6 sm:h-7 px-1.5 sm:px-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-md sm:rounded-lg text-[10px] sm:text-xs font-black flex items-center justify-center gap-1 shadow-xs cursor-pointer transition-transform active:scale-95 shrink-0"
+                                        title="Añadir nuevo cliente"
+                                    >
+                                        <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                        <span className="hidden sm:inline">Cliente</span>
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => setIsClientModalOpen(true)}
-                                    className="h-7 px-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-xs cursor-pointer transition-transform active:scale-95 shrink-0"
-                                    title="Añadir nuevo cliente"
-                                >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    <span>Cliente</span>
-                                </button>
+                                <span className="text-base sm:text-2xl font-black text-black font-mono block truncate">
+                                    {stats.clients_count || clients.length}
+                                </span>
                             </div>
-                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                                <span className="font-bold text-slate-600">Directorio en BD</span>
-                                <span className="font-mono font-black text-emerald-900 bg-emerald-100/80 px-2 py-0.5 rounded text-[11px]">
+                            <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs">
+                                <span className="font-bold text-slate-600 hidden sm:inline">Directorio en BD</span>
+                                <span className="font-mono font-black text-emerald-900 bg-emerald-100/80 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
                                     Activos
                                 </span>
                             </div>
@@ -907,7 +925,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                     <div className="bg-white rounded-xl border-2 border-slate-300 shadow-sm overflow-hidden">
 
                         {/* Cabecera de la tabla */}
-                        <div className="p-5 border-b-2 border-slate-300 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-100/70">
+                        <div className="p-3.5 sm:p-5 border-b-2 border-slate-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-100/70">
                             <div>
                                 <h2 className="text-sm font-black text-black uppercase tracking-tight">
                                     Libro de Ventas & Registro Histórico de Facturas (Base de Datos)
@@ -917,17 +935,17 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 </p>
                             </div>
 
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
                                 <button
                                     onClick={() => window.print()}
-                                    className="h-9 px-3.5 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                                    className="h-8 sm:h-9 px-3 sm:px-3.5 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer flex-1 sm:flex-initial"
                                 >
                                     <Printer className="w-4 h-4 text-black" />
                                     <span>Imprimir Libro</span>
                                 </button>
                                 <button
                                     onClick={handleNewInvoice}
-                                    className="h-9 px-4 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                                    className="h-8 sm:h-9 px-3.5 sm:px-4 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer flex-1 sm:flex-initial"
                                 >
                                     <Plus className="w-4 h-4 text-white" />
                                     <span>Emitir Factura</span>
@@ -935,9 +953,15 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                             </div>
                         </div>
 
+                        {/* Indicador de desplazamiento horizontal para móviles */}
+                        <div className="md:hidden px-3.5 py-1.5 bg-blue-50 text-blue-900 border-b border-blue-200 text-[11px] font-bold flex items-center justify-between">
+                            <span>↔ Desliza la tabla para ver todos los datos</span>
+                            <ArrowUpDown className="w-3.5 h-3.5 rotate-90 text-blue-700" />
+                        </div>
+
                         {/* Tabla */}
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs border-collapse">
+                            <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                                 <thead className="bg-slate-200 text-black uppercase text-xs font-black tracking-wider border-b-2 border-slate-400">
                                     <tr>
                                         <th className="px-5 py-3.5">Correlativo</th>
@@ -1058,21 +1082,21 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                         </div>
 
                         {/* Barra de Paginación de 10 Filas por Página */}
-                        <div className="px-5 py-3.5 border-t-2 border-slate-300 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
-                            <div className="text-xs font-black text-slate-700">
+                        <div className="p-3 sm:px-5 sm:py-3.5 border-t-2 border-slate-300 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3">
+                            <div className="text-xs font-black text-slate-700 text-center sm:text-left">
                                 {filteredInvoices.length === 0 ? (
                                     <span>0 documentos encontrados</span>
                                 ) : (
                                     <span>
                                         Mostrando <strong className="text-black">{(invoicePage - 1) * invoicePageSize + 1}</strong> a{' '}
                                         <strong className="text-black">{Math.min(invoicePage * invoicePageSize, filteredInvoices.length)}</strong> de{' '}
-                                        <strong className="text-black">{filteredInvoices.length}</strong> documentos fiscales (Pág. {invoicePage} de {totalInvoicePages})
+                                        <strong className="text-black">{filteredInvoices.length}</strong> facturas (Pág. {invoicePage}/{totalInvoicePages})
                                     </span>
                                 )}
                             </div>
 
                             {totalInvoicePages > 1 && (
-                                <div className="flex items-center space-x-1.5">
+                                <div className="flex items-center space-x-1.5 flex-wrap justify-center">
                                     <button
                                         type="button"
                                         onClick={() => setInvoicePage(p => Math.max(1, p - 1))}
@@ -1080,23 +1104,31 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         className="h-8 px-2.5 rounded-lg border-2 border-slate-300 text-xs font-black text-black bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
                                     >
                                         <ChevronLeft className="w-3.5 h-3.5" />
-                                        <span>Anterior</span>
+                                        <span className="hidden xs:inline">Anterior</span>
                                     </button>
 
-                                    {Array.from({ length: totalInvoicePages }, (_, i) => i + 1).map(pageNumber => (
-                                        <button
-                                            key={pageNumber}
-                                            type="button"
-                                            onClick={() => setInvoicePage(pageNumber)}
-                                            className={`h-8 w-8 rounded-lg text-xs font-mono font-black transition-all cursor-pointer ${
-                                                invoicePage === pageNumber
-                                                    ? 'bg-blue-700 text-white shadow-xs'
-                                                    : 'bg-white border-2 border-slate-300 text-black hover:bg-slate-200'
-                                            }`}
-                                        >
-                                            {pageNumber}
-                                        </button>
-                                    ))}
+                                    {/* En pantallas móviles se muestra indicador numérico compacto */}
+                                    <div className="flex sm:hidden items-center px-2 font-mono font-bold text-xs text-black">
+                                        {invoicePage} / {totalInvoicePages}
+                                    </div>
+
+                                    {/* En pantallas sm y mayores se muestran todos los botones numéricos */}
+                                    <div className="hidden sm:flex items-center space-x-1.5">
+                                        {Array.from({ length: totalInvoicePages }, (_, i) => i + 1).map(pageNumber => (
+                                            <button
+                                                key={pageNumber}
+                                                type="button"
+                                                onClick={() => setInvoicePage(pageNumber)}
+                                                className={`h-8 w-8 rounded-lg text-xs font-mono font-black transition-all cursor-pointer ${
+                                                    invoicePage === pageNumber
+                                                        ? 'bg-blue-700 text-white shadow-xs'
+                                                        : 'bg-white border-2 border-slate-300 text-black hover:bg-slate-200'
+                                                }`}
+                                            >
+                                                {pageNumber}
+                                            </button>
+                                        ))}
+                                    </div>
 
                                     <button
                                         type="button"
@@ -1104,7 +1136,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         disabled={invoicePage === totalInvoicePages}
                                         className="h-8 px-2.5 rounded-lg border-2 border-slate-300 text-xs font-black text-black bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
                                     >
-                                        <span>Siguiente</span>
+                                        <span className="hidden xs:inline">Siguiente</span>
                                         <ChevronRight className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
@@ -1117,36 +1149,34 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                 {currentView === 'directorio' && (
                     <div className="space-y-4">
                         {/* Barra de Navegación del Directorio: Separación clara entre Empresas Emisoras y Clientes */}
-                        <div className="bg-white p-4 rounded-xl border-2 border-slate-300 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-xs font-black uppercase text-black mr-1">Sección:</span>
-
+                        <div className="bg-white p-3 sm:p-4 rounded-xl border-2 border-slate-300 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
+                            <div className="grid grid-cols-2 gap-2 w-full lg:w-auto">
                                 {/* Botón Pestaña 1: Empresas Emisoras */}
                                 <button
                                     type="button"
                                     onClick={() => setDirectorySection('empresas-emisoras')}
-                                    className={`h-9 px-4 rounded-xl font-black text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                                    className={`h-9 px-2.5 sm:px-4 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
                                         directorySection === 'empresas-emisoras'
                                             ? 'bg-blue-700 text-white shadow-xs'
                                             : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300'
                                     }`}
                                 >
-                                    <Building2 className="w-4 h-4" />
-                                    <span>🏢 Empresas Emisoras ({companies.length})</span>
+                                    <Building2 className="w-4 h-4 shrink-0" />
+                                    <span className="truncate">🏢 Emisoras ({companies.length})</span>
                                 </button>
 
                                 {/* Botón Pestaña 2: Clientes Receptores */}
                                 <button
                                     type="button"
                                     onClick={() => setDirectorySection('clientes')}
-                                    className={`h-9 px-4 rounded-xl font-black text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                                    className={`h-9 px-2.5 sm:px-4 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
                                         directorySection === 'clientes'
                                             ? 'bg-blue-700 text-white shadow-xs'
                                             : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300'
                                     }`}
                                 >
-                                    <Users2 className="w-4 h-4" />
-                                    <span>👥 Clientes / Receptores ({clients.length})</span>
+                                    <Users2 className="w-4 h-4 shrink-0" />
+                                    <span className="truncate">👥 Clientes ({clients.length})</span>
                                 </button>
                             </div>
 
@@ -1155,18 +1185,18 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 <button
                                     type="button"
                                     onClick={() => setIsCompanyModalOpen(true)}
-                                    className="h-9 bg-black hover:bg-slate-800 text-white text-xs font-black px-4 rounded-lg flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                                    className="h-9 w-full lg:w-auto bg-black hover:bg-slate-800 text-white text-xs font-black px-4 rounded-lg flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
                                 >
                                     <Plus className="w-4 h-4 text-emerald-400" />
                                     <span>+ Registrar Nueva Empresa Emisora</span>
                                 </button>
                             ) : (
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <div className="flex bg-slate-200 p-1 rounded-lg border-2 border-slate-300 text-xs">
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
+                                    <div className="grid grid-cols-3 bg-slate-200 p-1 rounded-lg border-2 border-slate-300 text-xs w-full sm:w-auto">
                                         <button
                                             type="button"
                                             onClick={() => setDirectoryType('todos')}
-                                            className={`h-8 px-3 rounded-md font-black transition-all cursor-pointer ${
+                                            className={`h-8 px-2 rounded-md font-black text-center transition-all cursor-pointer truncate ${
                                                 directoryType === 'todos' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
                                             }`}
                                         >
@@ -1175,7 +1205,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         <button
                                             type="button"
                                             onClick={() => setDirectoryType('empresas')}
-                                            className={`h-8 px-3 rounded-md font-black transition-all cursor-pointer ${
+                                            className={`h-8 px-2 rounded-md font-black text-center transition-all cursor-pointer truncate ${
                                                 directoryType === 'empresas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
                                             }`}
                                         >
@@ -1184,7 +1214,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         <button
                                             type="button"
                                             onClick={() => setDirectoryType('personas')}
-                                            className={`h-8 px-3 rounded-md font-black transition-all cursor-pointer ${
+                                            className={`h-8 px-2 rounded-md font-black text-center transition-all cursor-pointer truncate ${
                                                 directoryType === 'personas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
                                             }`}
                                         >
@@ -1195,7 +1225,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     <button
                                         type="button"
                                         onClick={() => setIsClientModalOpen(true)}
-                                        className="h-9 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 rounded-lg flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                                        className="h-9 w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 rounded-lg flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
                                     >
                                         <Plus className="w-4 h-4 text-white" />
                                         <span>+ Registrar Cliente (CNE)</span>
@@ -1480,33 +1510,64 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                 {/* VISTA 3: TALLER DE EMISIÓN 100% SINCRONIZADO EN TIEMPO REAL CON LA HOJA A4 */}
                 {currentView === 'generador-pdf' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start print:block print:w-full print:m-0 print:p-0">
+                    <div className="space-y-4 print:space-y-0">
+                        {/* SELECTOR MÓVIL ENTRE FORMULARIO Y VISTA PREVIA A4 (Visible solo en pantallas < lg) */}
+                        <div className="lg:hidden sticky top-[53px] z-30 bg-[#F1F5F9] pb-2 pt-1 -mx-1 px-1 no-print">
+                            <div className="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-xl border-2 border-slate-300 shadow-sm text-xs font-black">
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileEditorTab('formulario')}
+                                    className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                        mobileEditorTab === 'formulario'
+                                            ? 'bg-blue-700 text-white shadow-xs'
+                                            : 'text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    <FileText className="w-4 h-4 shrink-0" />
+                                    <span>1. Formulario</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileEditorTab('preview')}
+                                    className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                        mobileEditorTab === 'preview'
+                                            ? 'bg-blue-700 text-white shadow-xs'
+                                            : 'text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    <Eye className="w-4 h-4 shrink-0" />
+                                    <span>2. Hoja A4 en Vivo</span>
+                                </button>
+                            </div>
+                        </div>
 
-                        {/* COLUMNA IZQUIERDA (5 cols): FORMULARIO DE CARGA */}
-                        <form onSubmit={handleSubmitInvoice} className="lg:col-span-5 bg-white rounded-xl border-2 border-slate-300 shadow-sm p-6 space-y-5 no-print">
-                            {/* Cabecera del Formulario con Selector Segmentado de Tipo de Documento */}
-                            <div className="border-b-2 border-slate-200 pb-3.5 space-y-2.5">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-1.5 bg-blue-100 text-blue-800 rounded-lg">
-                                            <FileText className="w-5 h-5" />
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start print:block print:w-full print:m-0 print:p-0">
+
+                            {/* COLUMNA IZQUIERDA (5 cols): FORMULARIO DE CARGA */}
+                            <form onSubmit={handleSubmitInvoice} className={`lg:col-span-5 bg-white rounded-xl border-2 border-slate-300 shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5 no-print ${mobileEditorTab === 'formulario' ? 'block' : 'hidden lg:block'}`}>
+                                {/* Cabecera del Formulario con Selector Segmentado de Tipo de Documento */}
+                                <div className="border-b-2 border-slate-200 pb-3.5 space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-blue-100 text-blue-800 rounded-lg">
+                                                <FileText className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-black text-black uppercase tracking-tight">
+                                                    Generar Factura o Proforma
+                                                </h3>
+                                                <p className="text-[11px] font-bold text-slate-600">
+                                                    Edición en vivo sincronizada con la hoja física A4
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h3 className="text-sm font-black text-black uppercase tracking-tight">
-                                                Generar Factura o Proforma
-                                            </h3>
-                                            <p className="text-[11px] font-bold text-slate-600">
-                                                Edición en vivo sincronizada con la hoja física A4
-                                            </p>
-                                        </div>
+                                        <span className="text-xs font-mono font-black bg-blue-100 text-blue-900 border border-blue-400 px-2 py-0.5 rounded uppercase">
+                                            {getDocumentTypeInfo(invoiceForm.document_type).badgeText}
+                                        </span>
                                     </div>
-                                    <span className="text-xs font-mono font-black bg-blue-100 text-blue-900 border border-blue-400 px-2 py-0.5 rounded uppercase">
-                                        {getDocumentTypeInfo(invoiceForm.document_type).badgeText}
-                                    </span>
-                                </div>
 
-                                {/* Selector Segmentado de Tipo de Documento */}
-                                <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-300 text-xs font-black">
+                                    {/* Selector Segmentado de Tipo de Documento (2x2 en móviles, 1x4 en desktop) */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-300 text-xs font-black">
                                     {[
                                         { id: 'factura', label: 'Factura' },
                                         { id: 'proforma', label: 'Proforma' },
@@ -1830,7 +1891,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                 />
                                             </div>
 
-                                            <div className="grid grid-cols-4 gap-2 text-xs font-black">
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-black">
                                                 <div>
                                                     <span className="text-black block mb-0.5 text-[11px]">Cant.</span>
                                                     <div className="flex items-center border border-slate-300 rounded-md bg-white overflow-hidden h-8">
@@ -2194,6 +2255,18 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 </div>
                             </div>
 
+                            {/* Botón Móvil para Ver la Hoja A4 directamente */}
+                            <div className="lg:hidden pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileEditorTab('preview')}
+                                    className="w-full h-11 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                                >
+                                    <Eye className="w-4 h-4 text-sky-400" />
+                                    <span>Ver Vista Previa de la Hoja A4 →</span>
+                                </button>
+                            </div>
+
                             <button
                                 type="submit"
                                 disabled={isSubmittingInvoice}
@@ -2205,55 +2278,69 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                         </form>
 
                         {/* COLUMNA DERECHA (7 cols): HOJA FÍSICA A4 100% SINCRONIZADA EN TIEMPO REAL */}
-                        <div className="lg:col-span-7 space-y-4 print:space-y-0 print:w-full print:m-0 print:p-0 print:block">
+                        <div className={`lg:col-span-7 space-y-4 print:space-y-0 print:w-full print:m-0 print:p-0 ${mobileEditorTab === 'preview' ? 'block' : 'hidden lg:block'}`}>
+                            {/* Botón Móvil para Regresar al Formulario */}
+                            <div className="lg:hidden flex items-center justify-between pb-1 no-print">
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileEditorTab('formulario')}
+                                    className="text-xs font-black text-blue-700 hover:text-blue-900 flex items-center gap-1 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-300 shadow-2xs"
+                                >
+                                    <span>← Volver al Formulario</span>
+                                </button>
+                                <span className="text-[11px] font-bold text-slate-500">
+                                    Vista Hoja A4
+                                </span>
+                            </div>
+
                             {/* BARRA SUPERIOR DE CONTROL CON SELECTOR DE FORMATO 1 / FORMATO 2 */}
-                            <div className="flex flex-wrap items-center justify-between gap-3 no-print bg-white p-3 rounded-xl border border-slate-300 shadow-2xs">
-                                <div className="flex flex-wrap items-center gap-2.5">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 no-print bg-white p-3 rounded-xl border border-slate-300 shadow-2xs">
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                                     <div className="flex items-center gap-1.5 text-xs font-black text-black uppercase tracking-wider">
                                         <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        <span className="hidden sm:inline">Plantilla:</span>
+                                        <span>Plantilla:</span>
                                     </div>
                                     
                                     {/* Selector de Formato 1 (Fiscal Agrosuministros) / Formato 2 (Industrial Moaiven) */}
-                                    <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-300 text-xs font-black">
+                                    <div className="grid grid-cols-2 bg-slate-100 p-0.5 rounded-lg border border-slate-300 text-xs font-black">
                                         <button
                                             type="button"
                                             onClick={() => setSelectedPdfFormat('formato-1')}
-                                            className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                                            className={`px-2.5 py-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                                 selectedPdfFormat === 'formato-1'
                                                     ? 'bg-slate-900 text-white shadow-xs'
                                                     : 'text-slate-800 hover:text-black hover:bg-slate-200'
                                             }`}
                                         >
                                             <FileText className="w-3.5 h-3.5" />
-                                            <span>Formato 1: Fiscal Estándar</span>
+                                            <span>Formato 1: Fiscal</span>
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setSelectedPdfFormat('formato-2')}
-                                            className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                                            className={`px-2.5 py-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                                 selectedPdfFormat === 'formato-2'
                                                     ? 'bg-slate-900 text-white shadow-xs'
                                                     : 'text-slate-800 hover:text-black hover:bg-slate-200'
                                             }`}
                                         >
                                             <Layers className="w-3.5 h-3.5 text-amber-400" />
-                                            <span>Formato 2: Proforma Industrial</span>
+                                            <span>Formato 2: Industrial</span>
                                         </button>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-2 w-full sm:w-auto">
                                     <button
                                         onClick={() => window.print()}
-                                        className="h-9 px-3.5 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                                        className="h-8 sm:h-9 px-3.5 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors flex-1 sm:flex-initial"
                                     >
                                         <Printer className="w-4 h-4 text-black" />
                                         <span>Imprimir</span>
                                     </button>
                                     <button
                                         onClick={() => window.print()}
-                                        className="h-9 px-3.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                                        className="h-8 sm:h-9 px-3.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors flex-1 sm:flex-initial"
                                     >
                                         <Download className="w-4 h-4 text-white" />
                                         <span>Guardar PDF</span>
@@ -2261,8 +2348,9 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 </div>
                             </div>
 
-                            {/* CONTENEDOR DE HOJA FÍSICA A4 EN VIVO */}
-                            <div className="bg-white rounded-lg shadow-sm p-8 sm:p-10 text-slate-900 text-xs font-sans relative printable-sheet border border-slate-200 print:bg-white print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:w-full">
+                            {/* CONTENEDOR DE HOJA FÍSICA A4 EN VIVO (CON SCROLL HORIZONTAL FLUIDO EN SMARTPHONES) */}
+                            <div className="overflow-x-auto -mx-2 sm:mx-0 p-1 sm:p-0">
+                                <div className="min-w-[620px] lg:min-w-0 bg-white rounded-lg shadow-sm p-4 sm:p-8 md:p-10 text-slate-900 text-xs font-sans relative printable-sheet border border-slate-200 print:bg-white print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:w-full">
 
                                 {selectedPdfFormat === 'formato-1' ? (
                                     /* ========================================================================= */
@@ -2795,18 +2883,19 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     </div>
                                 )}
 
+                                </div>
                             </div>
                         </div>
-
                     </div>
+                </div>
                 )}
 
             </main>
 
             {/* MODAL 1: REGISTRAR EMPRESA EMISORA (CON LOGO) */}
             {isCompanyModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-                    <div className="bg-white rounded-2xl border-4 border-black shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
+                    <div className="bg-white rounded-2xl border-4 border-black shadow-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center border-b-2 border-slate-300 pb-3">
                             <div className="flex items-center gap-2">
                                 <Building2 className="w-5 h-5 text-blue-700" />
@@ -2841,7 +2930,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-black text-black block mb-1">RIF / ID Fiscal *</label>
                                     <input
@@ -2865,7 +2954,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-black text-black block mb-1">Teléfono / WhatsApp *</label>
                                     <input
@@ -2922,18 +3011,18 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 )}
                             </div>
 
-                            <div className="flex justify-end gap-2.5 pt-2 border-t-2 border-slate-200">
+                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5 pt-2 border-t-2 border-slate-200">
                                 <button
                                     type="button"
                                     onClick={() => setIsCompanyModalOpen(false)}
-                                    className="h-9 px-4 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-black text-black cursor-pointer"
+                                    className="h-9 px-4 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-black text-black cursor-pointer w-full sm:w-auto"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSavingCompany}
-                                    className="h-9 px-5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                    className="h-9 px-5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 w-full sm:w-auto"
                                 >
                                     <Save className="w-4 h-4 text-emerald-400" />
                                     <span>{isSavingCompany ? 'Guardando...' : 'Guardar Empresa'}</span>
@@ -2946,8 +3035,8 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
             {/* MODAL 2: REGISTRAR CLIENTE CON BOTÓN CNE AUTOCOMPLETE */}
             {isClientModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-                    <div className="bg-white rounded-2xl border-4 border-black shadow-2xl max-w-lg w-full p-6 space-y-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
+                    <div className="bg-white rounded-2xl border-4 border-black shadow-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center border-b-2 border-slate-300 pb-3">
                             <div className="flex items-center gap-2">
                                 <User className="w-5 h-5 text-emerald-700" />
@@ -2993,7 +3082,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 <label className="text-xs font-black text-black block mb-1">
                                     Cédula / DNI del Cliente (Consulta CNE) *
                                 </label>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                                     <select
                                         value={newClient.nacionalidad}
                                         onChange={(e) => {
@@ -3024,7 +3113,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                 tax_id: digits ? `${prev.nacionalidad}-${digits}` : ''
                                             }));
                                         }}
-                                        className="h-9 flex-1 bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black font-mono placeholder:text-slate-500"
+                                        className="h-9 flex-1 min-w-[130px] bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black font-mono placeholder:text-slate-500"
                                     />
 
                                     {/* BOTÓN CNE SOLICITADO */}
@@ -3032,7 +3121,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         type="button"
                                         onClick={handleConsultCne}
                                         disabled={isConsultingCne}
-                                        className="h-9 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-lg flex items-center gap-1.5 shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
+                                        className="h-9 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-lg flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer w-full sm:w-auto shrink-0"
                                         title="Consultar datos oficiales en CNE y autocompletar"
                                     >
                                         {isConsultingCne ? (
@@ -3053,7 +3142,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-black text-black block mb-1">Tipo de Cliente</label>
                                     <select
@@ -3090,7 +3179,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-black text-black block mb-1">Teléfono / WhatsApp *</label>
                                     <input
@@ -3125,21 +3214,21 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-2.5 pt-2 border-t-2 border-slate-200">
+                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5 pt-2 border-t-2 border-slate-200">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setIsClientModalOpen(false);
                                         setCneAlert(null);
                                     }}
-                                    className="h-9 px-4 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-black text-black cursor-pointer"
+                                    className="h-9 px-4 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-black text-black cursor-pointer w-full sm:w-auto"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSavingClient}
-                                    className="h-9 px-5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                    className="h-9 px-5 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 w-full sm:w-auto"
                                 >
                                     <Save className="w-4 h-4 text-emerald-400" />
                                     <span>{isSavingClient ? 'Guardando...' : 'Guardar Cliente'}</span>
