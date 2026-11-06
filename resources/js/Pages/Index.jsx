@@ -50,7 +50,6 @@ import {
     Globe,
     LogOut,
     X,
-    UploadCloud,
     Loader2,
     Sparkles
 } from 'lucide-react';
@@ -462,40 +461,22 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         city: '',
         state: '',
         invoice_prefix: 'F-',
-        default_terms: '',
-        logo: null
+        default_terms: ''
     });
-    const [logoPreview, setLogoPreview] = useState(null);
     const [isSavingCompany, setIsSavingCompany] = useState(false);
-
-    const handleCompanyLogoChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setNewCompany(prev => ({ ...prev, logo: file }));
-            setLogoPreview(URL.createObjectURL(file));
-        }
-    };
 
     const handleSubmitCompany = (e) => {
         e.preventDefault();
         setIsSavingCompany(true);
-        const formData = new FormData();
-        Object.keys(newCompany).forEach(key => {
-            if (newCompany[key] !== null && newCompany[key] !== '') {
-                formData.append(key, newCompany[key]);
-            }
-        });
 
-        router.post('/companies', formData, {
-            forceFormData: true,
+        router.post('/companies', newCompany, {
             onSuccess: () => {
                 setIsSavingCompany(false);
                 setIsCompanyModalOpen(false);
                 setNewCompany({
                     name: '', trade_name: '', tax_id: '', phone: '', email: '',
-                    address: '', city: '', state: '', invoice_prefix: 'F-', default_terms: '', logo: null
+                    address: '', city: '', state: '', invoice_prefix: 'F-', default_terms: ''
                 });
-                setLogoPreview(null);
             },
             onError: () => setIsSavingCompany(false)
         });
@@ -926,7 +907,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                             <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs">
                                 <span className="font-bold text-slate-600 hidden sm:inline">Emisores en BD</span>
                                 <span className="font-bold text-slate-800 bg-slate-100 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
-                                    Con Logo
+                                    Activas
                                 </span>
                             </div>
                         </div>
@@ -2997,7 +2978,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
             </main>
 
-            {/* MODAL 1: REGISTRAR EMPRESA EMISORA (CON LOGO) */}
+            {/* MODAL 1: REGISTRAR EMPRESA EMISORA */}
             {isCompanyModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
                     <div className="bg-white rounded-2xl border-4 border-black shadow-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -3018,7 +2999,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                         <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs flex items-start gap-2.5">
                             <Building2 className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
                             <p className="text-slate-800 text-[11px] leading-relaxed">
-                                <strong className="text-blue-950 font-black">🏢 Empresa Emisora:</strong> Es la compañía oficial dueña del membrete que emitirá y timbrará facturas o proformas. Podrá cargar su logo y definir su prefijo correlativo inicial.
+                                <strong className="text-blue-950 font-black">🏢 Empresa Emisora:</strong> Es la entidad jurídica oficial con su RIF y domicilio fiscal que emitirá facturas, proformas y notas de entrega. Todos los documentos emitidos utilizan automáticamente el membrete corporativo institucional.
                             </p>
                         </div>
 
@@ -3094,26 +3075,6 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     onChange={(e) => setNewCompany(prev => ({ ...prev, address: e.target.value }))}
                                     className="w-full bg-white border-2 border-slate-400 rounded-lg p-2.5 text-xs font-black text-black"
                                 />
-                            </div>
-
-                            {/* SUBIR LOGO DE LA EMPRESA */}
-                            <div className="p-3.5 bg-amber-50 rounded-xl border-2 border-amber-300 space-y-2">
-                                <label className="text-xs font-black text-black flex items-center gap-1.5">
-                                    <UploadCloud className="w-4 h-4 text-amber-900" />
-                                    <span>Logo de la Empresa (PNG, JPG o SVG)</span>
-                                </label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleCompanyLogoChange}
-                                    className="w-full text-xs font-bold text-black file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-2 file:border-black file:text-xs file:font-black file:bg-white file:text-black cursor-pointer"
-                                />
-                                {logoPreview && (
-                                    <div className="flex items-center gap-2 mt-2 p-2 bg-white rounded-lg border border-amber-400">
-                                        <img src={logoPreview} alt="Preview" className="h-10 w-10 object-contain" />
-                                        <span className="text-[11px] font-bold text-black">Vista previa del logo seleccionado</span>
-                                    </div>
-                                )}
                             </div>
 
                             <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5 pt-2 border-t-2 border-slate-200">

@@ -69,7 +69,7 @@ class CompanyController extends Controller
             'is_active' => true,
         ]);
 
-        return redirect()->back()->with('success', '¡Empresa registrada exitosamente con su logo!');
+        return redirect()->back()->with('success', '¡Empresa emisora registrada exitosamente!');
     }
 }
 
