@@ -207,8 +207,8 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         document_subtitle: '',
         order_number: '#' + (company?.next_control_number || 1),
         issue_date: new Date().toISOString().split('T')[0],
-        due_date: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
-        offer_validity_days: 15,
+        due_date: new Date(Date.now() + 8 * 86400000).toISOString().split('T')[0],
+        offer_validity_days: 8,
         delivery_address: '',
         sale_condition: 'Venta de Contado',
         sales_channel: 'Oficina / Presencial',
@@ -238,6 +238,44 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
     // Estado del formulario de factura (SINCRONIZADO EN TIEMPO REAL CON LA VISTA PREVIA)
     const [invoiceForm, setInvoiceForm] = useState(getEmptyInvoice(activeCompany));
+
+    // Cambio inteligente de tipo de documento (Factura, Proforma, Cotización, Nota Entrega)
+    const handleDocumentTypeChange = (newType) => {
+        setInvoiceForm(prev => {
+            let newValidity = prev.offer_validity_days || 8;
+            let newTerms = prev.terms_conditions;
+            let newTaxPercentage = prev.tax_percentage;
+            let newSaleCondition = prev.sale_condition;
+
+            if (newType === 'proforma') {
+                newValidity = 8;
+                newTaxPercentage = 0; // Boss: "es el precio en China en la cotización de agregar nada de impuesto... precio neto"
+                newTerms = 'Oferta proforma con validez máxima de ocho (8) días continuos a partir de su emisión. Transcurrido este plazo, los precios, fletes y disponibilidad de los equipos o mercancía quedan sujetos a reconfirmación.';
+            } else if (newType === 'cotizacion') {
+                newValidity = 8;
+                newTaxPercentage = 0; // Neto
+                newTerms = 'Cotización comercial con validez de ocho (8) días continuos a partir de la fecha de emisión.';
+            } else if (newType === 'nota_entrega') {
+                newTaxPercentage = 0; // Boss: "estamos trabajando es con una nota de entrega... sin el impuesto"
+                if (!newSaleCondition || newSaleCondition === 'Venta de Contado') {
+                    newSaleCondition = 'Consignación';
+                }
+                newTerms = 'Nota de entrega de mercancía / equipos recibidos conforme y a entera satisfacción. Control y despacho sin efecto de facturación fiscal.';
+            } else if (newType === 'factura') {
+                newTaxPercentage = 16.00;
+                newTerms = activeCompany?.default_terms || 'Comprobante fiscal oficial generado por el sistema. Para devoluciones o reclamos conserve este documento. Plazo máximo de reclamación: 3 días hábiles desde la fecha de emisión.';
+            }
+
+            return {
+                ...prev,
+                document_type: newType,
+                offer_validity_days: newValidity,
+                terms_conditions: newTerms,
+                tax_percentage: newTaxPercentage,
+                sale_condition: newSaleCondition,
+            };
+        });
+    };
 
     // Acción para iniciar una nueva factura limpia
     const handleNewInvoice = () => {
@@ -634,9 +672,12 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                 {/* Logo & Marca del Sistema */}
                 <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-                    <div className="h-9 w-9 sm:h-10 sm:w-10 bg-black text-white rounded-xl flex items-center justify-center font-black text-sm shadow-xs shrink-0">
-                        <BookOpen className="w-5 h-5 text-sky-400" />
-                    </div>
+                    <img
+                        src="/images/CorpoAsia.jpg"
+                        alt="Inversiones CorpoAsia C.A."
+                        className="h-7 sm:h-9 w-auto object-contain shrink-0"
+                    />
+                    <div className="hidden xs:block h-6 w-px bg-slate-300"></div>
                     <div>
                         <div className="flex items-center gap-1.5 sm:gap-2">
                             <h1 className="text-xs sm:text-sm font-black tracking-tight text-black uppercase leading-none">
@@ -1577,9 +1618,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         <button
                                             key={t.id}
                                             type="button"
-                                            onClick={() => {
-                                                setInvoiceForm(prev => ({ ...prev, document_type: t.id }));
-                                            }}
+                                            onClick={() => handleDocumentTypeChange(t.id)}
                                             className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer font-black text-xs ${invoiceForm.document_type === t.id
                                                 ? 'bg-blue-700 text-white shadow-xs'
                                                 : 'text-slate-800 hover:text-black hover:bg-slate-200'
@@ -1716,18 +1755,22 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                 {/* Fila 2: Condición de Venta y Canal de Venta */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="min-w-0">
-                                        <label className="text-xs font-black text-black block mb-1 truncate">
-                                            Condición de Venta
-                                        </label>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="text-xs font-black text-black block truncate">
+                                                Condición de Venta *
+                                            </label>
+                                        </div>
                                         <input
                                             type="text"
                                             list="condiciones-list"
                                             value={invoiceForm.sale_condition}
                                             onChange={(e) => setInvoiceForm(prev => ({ ...prev, sale_condition: e.target.value }))}
                                             className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                            placeholder="Venta de Contado"
+                                            placeholder="Consignación / Contado..."
                                         />
                                         <datalist id="condiciones-list">
+                                            <option value="Consignación" />
+                                            <option value="A Consignación" />
                                             <option value="Venta de Contado" />
                                             <option value="Crédito 7 días" />
                                             <option value="Crédito 15 días" />
@@ -1735,6 +1778,29 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                             <option value="Contra Entrega" />
                                             <option value="Anticipo 50%" />
                                         </datalist>
+
+                                        {/* Chips de selección rápida de Condición de Venta */}
+                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                            {[
+                                                { label: 'Consignación', val: 'Consignación' },
+                                                { label: 'Contado', val: 'Venta de Contado' },
+                                                { label: 'Crédito 15d', val: 'Crédito 15 días' },
+                                                { label: 'Contra Entrega', val: 'Contra Entrega' },
+                                            ].map(pill => (
+                                                <button
+                                                    key={pill.val}
+                                                    type="button"
+                                                    onClick={() => setInvoiceForm(prev => ({ ...prev, sale_condition: pill.val }))}
+                                                    className={`text-[10px] font-black px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                                                        invoiceForm.sale_condition === pill.val
+                                                            ? 'bg-blue-700 text-white border-blue-700 shadow-2xs'
+                                                            : 'bg-white hover:bg-slate-200 text-slate-800 border-slate-300'
+                                                    }`}
+                                                >
+                                                    {pill.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
 
                                     <div className="min-w-0">
@@ -2222,17 +2288,59 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center text-black">
-                                    <span>Alícuota IVA (%):</span>
-                                    <div className="relative w-20">
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={invoiceForm.tax_percentage}
-                                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, tax_percentage: Number(e.target.value) }))}
-                                            className="h-8 w-full bg-white border border-slate-300 rounded-md pr-6 pl-2 text-right font-mono font-black text-xs text-black"
-                                        />
-                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">%</span>
+                                {/* Alícuota IVA con toggle rápido de 0% Neto y 16% Fiscal */}
+                                <div className="space-y-1.5 pt-2 border-t border-slate-200">
+                                    <div className="flex justify-between items-center text-black">
+                                        <div className="flex items-center gap-1.5">
+                                            <span>Alícuota IVA:</span>
+                                            {Number(invoiceForm.tax_percentage) === 0 ? (
+                                                <span className="text-[10px] font-mono font-black bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-300">
+                                                    0% NETO
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] font-mono font-black bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded border border-blue-300">
+                                                    {Number(invoiceForm.tax_percentage)}% IVA
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="relative w-20">
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                max="100"
+                                                value={invoiceForm.tax_percentage}
+                                                onChange={(e) => setInvoiceForm(prev => ({ ...prev, tax_percentage: Number(e.target.value) }))}
+                                                className="h-8 w-full bg-white border border-slate-300 rounded-md pr-6 pl-2 text-right font-mono font-black text-xs text-black"
+                                            />
+                                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">%</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Botones de acción rápida: 0% NETO (Sin IVA) / 16% IVA FISCAL */}
+                                    <div className="grid grid-cols-2 gap-1.5 font-sans">
+                                        <button
+                                            type="button"
+                                            onClick={() => setInvoiceForm(prev => ({ ...prev, tax_percentage: 0 }))}
+                                            className={`py-1 px-2 rounded-lg text-center text-[11px] font-black transition-all cursor-pointer border ${
+                                                Number(invoiceForm.tax_percentage) === 0
+                                                    ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
+                                                    : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+                                            }`}
+                                        >
+                                            0% Neto (Sin IVA)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setInvoiceForm(prev => ({ ...prev, tax_percentage: 16.00 }))}
+                                            className={`py-1 px-2 rounded-lg text-center text-[11px] font-black transition-all cursor-pointer border ${
+                                                Number(invoiceForm.tax_percentage) === 16
+                                                    ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
+                                                    : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+                                            }`}
+                                        >
+                                            16% IVA Fiscal
+                                        </button>
                                     </div>
                                 </div>
 
@@ -2359,24 +2467,18 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     <div>
                                         {/* 1. CABECERA / MEMBRETE INSTITUCIONAL */}
                                         <div className="flex justify-between items-start gap-6 pb-4">
-                                            {/* Lado Izquierdo: Logo y Datos de la Empresa Emisora */}
-                                            <div className="flex items-start gap-4 min-w-0">
-                                                {activeCompany.logo_url ? (
-                                                    <div className="w-20 h-20 shrink-0 flex items-center justify-start">
-                                                        <img
-                                                            src={activeCompany.logo_url}
-                                                            alt={activeCompany.name}
-                                                            className="max-h-20 max-w-full w-auto h-auto object-contain object-left"
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <div className="w-16 h-16 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xl shrink-0">
-                                                        {activeCompany.name.substring(0, 2).toUpperCase()}
-                                                    </div>
-                                                )}
+                                            {/* Lado Izquierdo: Logo Corporativo Oficial CorpoAsia y Datos de la Empresa Emisora (Alineados Verticalmente) */}
+                                            <div className="max-w-[360px] space-y-2">
+                                                <div className="flex items-center justify-start shrink-0 mb-1">
+                                                    <img
+                                                        src="/images/CorpoAsia.jpg"
+                                                        alt="Inversiones CorpoAsia C.A."
+                                                        className="h-12 w-auto object-contain object-left"
+                                                    />
+                                                </div>
 
-                                                <div className="min-w-0 space-y-0.5">
-                                                    <h1 className="text-base font-black text-slate-900 uppercase tracking-tight leading-snug">
+                                                <div className="space-y-0.5">
+                                                    <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-snug">
                                                         {activeCompany.name}
                                                     </h1>
                                                     <p className="text-xs font-bold text-slate-900">
@@ -2476,6 +2578,14 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                             Bs. {Number(invoiceForm.bcv_exchange_rate || 876.80).toFixed(2)} / USD
                                                         </span>
                                                     </div>
+                                                    {(invoiceForm.document_type === 'proforma' || invoiceForm.document_type === 'cotizacion') && (
+                                                        <div className="grid grid-cols-12 gap-1">
+                                                            <span className="col-span-4 text-slate-600 font-bold">Validez:</span>
+                                                            <span className="col-span-8 font-bold text-blue-900">
+                                                                {invoiceForm.offer_validity_days || 8} días continuos
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -2558,7 +2668,9 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                     </div>
                                                 )}
                                                 <div className="flex justify-between py-1 border-b-2 border-slate-950">
-                                                    <span className="font-sans font-bold text-slate-700">IVA ({Number(invoiceForm.tax_percentage)}%):</span>
+                                                    <span className="font-sans font-bold text-slate-700">
+                                                        {Number(invoiceForm.tax_percentage) === 0 ? 'IVA (0% Exento / Neto):' : `IVA (${Number(invoiceForm.tax_percentage)}%):`}
+                                                    </span>
                                                     <span className="font-bold text-slate-900">${taxAmount.toFixed(2)}</span>
                                                 </div>
                                                 <div className="flex justify-between pt-2 text-sm font-black">
@@ -2595,10 +2707,6 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            <div className="border-t border-slate-200 mt-6 pt-3 text-center text-[10px] text-slate-500">
-                                                {activeCompany.name} • RIF: {activeCompany.tax_id} • Barinitas, Edo. Barinas • Sistema de Gestión y Facturación
-                                            </div>
                                         </div>
                                     </div>
                                 ) : (
@@ -2612,21 +2720,18 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                             {/* Cabecera Moaiven */}
                                             <div className="flex justify-between items-start gap-4">
                                                 <div className="max-w-[340px] space-y-1">
-                                                    {activeCompany.logo_url ? (
-                                                        <div className="h-16 flex items-center justify-start mb-2">
-                                                            <img
-                                                                src={activeCompany.logo_url}
-                                                                alt={activeCompany.name}
-                                                                className="max-h-16 max-w-[200px] object-contain object-left"
-                                                            />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-2xl font-black text-[#0E1C33] tracking-tighter mb-1">
-                                                            {activeCompany.name.split(' ')[0]}
-                                                        </div>
-                                                    )}
+                                                    <div className="h-14 flex items-center justify-start mb-2 shrink-0">
+                                                        <img
+                                                            src="/images/CorpoAsia.jpg"
+                                                            alt="Inversiones CorpoAsia C.A."
+                                                            className="h-12 w-auto object-contain object-left"
+                                                        />
+                                                    </div>
+                                                    <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                                                        {activeCompany.name}
+                                                    </h1>
                                                     <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">
-                                                        {activeCompany.name.includes('MOAIVEN') ? 'GROUP C.A. · IMPORT & LOGISTICS' : `${activeCompany.name} · IMPORT & LOGISTICS`}
+                                                        IMPORT & LOGISTICS · CHINA - VENEZUELA
                                                     </p>
                                                     <p className="text-xs font-bold text-slate-800">
                                                         RIF: {activeCompany.tax_id}
@@ -2665,7 +2770,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                         </p>
                                                         <p>
                                                             <span className="font-medium text-slate-600">Validez de la oferta:</span>{' '}
-                                                            <span className="font-bold">{invoiceForm.offer_validity_days || 15} días</span>
+                                                            <span className="font-bold">{invoiceForm.offer_validity_days || 8} días</span>
                                                         </p>
                                                         <p>
                                                             <span className="font-medium text-slate-600">{getDocumentTypeInfo(invoiceForm.document_type).controlLabel}:</span>{' '}

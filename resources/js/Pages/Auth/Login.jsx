@@ -24,8 +24,12 @@ export default function Login({ status, canResetPassword }) {
             <div className="w-full max-w-md">
                 {/* Brand Header */}
                 <div className="text-center mb-6">
-                    <div className="inline-flex h-14 w-14 bg-black rounded-2xl items-center justify-center text-white shadow-md mb-3">
-                        <BookOpen className="w-8 h-8 text-sky-400" />
+                    <div className="inline-flex items-center justify-center bg-white p-3 rounded-2xl border-2 border-slate-300 shadow-sm mb-3">
+                        <img
+                            src="/images/CorpoAsia.jpg"
+                            alt="Inversiones CorpoAsia C.A."
+                            className="h-10 sm:h-12 w-auto object-contain"
+                        />
                     </div>
                     <h1 className="text-2xl font-black tracking-tight text-black uppercase">
                         Corpo<span className="text-blue-700">Documents</span>
