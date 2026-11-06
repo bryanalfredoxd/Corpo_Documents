@@ -14,6 +14,7 @@ import {
     Printer,
     CheckCircle2,
     Clock,
+    ChevronLeft,
     ChevronRight,
     TrendingUp,
     ShieldCheck,
@@ -66,8 +67,58 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
     const [selectedPdfFormat, setSelectedPdfFormat] = useState('formato-1');
 
     // Filtros de directorio
+    // directorySection: 'empresas-emisoras' (nuestras empresas con logo) | 'clientes' (compradores/receptores)
+    const [directorySection, setDirectorySection] = useState('empresas-emisoras');
     const [directoryType, setDirectoryType] = useState('todos'); // todos | empresas | personas
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Paginación del Libro Fiscal (10 por página)
+    const [invoicePage, setInvoicePage] = useState(1);
+    const invoicePageSize = 10;
+
+    // Resetear a la página 1 cuando se realiza una búsqueda
+    useEffect(() => {
+        setInvoicePage(1);
+    }, [searchQuery]);
+
+    // Diccionario de información visual según el tipo de documento (Factura, Proforma, Cotización, Nota Entrega)
+    const getDocumentTypeInfo = (type) => {
+        switch (type) {
+            case 'proforma':
+                return {
+                    title: 'PROFORMA',
+                    badgeText: 'PROFORMA',
+                    correlativeLabel: 'N° de Proforma',
+                    controlLabel: 'Control',
+                    defaultSubtitle: 'LÍNEA INDUSTRIAL / IMPORTACIÓN'
+                };
+            case 'cotizacion':
+                return {
+                    title: 'COTIZACIÓN',
+                    badgeText: 'COTIZACIÓN',
+                    correlativeLabel: 'N° de Cotización',
+                    controlLabel: 'Control',
+                    defaultSubtitle: 'PRESUPUESTO / COTIZACIÓN COMERCIAL'
+                };
+            case 'nota_entrega':
+                return {
+                    title: 'NOTA DE ENTREGA',
+                    badgeText: 'NOTA DE ENTREGA',
+                    correlativeLabel: 'N° Nota de Entrega',
+                    controlLabel: 'Control de Despacho',
+                    defaultSubtitle: 'GUÍA / NOTA DE ENTREGA'
+                };
+            case 'factura':
+            default:
+                return {
+                    title: 'FACTURA FISCAL',
+                    badgeText: 'FACTURA',
+                    correlativeLabel: 'N° de Factura',
+                    controlLabel: 'Control',
+                    defaultSubtitle: ''
+                };
+        }
+    };
 
     // Modales de creación
     const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -304,9 +355,6 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
     // Cargar una factura pasada en el formulario y sincronizarla en tiempo real
     const handleLoadInvoiceToEditor = (inv) => {
         setSelectedCompanyId(inv.company_id);
-        if (inv.document_type === 'proforma') {
-            setSelectedPdfFormat('formato-2');
-        }
         setInvoiceForm({
             company_id: inv.company_id,
             client_id: inv.client_id,
@@ -512,11 +560,27 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         }
     };
 
-    // Filtrar clientes
+    // Filtrar empresas emisoras registradas
+    const filteredCompanies = companies.filter(comp => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            (comp.name && comp.name.toLowerCase().includes(q)) ||
+            (comp.trade_name && comp.trade_name.toLowerCase().includes(q)) ||
+            (comp.tax_id && comp.tax_id.toLowerCase().includes(q)) ||
+            (comp.email && comp.email.toLowerCase().includes(q)) ||
+            (comp.phone && comp.phone.toLowerCase().includes(q)) ||
+            (comp.address && comp.address.toLowerCase().includes(q))
+        );
+    });
+
+    // Filtrar clientes receptores
     const filteredClients = clients.filter(c => {
         const matchesSearch = searchQuery === '' ||
-            c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.tax_id.toLowerCase().includes(searchQuery.toLowerCase());
+            (c.name && c.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (c.tax_id && c.tax_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (c.email && c.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (c.phone && c.phone.toLowerCase().includes(searchQuery.toLowerCase()));
 
         if (!matchesSearch) return false;
         if (directoryType === 'empresas') return c.type === 'empresa';
@@ -524,15 +588,25 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         return true;
     });
 
-    // Filtrar facturas
+    // Filtrar facturas del Libro Fiscal
     const filteredInvoices = invoices.filter(inv => {
         if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
         return (
-            inv.correlative_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            inv.client?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            inv.client?.tax_id.toLowerCase().includes(searchQuery.toLowerCase())
+            (inv.correlative_number && inv.correlative_number.toLowerCase().includes(q)) ||
+            (inv.control_number && inv.control_number.toLowerCase().includes(q)) ||
+            (inv.client?.name && inv.client.name.toLowerCase().includes(q)) ||
+            (inv.client?.tax_id && inv.client.tax_id.toLowerCase().includes(q)) ||
+            (inv.company?.name && inv.company.name.toLowerCase().includes(q))
         );
     });
+
+    // Paginación de facturas (10 por página)
+    const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoices.length / invoicePageSize));
+    const paginatedInvoices = filteredInvoices.slice(
+        (invoicePage - 1) * invoicePageSize,
+        invoicePage * invoicePageSize
+    );
 
     return (
         <div
@@ -667,10 +741,10 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                             }`}
                     >
                         <Users2 className="w-4 h-4 text-emerald-400" />
-                        <span>2. DIRECTORIO DE CLIENTES</span>
+                        <span>2. DIRECTORIO (EMPRESAS & CLIENTES)</span>
                         <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${currentView === 'directorio' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
                             }`}>
-                            {clients.length}
+                            {companies.length} Emp · {clients.length} Clie
                         </span>
                     </button>
 
@@ -702,7 +776,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                     <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-700">Documento Activo:</span>
                         <span className="text-xs font-mono font-black text-blue-900 bg-blue-50 border border-blue-300 px-2.5 py-1 rounded-md uppercase">
-                            {invoiceForm.document_type} • N° {projectedCorrelative}
+                            {getDocumentTypeInfo(invoiceForm.document_type).badgeText} • N° {projectedCorrelative}
                         </span>
                     </div>
                 )}
@@ -879,208 +953,528 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y-2 divide-slate-200 font-medium">
-                                    {filteredInvoices.map((inv) => (
-                                        <tr key={inv.id} className="hover:bg-amber-50/50 transition-colors">
-                                            <td className="px-5 py-4 font-mono font-black text-blue-900 text-sm">
-                                                {inv.correlative_number}
-                                                <span className="block text-[10px] font-bold text-slate-800">
-                                                    Control: {inv.control_number || 'N/A'}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center gap-2.5">
-                                                    {inv.company?.logo_url && (
-                                                        <img
-                                                            src={inv.company.logo_url}
-                                                            alt=""
-                                                            className="h-7 w-7 object-contain rounded-md shrink-0 bg-white border border-slate-300 p-0.5 shadow-xs"
-                                                        />
-                                                    )}
-                                                    <div>
-                                                        <span className="font-black text-black block text-xs">
-                                                            {inv.company?.name}
-                                                        </span>
-                                                        <span className="text-[10px] font-mono text-slate-800 font-bold">
-                                                            {inv.company?.tax_id}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-4 max-w-[200px]">
-                                                <span className="font-black text-black block text-xs">
-                                                    {inv.client?.name}
-                                                </span>
-                                                <span className="text-[10px] font-mono text-slate-800 font-bold">
-                                                    {inv.client?.tax_id}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4 uppercase font-bold text-xs">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black ${inv.document_type === 'factura'
-                                                    ? 'bg-blue-100 text-blue-900 border border-blue-400'
-                                                    : 'bg-purple-100 text-purple-900 border border-purple-400'
-                                                    }`}>
-                                                    {inv.document_type}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4 font-mono font-bold text-slate-900">
-                                                {new Date(inv.issue_date).toLocaleDateString('es-VE')}
-                                            </td>
-                                            <td className="px-4 py-4 font-mono text-xs font-bold text-slate-900">
-                                                Bs. {Number(inv.bcv_exchange_rate).toFixed(2)}
-                                            </td>
-                                            <td className="px-4 py-4 font-mono font-black text-black text-sm">
-                                                ${Number(inv.total_usd).toFixed(2)}
-                                            </td>
-                                            <td className="px-4 py-4 font-mono font-bold text-slate-900 text-xs">
-                                                Bs. {Number(inv.total_ves).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="px-4 py-4">
-                                                <span className="inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded bg-emerald-100 text-emerald-950 border border-emerald-500">
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-800" />
-                                                    {inv.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-5 py-4 text-right">
-                                                <div className="flex items-center justify-end space-x-2">
-                                                    <button
-                                                        onClick={() => handleLoadInvoiceToEditor(inv)}
-                                                        className="h-8 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-300 text-black font-black border-2 border-slate-300 flex items-center gap-1 transition-colors cursor-pointer"
-                                                        title="Cargar y Ver en Visor A4"
-                                                    >
-                                                        <Eye className="w-3.5 h-3.5" />
-                                                        <span>Ver</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            handleLoadInvoiceToEditor(inv);
-                                                            setTimeout(() => window.print(), 350);
-                                                        }}
-                                                        className="h-8 px-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black flex items-center gap-1 transition-colors cursor-pointer"
-                                                        title="Imprimir / Descargar PDF"
-                                                    >
-                                                        <Printer className="w-3.5 h-3.5" />
-                                                        <span>PDF</span>
-                                                    </button>
-                                                </div>
+                                    {paginatedInvoices.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={10} className="px-5 py-12 text-center text-slate-500 font-bold text-xs">
+                                                No se encontraron documentos fiscales registrados
+                                                {searchQuery && ` para la búsqueda "${searchQuery}"`}.
                                             </td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        paginatedInvoices.map((inv) => (
+                                            <tr key={inv.id} className="hover:bg-amber-50/50 transition-colors">
+                                                <td className="px-5 py-4 font-mono font-black text-blue-900 text-sm">
+                                                    {inv.correlative_number}
+                                                    <span className="block text-[10px] font-bold text-slate-800">
+                                                        Control: {inv.control_number || 'N/A'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <div className="flex items-center gap-2.5">
+                                                        {inv.company?.logo_url && (
+                                                            <img
+                                                                src={inv.company.logo_url}
+                                                                alt=""
+                                                                className="h-7 w-7 object-contain rounded-md shrink-0 bg-white border border-slate-300 p-0.5 shadow-xs"
+                                                            />
+                                                        )}
+                                                        <div>
+                                                            <span className="font-black text-black block text-xs">
+                                                                {inv.company?.name}
+                                                            </span>
+                                                            <span className="text-[10px] font-mono text-slate-800 font-bold">
+                                                                {inv.company?.tax_id}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-4 max-w-[200px]">
+                                                    <span className="font-black text-black block text-xs">
+                                                        {inv.client?.name}
+                                                    </span>
+                                                    <span className="text-[10px] font-mono text-slate-800 font-bold">
+                                                        {inv.client?.tax_id}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4 uppercase font-bold text-xs">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                                                        inv.document_type === 'factura'
+                                                            ? 'bg-blue-100 text-blue-900 border border-blue-400'
+                                                            : inv.document_type === 'proforma'
+                                                            ? 'bg-amber-100 text-amber-900 border border-amber-400'
+                                                            : inv.document_type === 'cotizacion'
+                                                            ? 'bg-purple-100 text-purple-900 border border-purple-400'
+                                                            : 'bg-emerald-100 text-emerald-900 border border-emerald-400'
+                                                    }`}>
+                                                        {getDocumentTypeInfo(inv.document_type).badgeText}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4 font-mono font-bold text-slate-900">
+                                                    {new Date(inv.issue_date).toLocaleDateString('es-VE')}
+                                                </td>
+                                                <td className="px-4 py-4 font-mono text-xs font-bold text-slate-900">
+                                                    Bs. {Number(inv.bcv_exchange_rate).toFixed(2)}
+                                                </td>
+                                                <td className="px-4 py-4 font-mono font-black text-black text-sm">
+                                                    ${Number(inv.total_usd).toFixed(2)}
+                                                </td>
+                                                <td className="px-4 py-4 font-mono font-bold text-slate-900 text-xs">
+                                                    Bs. {Number(inv.total_ves).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <span className="inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded bg-emerald-100 text-emerald-950 border border-emerald-500">
+                                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-800" />
+                                                        {inv.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-5 py-4 text-right">
+                                                    <div className="flex items-center justify-end space-x-2">
+                                                        <button
+                                                            onClick={() => handleLoadInvoiceToEditor(inv)}
+                                                            className="h-8 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-300 text-black font-black border-2 border-slate-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                                            title="Cargar y Ver en Visor A4"
+                                                        >
+                                                            <Eye className="w-3.5 h-3.5" />
+                                                            <span>Ver</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                handleLoadInvoiceToEditor(inv);
+                                                                setTimeout(() => window.print(), 350);
+                                                            }}
+                                                            className="h-8 px-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black flex items-center gap-1 transition-colors cursor-pointer"
+                                                            title="Imprimir / Descargar PDF"
+                                                        >
+                                                            <Printer className="w-3.5 h-3.5" />
+                                                            <span>PDF</span>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Barra de Paginación de 10 Filas por Página */}
+                        <div className="px-5 py-3.5 border-t-2 border-slate-300 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="text-xs font-black text-slate-700">
+                                {filteredInvoices.length === 0 ? (
+                                    <span>0 documentos encontrados</span>
+                                ) : (
+                                    <span>
+                                        Mostrando <strong className="text-black">{(invoicePage - 1) * invoicePageSize + 1}</strong> a{' '}
+                                        <strong className="text-black">{Math.min(invoicePage * invoicePageSize, filteredInvoices.length)}</strong> de{' '}
+                                        <strong className="text-black">{filteredInvoices.length}</strong> documentos fiscales (Pág. {invoicePage} de {totalInvoicePages})
+                                    </span>
+                                )}
+                            </div>
+
+                            {totalInvoicePages > 1 && (
+                                <div className="flex items-center space-x-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setInvoicePage(p => Math.max(1, p - 1))}
+                                        disabled={invoicePage === 1}
+                                        className="h-8 px-2.5 rounded-lg border-2 border-slate-300 text-xs font-black text-black bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
+                                    >
+                                        <ChevronLeft className="w-3.5 h-3.5" />
+                                        <span>Anterior</span>
+                                    </button>
+
+                                    {Array.from({ length: totalInvoicePages }, (_, i) => i + 1).map(pageNumber => (
+                                        <button
+                                            key={pageNumber}
+                                            type="button"
+                                            onClick={() => setInvoicePage(pageNumber)}
+                                            className={`h-8 w-8 rounded-lg text-xs font-mono font-black transition-all cursor-pointer ${
+                                                invoicePage === pageNumber
+                                                    ? 'bg-blue-700 text-white shadow-xs'
+                                                    : 'bg-white border-2 border-slate-300 text-black hover:bg-slate-200'
+                                            }`}
+                                        >
+                                            {pageNumber}
+                                        </button>
+                                    ))}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setInvoicePage(p => Math.min(totalInvoicePages, p + 1))}
+                                        disabled={invoicePage === totalInvoicePages}
+                                        className="h-8 px-2.5 rounded-lg border-2 border-slate-300 text-xs font-black text-black bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
+                                    >
+                                        <span>Siguiente</span>
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
 
-                {/* VISTA 2: DIRECTORIO DE CLIENTES (DESDE LA BASE DE DATOS) */}
+                {/* VISTA 2: DIRECTORIO COMPLETO (EMPRESAS EMISORAS & CLIENTES RECEPTORES) */}
                 {currentView === 'directorio' && (
                     <div className="space-y-4">
-                        {/* Filtros */}
-                        <div className="bg-white p-4 rounded-xl border-2 border-slate-300 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            <div className="flex items-center space-x-3">
-                                <span className="text-xs font-black uppercase text-black">Filtrar:</span>
-                                <div className="flex bg-slate-200 p-1 rounded-lg border-2 border-slate-300 text-xs">
-                                    <button
-                                        onClick={() => setDirectoryType('todos')}
-                                        className={`h-8 px-3.5 rounded-md font-black transition-all cursor-pointer ${directoryType === 'todos' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
-                                            }`}
-                                    >
-                                        Todos ({clients.length})
-                                    </button>
-                                    <button
-                                        onClick={() => setDirectoryType('empresas')}
-                                        className={`h-8 px-3.5 rounded-md font-black transition-all cursor-pointer ${directoryType === 'empresas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
-                                            }`}
-                                    >
-                                        Empresas ({clients.filter(c => c.type === 'empresa').length})
-                                    </button>
-                                    <button
-                                        onClick={() => setDirectoryType('personas')}
-                                        className={`h-8 px-3.5 rounded-md font-black transition-all cursor-pointer ${directoryType === 'personas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
-                                            }`}
-                                    >
-                                        Personas ({clients.filter(c => c.type === 'persona').length})
-                                    </button>
-                                </div>
+                        {/* Barra de Navegación del Directorio: Separación clara entre Empresas Emisoras y Clientes */}
+                        <div className="bg-white p-4 rounded-xl border-2 border-slate-300 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-black uppercase text-black mr-1">Sección:</span>
+
+                                {/* Botón Pestaña 1: Empresas Emisoras */}
+                                <button
+                                    type="button"
+                                    onClick={() => setDirectorySection('empresas-emisoras')}
+                                    className={`h-9 px-4 rounded-xl font-black text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                                        directorySection === 'empresas-emisoras'
+                                            ? 'bg-blue-700 text-white shadow-xs'
+                                            : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300'
+                                    }`}
+                                >
+                                    <Building2 className="w-4 h-4" />
+                                    <span>🏢 Empresas Emisoras ({companies.length})</span>
+                                </button>
+
+                                {/* Botón Pestaña 2: Clientes Receptores */}
+                                <button
+                                    type="button"
+                                    onClick={() => setDirectorySection('clientes')}
+                                    className={`h-9 px-4 rounded-xl font-black text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                                        directorySection === 'clientes'
+                                            ? 'bg-blue-700 text-white shadow-xs'
+                                            : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300'
+                                    }`}
+                                >
+                                    <Users2 className="w-4 h-4" />
+                                    <span>👥 Clientes / Receptores ({clients.length})</span>
+                                </button>
                             </div>
 
-                            <button
-                                onClick={() => setIsClientModalOpen(true)}
-                                className="h-9 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 rounded-lg flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
-                            >
-                                <Plus className="w-4 h-4 text-white" />
-                                <span>Registrar Nuevo Cliente / Empresa</span>
-                            </button>
-                        </div>
-
-                        {/* Fichas de Clientes */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {filteredClients.map((client) => (
-                                <div
-                                    key={client.id}
-                                    className="bg-white rounded-2xl border-2 border-slate-300 shadow-xs p-5 flex flex-col justify-between hover:border-slate-400 hover:shadow-sm transition-all"
+                            {/* Acciones y Subfiltros contextuales según la pestaña activa */}
+                            {directorySection === 'empresas-emisoras' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCompanyModalOpen(true)}
+                                    className="h-9 bg-black hover:bg-slate-800 text-white text-xs font-black px-4 rounded-lg flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
                                 >
-                                    <div>
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex items-center space-x-3">
-                                                <div className={`p-3 rounded-xl border ${client.type === 'empresa'
-                                                    ? 'bg-blue-50 text-blue-800 border-blue-200'
-                                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                                    }`}>
-                                                    {client.type === 'empresa' ? <Building2 className="w-6 h-6" /> : <User className="w-6 h-6" />}
-                                                </div>
-                                                <div>
-                                                    <span className="text-[11px] font-black uppercase text-slate-600 block">
-                                                        {client.type === 'empresa' ? 'Persona Jurídica' : 'Persona Natural'}
-                                                    </span>
-                                                    <h3 className="text-sm font-black text-black leading-tight mt-0.5">
-                                                        {client.name}
-                                                    </h3>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-4 flex items-center justify-between bg-slate-100 p-2.5 rounded-xl border border-slate-200 font-mono text-xs">
-                                            <span className="text-slate-700 font-black text-xs">CÉDULA / RIF:</span>
-                                            <strong className="text-black text-sm font-black">{client.tax_id}</strong>
-                                        </div>
-
-                                        <div className="mt-4 space-y-2 text-xs font-bold text-black">
-                                            <div className="flex items-center gap-2">
-                                                <Mail className="w-4 h-4 text-slate-600 shrink-0" />
-                                                <span className="truncate">{client.email || 'Sin correo registrado'}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Phone className="w-4 h-4 text-slate-600 shrink-0" />
-                                                <span>{client.phone}</span>
-                                            </div>
-                                            <div className="flex items-start gap-2">
-                                                <MapPin className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
-                                                <span className="text-slate-800">{client.address || 'Sin dirección fiscal'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between">
-                                        <span className="text-xs font-bold text-slate-600">
-                                            {client.notes || 'Cliente Registrado'}
-                                        </span>
+                                    <Plus className="w-4 h-4 text-emerald-400" />
+                                    <span>+ Registrar Nueva Empresa Emisora</span>
+                                </button>
+                            ) : (
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <div className="flex bg-slate-200 p-1 rounded-lg border-2 border-slate-300 text-xs">
                                         <button
-                                            onClick={() => {
-                                                setInvoiceForm({
-                                                    ...getEmptyInvoice(activeCompany),
-                                                    client_id: client.id
-                                                });
-                                                setCurrentView('generador-pdf');
-                                            }}
-                                            className="h-8 px-3.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black text-xs flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-2xs"
+                                            type="button"
+                                            onClick={() => setDirectoryType('todos')}
+                                            className={`h-8 px-3 rounded-md font-black transition-all cursor-pointer ${
+                                                directoryType === 'todos' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
+                                            }`}
                                         >
-                                            <Receipt className="w-4 h-4 text-sky-200" />
-                                            <span>Facturar</span>
+                                            Todos ({clients.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setDirectoryType('empresas')}
+                                            className={`h-8 px-3 rounded-md font-black transition-all cursor-pointer ${
+                                                directoryType === 'empresas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
+                                            }`}
+                                        >
+                                            Empresas ({clients.filter(c => c.type === 'empresa').length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setDirectoryType('personas')}
+                                            className={`h-8 px-3 rounded-md font-black transition-all cursor-pointer ${
+                                                directoryType === 'personas' ? 'bg-black text-white shadow-xs' : 'text-black hover:bg-slate-300'
+                                            }`}
+                                        >
+                                            Personas ({clients.filter(c => c.type === 'persona').length})
                                         </button>
                                     </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsClientModalOpen(true)}
+                                        className="h-9 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black px-4 rounded-lg flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                                    >
+                                        <Plus className="w-4 h-4 text-white" />
+                                        <span>+ Registrar Cliente (CNE)</span>
+                                    </button>
                                 </div>
-                            ))}
+                            )}
                         </div>
+
+                        {/* Banner Informativo Explicativo */}
+                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3.5 flex items-start gap-3 text-xs">
+                            <Info className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
+                            {directorySection === 'empresas-emisoras' ? (
+                                <div>
+                                    <strong className="text-blue-950 font-black block text-sm">
+                                        Directorio de Empresas Emisoras Oficiales (Nuestras Compañías Facturadoras)
+                                    </strong>
+                                    <p className="text-slate-700 font-medium mt-0.5">
+                                        Aquí se encuentran registradas las empresas que emiten las facturas, proformas y notas de entrega. Cada empresa cuenta con su propio logotipo oficial, RIF, membrete fiscal, prefijo correlativo (ej. <code className="font-mono font-bold bg-white px-1 py-0.5 rounded border border-blue-200">F-</code> o <code className="font-mono font-bold bg-white px-1 py-0.5 rounded border border-blue-200">PROF-</code>) y control de numeración secuencial.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div>
+                                    <strong className="text-blue-950 font-black block text-sm">
+                                        Directorio de Clientes y Adquirentes (Compradores y Receptores)
+                                    </strong>
+                                    <p className="text-slate-700 font-medium mt-0.5">
+                                        Base de datos de personas naturales y jurídicas a quienes les vendemos y emitimos documentos fiscales. Puedes registrar nuevos clientes rápidamente con validación y autocompletado oficial mediante CNE / SENIAT.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* CONTENIDO SEGÚN LA PESTAÑA: EMPRESAS EMISORAS */}
+                        {directorySection === 'empresas-emisoras' && (
+                            <div>
+                                {filteredCompanies.length === 0 ? (
+                                    <div className="bg-white rounded-2xl border-2 border-slate-300 p-12 text-center space-y-3">
+                                        <Building2 className="w-12 h-12 text-slate-400 mx-auto" />
+                                        <h4 className="text-sm font-black text-slate-900 uppercase">No se encontraron empresas emisoras</h4>
+                                        <p className="text-xs text-slate-600 max-w-md mx-auto">
+                                            {searchQuery ? `No hay empresas que coincidan con "${searchQuery}".` : 'No hay empresas emisoras registradas aún.'}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCompanyModalOpen(true)}
+                                            className="inline-flex items-center gap-2 h-9 px-4 bg-black text-white text-xs font-black rounded-lg hover:bg-slate-800 cursor-pointer"
+                                        >
+                                            <Plus className="w-4 h-4 text-emerald-400" />
+                                            <span>Registrar Primera Empresa Emisora</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                        {filteredCompanies.map((comp) => {
+                                            const isCurrentActive = comp.id === activeCompany.id;
+                                            return (
+                                                <div
+                                                    key={comp.id}
+                                                    className={`bg-white rounded-2xl border-2 shadow-xs p-5 flex flex-col justify-between transition-all ${
+                                                        isCurrentActive ? 'border-blue-600 ring-2 ring-blue-500/30' : 'border-slate-300 hover:border-slate-400'
+                                                    }`}
+                                                >
+                                                    <div>
+                                                        {/* Cabecera de la Tarjeta de Empresa */}
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="flex items-center space-x-3 min-w-0">
+                                                                {comp.logo_url ? (
+                                                                    <div className="h-12 w-12 rounded-xl bg-white border border-slate-300 p-1 flex items-center justify-center shrink-0 shadow-xs">
+                                                                        <img
+                                                                            src={comp.logo_url}
+                                                                            alt={comp.name}
+                                                                            className="max-h-10 max-w-full object-contain"
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="h-12 w-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-base shrink-0 shadow-xs">
+                                                                        {comp.name.substring(0, 2).toUpperCase()}
+                                                                    </div>
+                                                                )}
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <span className="text-[10px] font-black uppercase text-blue-900 bg-blue-100 border border-blue-300 px-1.5 py-0.5 rounded">
+                                                                            Empresa Emisora
+                                                                        </span>
+                                                                        {isCurrentActive && (
+                                                                            <span className="text-[10px] font-black uppercase text-emerald-900 bg-emerald-100 border border-emerald-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                                                <Check className="w-2.5 h-2.5" />
+                                                                                Activa
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <h3 className="text-sm font-black text-black leading-tight mt-1 truncate" title={comp.name}>
+                                                                        {comp.name}
+                                                                    </h3>
+                                                                    {comp.trade_name && (
+                                                                        <p className="text-[11px] font-bold text-slate-600 truncate">{comp.trade_name}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* RIF */}
+                                                        <div className="mt-4 flex items-center justify-between bg-slate-100 p-2.5 rounded-xl border border-slate-200 font-mono text-xs">
+                                                            <span className="text-slate-700 font-black text-xs">RIF FISCAL:</span>
+                                                            <strong className="text-black text-sm font-black">{comp.tax_id}</strong>
+                                                        </div>
+
+                                                        {/* Contactos */}
+                                                        <div className="mt-3.5 space-y-1.5 text-xs font-bold text-black">
+                                                            {comp.email && (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Mail className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                                                                    <span className="truncate text-slate-800">{comp.email}</span>
+                                                                </div>
+                                                            )}
+                                                            {comp.phone && (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Phone className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                                                                    <span className="text-slate-800">{comp.phone}</span>
+                                                                </div>
+                                                            )}
+                                                            {comp.address && (
+                                                                <div className="flex items-start gap-2">
+                                                                    <MapPin className="w-3.5 h-3.5 text-slate-600 shrink-0 mt-0.5" />
+                                                                    <span className="text-slate-800 line-clamp-2">{comp.address}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Cuadro de Secuencia y Correlativos */}
+                                                        <div className="mt-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[11px] grid grid-cols-2 gap-2 font-mono">
+                                                            <div>
+                                                                <span className="text-slate-600 block text-[10px] font-sans font-bold">Prefijo / Próx:</span>
+                                                                <strong className="text-blue-900 font-black">
+                                                                    {sprintfCorrelative(comp.invoice_prefix || 'F-', comp.next_correlative || 1)}
+                                                                </strong>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-slate-600 block text-[10px] font-sans font-bold">Control:</span>
+                                                                <strong className="text-slate-900 font-black">
+                                                                    {sprintfControl(0, comp.next_control_number || 1)}
+                                                                </strong>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Botones de acción */}
+                                                    <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
+                                                        {!isCurrentActive ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedCompanyId(comp.id);
+                                                                    setInvoiceForm(prev => ({ ...prev, company_id: comp.id }));
+                                                                }}
+                                                                className="h-8 px-2.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-black text-xs font-black cursor-pointer transition-colors"
+                                                            >
+                                                                Seleccionar Emisor
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-[11px] font-black text-emerald-700 flex items-center gap-1">
+                                                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                                                Emisor Seleccionado
+                                                            </span>
+                                                        )}
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedCompanyId(comp.id);
+                                                                setInvoiceForm(getEmptyInvoice(comp));
+                                                                setCurrentView('generador-pdf');
+                                                            }}
+                                                            className="h-8 px-3 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black text-xs flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-2xs"
+                                                        >
+                                                            <Receipt className="w-3.5 h-3.5 text-sky-200" />
+                                                            <span>Emitir Factura</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* CONTENIDO SEGÚN LA PESTAÑA: CLIENTES RECEPTORES */}
+                        {directorySection === 'clientes' && (
+                            <div>
+                                {filteredClients.length === 0 ? (
+                                    <div className="bg-white rounded-2xl border-2 border-slate-300 p-12 text-center space-y-3">
+                                        <Users2 className="w-12 h-12 text-slate-400 mx-auto" />
+                                        <h4 className="text-sm font-black text-slate-900 uppercase">No se encontraron clientes</h4>
+                                        <p className="text-xs text-slate-600 max-w-md mx-auto">
+                                            {searchQuery ? `No hay clientes que coincidan con "${searchQuery}".` : 'No hay clientes registrados en esta categoría.'}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsClientModalOpen(true)}
+                                            className="inline-flex items-center gap-2 h-9 px-4 bg-blue-700 text-white text-xs font-black rounded-lg hover:bg-blue-800 cursor-pointer"
+                                        >
+                                            <Plus className="w-4 h-4 text-white" />
+                                            <span>Registrar Primer Cliente</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                        {filteredClients.map((client) => (
+                                            <div
+                                                key={client.id}
+                                                className="bg-white rounded-2xl border-2 border-slate-300 shadow-xs p-5 flex flex-col justify-between hover:border-slate-400 hover:shadow-sm transition-all"
+                                            >
+                                                <div>
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className={`p-3 rounded-xl border ${client.type === 'empresa'
+                                                                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                                                }`}>
+                                                                {client.type === 'empresa' ? <Building2 className="w-6 h-6" /> : <User className="w-6 h-6" />}
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-[11px] font-black uppercase text-slate-600 block">
+                                                                    {client.type === 'empresa' ? 'Cliente Jurídico' : 'Cliente Natural'}
+                                                                </span>
+                                                                <h3 className="text-sm font-black text-black leading-tight mt-0.5">
+                                                                    {client.name}
+                                                                </h3>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-4 flex items-center justify-between bg-slate-100 p-2.5 rounded-xl border border-slate-200 font-mono text-xs">
+                                                        <span className="text-slate-700 font-black text-xs">CÉDULA / RIF:</span>
+                                                        <strong className="text-black text-sm font-black">{client.tax_id}</strong>
+                                                    </div>
+
+                                                    <div className="mt-4 space-y-2 text-xs font-bold text-black">
+                                                        <div className="flex items-center gap-2">
+                                                            <Mail className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                                                            <span className="truncate">{client.email || 'Sin correo registrado'}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Phone className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                                                            <span>{client.phone}</span>
+                                                        </div>
+                                                        <div className="flex items-start gap-2">
+                                                            <MapPin className="w-3.5 h-3.5 text-slate-600 shrink-0 mt-0.5" />
+                                                            <span className="text-slate-800">{client.address || 'Sin dirección fiscal'}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-slate-600">
+                                                        {client.notes || 'Cliente Registrado'}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setInvoiceForm({
+                                                                ...getEmptyInvoice(activeCompany),
+                                                                client_id: client.id
+                                                            });
+                                                            setCurrentView('generador-pdf');
+                                                        }}
+                                                        className="h-8 px-3.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black text-xs flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-2xs"
+                                                    >
+                                                        <Receipt className="w-4 h-4 text-sky-200" />
+                                                        <span>Facturar</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1107,7 +1501,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         </div>
                                     </div>
                                     <span className="text-xs font-mono font-black bg-blue-100 text-blue-900 border border-blue-400 px-2 py-0.5 rounded uppercase">
-                                        {invoiceForm.document_type}
+                                        {getDocumentTypeInfo(invoiceForm.document_type).badgeText}
                                     </span>
                                 </div>
 
@@ -1124,11 +1518,6 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                             type="button"
                                             onClick={() => {
                                                 setInvoiceForm(prev => ({ ...prev, document_type: t.id }));
-                                                if (t.id === 'proforma') {
-                                                    setSelectedPdfFormat('formato-2');
-                                                } else if (t.id === 'factura') {
-                                                    setSelectedPdfFormat('formato-1');
-                                                }
                                             }}
                                             className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer font-black text-xs ${invoiceForm.document_type === t.id
                                                 ? 'bg-blue-700 text-white shadow-xs'
@@ -1922,7 +2311,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                             {/* Lado Derecho: Título de Factura, Correlativo, Fecha y Control */}
                                             <div className="text-right shrink-0">
                                                 <h2 className="text-2xl font-black text-slate-950 uppercase tracking-wide leading-none">
-                                                    {invoiceForm.document_type === 'factura' ? 'FACTURA' : invoiceForm.document_type.toUpperCase()}
+                                                    {getDocumentTypeInfo(invoiceForm.document_type).title}
                                                 </h2>
                                                 {invoiceForm.document_subtitle && (
                                                     <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 mt-0.5">
@@ -1936,7 +2325,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                     <span className="font-bold">Fecha:</span> {invoiceForm.issue_date}
                                                 </p>
                                                 <p className="text-xs text-slate-800 mt-0.5">
-                                                    <span className="font-bold">Control:</span> {projectedControlNumber}
+                                                    <span className="font-bold">{getDocumentTypeInfo(invoiceForm.document_type).controlLabel}:</span> {projectedControlNumber}
                                                 </p>
                                             </div>
                                         </div>
@@ -2172,14 +2561,14 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                                                 <div className="text-right shrink-0">
                                                     <h2 className="text-3xl font-black text-[#0E1C33] tracking-tight leading-none uppercase">
-                                                        {invoiceForm.document_type === 'factura' ? 'PROFORMA' : invoiceForm.document_type.toUpperCase()}
+                                                        {getDocumentTypeInfo(invoiceForm.document_type).title}
                                                     </h2>
                                                     <p className="text-xs font-black text-[#C9A227] tracking-wider uppercase mt-1">
-                                                        {invoiceForm.document_subtitle || 'LÍNEA MÁQUINAS'}
+                                                        {invoiceForm.document_subtitle || getDocumentTypeInfo(invoiceForm.document_type).defaultSubtitle}
                                                     </p>
                                                     <div className="text-xs text-slate-800 space-y-1 mt-3">
                                                         <p>
-                                                            <span className="font-medium text-slate-600">N° de Proforma:</span>{' '}
+                                                            <span className="font-medium text-slate-600">{getDocumentTypeInfo(invoiceForm.document_type).correlativeLabel}:</span>{' '}
                                                             <span className="font-mono font-black text-[#0E1C33]">{projectedCorrelative}</span>
                                                         </p>
                                                         <p>
@@ -2189,6 +2578,10 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                         <p>
                                                             <span className="font-medium text-slate-600">Validez de la oferta:</span>{' '}
                                                             <span className="font-bold">{invoiceForm.offer_validity_days || 15} días</span>
+                                                        </p>
+                                                        <p>
+                                                            <span className="font-medium text-slate-600">{getDocumentTypeInfo(invoiceForm.document_type).controlLabel}:</span>{' '}
+                                                            <span className="font-mono font-bold">{projectedControlNumber}</span>
                                                         </p>
                                                     </div>
                                                 </div>
@@ -2273,7 +2666,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                             </div>
 
                                             <div className="text-right text-[10px] text-slate-400 pt-2 border-t border-slate-200">
-                                                Página 1 de 2 • Proforma Comercial {projectedCorrelative}
+                                                Página 1 de 2 • {getDocumentTypeInfo(invoiceForm.document_type).title} {projectedCorrelative}
                                             </div>
                                         </div>
 
@@ -2396,7 +2789,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
 
                                             {/* Pie de página 2 */}
                                             <div className="text-right text-[10px] text-slate-400 pt-4 border-t border-slate-200">
-                                                Página 2 de 2 • Proforma Comercial {projectedCorrelative}
+                                                Página 2 de 2 • {getDocumentTypeInfo(invoiceForm.document_type).title} {projectedCorrelative}
                                             </div>
                                         </div>
                                     </div>
@@ -2425,6 +2818,14 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                             >
                                 <X className="w-5 h-5" />
                             </button>
+                        </div>
+
+                        {/* Nota explicativa de Empresa Emisora */}
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs flex items-start gap-2.5">
+                            <Building2 className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+                            <p className="text-slate-800 text-[11px] leading-relaxed">
+                                <strong className="text-blue-950 font-black">🏢 Empresa Emisora:</strong> Es la compañía oficial dueña del membrete que emitirá y timbrará facturas o proformas. Podrá cargar su logo y definir su prefijo correlativo inicial.
+                            </p>
                         </div>
 
                         <form onSubmit={handleSubmitCompany} className="space-y-4">
@@ -2561,6 +2962,14 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                             >
                                 <X className="w-5 h-5" />
                             </button>
+                        </div>
+
+                        {/* Nota explicativa de Cliente / Adquiriente */}
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs flex items-start gap-2.5">
+                            <Users2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                            <p className="text-slate-800 text-[11px] leading-relaxed">
+                                <strong className="text-emerald-950 font-black">👥 Cliente / Adquiriente:</strong> Es la persona natural o jurídica que compra nuestros productos o servicios y a quien se le emitirá el documento de cobro.
+                            </p>
                         </div>
 
                         {/* Alerta de resultado CNE */}
