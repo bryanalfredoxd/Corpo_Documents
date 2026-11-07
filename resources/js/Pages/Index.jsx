@@ -200,6 +200,36 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         { category: 'Extras', name: 'País de origen', value: 'Made in Japan (Shin Caterpillar Mitsubishi)' },
     ];
 
+    // Helper: Obtener fecha en formato YYYY-MM-DD en zona horaria de Caracas / Venezuela (America/Caracas)
+    const getCaracasDate = (daysOffset = 0) => {
+        const d = new Date();
+        if (daysOffset) {
+            d.setDate(d.getDate() + daysOffset);
+        }
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Caracas',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+        return formatter.format(d);
+    };
+
+    // Helper: Formatear fecha para presentación (DD/MM/YYYY) respetando zona horaria de Caracas
+    const formatCaracasDate = (dateStr) => {
+        if (!dateStr) return '';
+        try {
+            const clean = String(dateStr).split('T')[0].split(' ')[0];
+            if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+                const [y, m, d] = clean.split('-');
+                return `${d}/${m}/${y}`;
+            }
+            return new Date(dateStr).toLocaleDateString('es-VE', { timeZone: 'America/Caracas' });
+        } catch {
+            return String(dateStr);
+        }
+    };
+
     // Plantilla de factura completamente limpia a la espera de ser llenada
     const getEmptyInvoice = (company) => ({
         company_id: company?.id || (companies.length > 0 ? companies[0].id : ''),
@@ -207,8 +237,8 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         document_type: 'factura',
         document_subtitle: '',
         order_number: '#' + (company?.next_control_number || 1),
-        issue_date: new Date().toISOString().split('T')[0],
-        due_date: new Date(Date.now() + 8 * 86400000).toISOString().split('T')[0],
+        issue_date: getCaracasDate(),
+        due_date: getCaracasDate(8),
         offer_validity_days: 8,
         delivery_address: '',
         sale_condition: 'Venta de Contado',
@@ -414,8 +444,8 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
             document_type: inv.document_type || 'factura',
             document_subtitle: inv.document_subtitle || '',
             order_number: inv.order_number || '',
-            issue_date: inv.issue_date ? inv.issue_date.split('T')[0] : new Date().toISOString().split('T')[0],
-            due_date: inv.due_date ? inv.due_date.split('T')[0] : '',
+            issue_date: inv.issue_date ? inv.issue_date.split('T')[0].split(' ')[0] : getCaracasDate(),
+            due_date: inv.due_date ? inv.due_date.split('T')[0].split(' ')[0] : '',
             offer_validity_days: inv.offer_validity_days || 15,
             delivery_address: inv.delivery_address || '',
             sale_condition: inv.sale_condition || 'Venta de Contado',
@@ -1178,7 +1208,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-4 font-mono font-bold text-slate-900">
-                                                    {new Date(inv.issue_date).toLocaleDateString('es-VE')}
+                                                    {formatCaracasDate(inv.issue_date)}
                                                 </td>
                                                 <td className="px-4 py-4 font-mono text-xs font-bold text-slate-900">
                                                     Bs. {Number(inv.bcv_exchange_rate).toFixed(2)}
