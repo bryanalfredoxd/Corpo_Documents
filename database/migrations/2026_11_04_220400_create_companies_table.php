@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('country')->default('Venezuela');
             $table->string('phone'); // Teléfono / WhatsApp principal
             $table->string('phone_secondary')->nullable(); // Teléfono secundario
-            $table->string('email'); // Correo de facturación / contacto
+            $table->string('email')->nullable(); // Correo de facturación / contacto
             $table->string('website')->nullable(); // Redes / Web (ej. TikTok, Instagram, Web)
             $table->string('invoice_prefix')->default('F-'); // Prefijo de facturas (ej. F-, PROF-)
             $table->unsignedInteger('next_correlative')->default(1); // Siguiente correlativo numérico

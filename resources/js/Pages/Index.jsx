@@ -537,8 +537,13 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         e.preventDefault();
         setIsSavingCompany(true);
 
+        const payload = {
+            ...newCompany,
+            email: newCompany.email ? newCompany.email.trim() : null
+        };
+
         if (editingCompany) {
-            router.put(`/companies/${editingCompany.id}`, newCompany, {
+            router.put(`/companies/${editingCompany.id}`, payload, {
                 onSuccess: () => {
                     setIsSavingCompany(false);
                     setIsCompanyModalOpen(false);
@@ -547,7 +552,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                 onError: () => setIsSavingCompany(false)
             });
         } else {
-            router.post('/companies', newCompany, {
+            router.post('/companies', payload, {
                 onSuccess: () => {
                     setIsSavingCompany(false);
                     setIsCompanyModalOpen(false);
@@ -3312,11 +3317,10 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-black text-black block mb-1">Email *</label>
+                                    <label className="text-xs font-black text-black block mb-1">Email (Opcional)</label>
                                     <input
                                         type="email"
-                                        required
-                                        placeholder="empresa@correo.com"
+                                        placeholder="empresa@correo.com (Opcional)"
                                         value={newCompany.email}
                                         onChange={(e) => setNewCompany(prev => ({ ...prev, email: e.target.value }))}
                                         className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black"

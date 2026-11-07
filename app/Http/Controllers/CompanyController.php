@@ -60,9 +60,9 @@ class CompanyController extends Controller
             'city' => $validated['city'] ?? null,
             'state' => $validated['state'] ?? null,
             'phone' => $validated['phone'],
-            'email' => $validated['email'],
+            'email' => !empty($validated['email']) ? trim($validated['email']) : null,
             'website' => $validated['website'] ?? null,
-            'invoice_prefix' => $validated['invoice_prefix'] ?: 'F-',
+            'invoice_prefix' => !empty($validated['invoice_prefix']) ? $validated['invoice_prefix'] : 'F-',
             'next_correlative' => 1,
             'next_control_number' => 1,
             'default_terms' => $validated['default_terms'] ?? null,
@@ -99,9 +99,9 @@ class CompanyController extends Controller
             'city' => $validated['city'] ?? null,
             'state' => $validated['state'] ?? null,
             'phone' => $validated['phone'],
-            'email' => $validated['email'],
+            'email' => !empty($validated['email']) ? trim($validated['email']) : null,
             'website' => $validated['website'] ?? null,
-            'invoice_prefix' => $validated['invoice_prefix'] ?: 'F-',
+            'invoice_prefix' => !empty($validated['invoice_prefix']) ? $validated['invoice_prefix'] : ($company->invoice_prefix ?: 'F-'),
             'default_terms' => $validated['default_terms'] ?? null,
         ]);
 

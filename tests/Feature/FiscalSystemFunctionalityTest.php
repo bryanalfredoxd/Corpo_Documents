@@ -80,6 +80,28 @@ class FiscalSystemFunctionalityTest extends TestCase
         Storage::disk('public')->assertExists($company->logo_path);
     }
 
+    public function test_authenticated_user_can_create_company_without_email(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/companies', [
+            'name' => 'Agro Insumos Sin Correo, C.A.',
+            'tax_id' => 'J-11223344-5',
+            'phone' => '+58 414 777 8899',
+            'email' => null,
+            'address' => 'Barinas, Edo. Barinas',
+            'invoice_prefix' => 'AG-',
+        ]);
+
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('companies', [
+            'name' => 'Agro Insumos Sin Correo, C.A.',
+            'tax_id' => 'J-11223344-5',
+            'email' => null,
+        ]);
+    }
+
     public function test_authenticated_user_can_create_client(): void
     {
         $user = User::factory()->create();
@@ -214,6 +236,39 @@ class FiscalSystemFunctionalityTest extends TestCase
             'name' => 'Updated Company Name',
             'phone' => '+58 414 9999999',
             'city' => 'Valencia',
+        ]);
+    }
+
+    public function test_authenticated_user_can_update_company_removing_email(): void
+    {
+        $user = User::factory()->create();
+
+        $company = Company::create([
+            'name' => 'Original Company',
+            'tax_id' => 'J-55667788-9',
+            'phone' => '+58 412 0000000',
+            'email' => 'original@empresa.com',
+            'address' => 'Caracas, Venezuela',
+            'invoice_prefix' => 'F-',
+            'next_correlative' => 1,
+            'next_control_number' => 1,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->put("/companies/{$company->id}", [
+            'name' => 'Updated Company Without Email',
+            'tax_id' => 'J-55667788-9',
+            'phone' => '+58 412 0000000',
+            'email' => '',
+            'address' => 'Caracas, Venezuela',
+        ]);
+
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('companies', [
+            'id' => $company->id,
+            'name' => 'Updated Company Without Email',
+            'email' => null,
         ]);
     }
 
