@@ -21,7 +21,7 @@ class CompanyController extends Controller
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
             'phone' => ['required', 'string', 'max:50'],
-            'email' => ['required', 'email', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
             'website' => ['nullable', 'string', 'max:255'],
             'invoice_prefix' => ['nullable', 'string', 'max:10'],
             'default_terms' => ['nullable', 'string'],
@@ -85,7 +85,7 @@ class CompanyController extends Controller
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
             'phone' => ['required', 'string', 'max:50'],
-            'email' => ['required', 'email', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
             'website' => ['nullable', 'string', 'max:255'],
             'invoice_prefix' => ['nullable', 'string', 'max:10'],
             'default_terms' => ['nullable', 'string'],
@@ -108,4 +108,3 @@ class CompanyController extends Controller
         return redirect()->back()->with('success', '¡Información de la empresa actualizada exitosamente!');
     }
 }
-
