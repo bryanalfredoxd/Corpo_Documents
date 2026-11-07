@@ -778,7 +778,7 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                     <img
                         src="/images/corpoasia-square.png"
                         alt="Inversiones CorpoAsia C.A."
-                        className="h-8 sm:h-9 w-auto object-contain rounded-md shrink-0 shadow-2xs border border-slate-200"
+                        className="h-8 sm:h-9 w-auto object-contain shrink-0"
                     />
                     <div className="hidden xs:block h-6 w-px bg-slate-300"></div>
                     <div>
@@ -2650,18 +2650,16 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     /* ========================================================================= */
                                     <div>
                                         {/* 1. CABECERA / MEMBRETE INSTITUCIONAL */}
-                                        <div className="flex justify-between items-start gap-4 pb-4">
-                                            {/* Lado Izquierdo: Logo Oficial CorpoAsia y Datos de la Empresa Emisora */}
-                                            <div className="flex items-start gap-4 max-w-[420px]">
-                                                <div className="shrink-0 p-1 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                                                    <img
-                                                        src="/images/corpoasia-square.png"
-                                                        alt="Inversiones CorpoAsia C.A."
-                                                        className="h-20 sm:h-24 w-auto max-w-[110px] object-contain"
-                                                    />
-                                                </div>
+                                        <div className="flex justify-between items-center gap-4 pb-4">
+                                            {/* Lado Izquierdo: Logo Oficial CorpoAsia y Datos de la Empresa Emisora (Centrados y Simétricos) */}
+                                            <div className="flex items-center gap-4 max-w-[430px]">
+                                                <img
+                                                    src="/images/corpoasia-square.png"
+                                                    alt="Inversiones CorpoAsia C.A."
+                                                    className="h-22 sm:h-26 w-auto max-w-[115px] object-contain shrink-0"
+                                                />
 
-                                                <div className="space-y-0.5">
+                                                <div className="space-y-0.5 min-w-0">
                                                     <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-snug">
                                                         {activeCompany.name}
                                                     </h1>
@@ -2915,40 +2913,32 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         {/* ---------- PÁGINA 1: FICHA TÉCNICA & DATOS DEL CLIENTE ---------- */}
                                         <div className="space-y-4">
                                             {/* Cabecera Moaiven / Industrial */}
-                                            <div className="flex justify-between items-start gap-4 pb-1">
-                                                {/* Lado Izquierdo: Logo Oficial CorpoAsia y Datos de la Empresa Emisora en Fila */}
-                                                <div className="flex items-start gap-4 max-w-[430px]">
-                                                    <div className="shrink-0 p-1 bg-white rounded-xl border border-slate-200 shadow-2xs mt-0.5">
-                                                        <img
-                                                            src="/images/corpoasia-square.png"
-                                                            alt="Inversiones CorpoAsia C.A."
-                                                            className="h-20 sm:h-24 w-auto max-w-[110px] object-contain"
-                                                        />
-                                                    </div>
+                                            <div className="flex justify-between items-center gap-4 pb-2">
+                                                {/* Lado Izquierdo: Logo Oficial CorpoAsia y Datos de la Empresa Emisora (Centrados y Simétricos) */}
+                                                <div className="flex items-center gap-4 max-w-[430px]">
+                                                    <img
+                                                        src="/images/corpoasia-square.png"
+                                                        alt="Inversiones CorpoAsia C.A."
+                                                        className="h-22 sm:h-26 w-auto max-w-[115px] object-contain shrink-0"
+                                                    />
                                                     <div className="space-y-0.5 min-w-0">
                                                         <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-snug">
                                                             {activeCompany.name}
                                                         </h1>
-                                                        <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">
-                                                            IMPORT & LOGISTICS · CHINA - VENEZUELA
-                                                        </p>
                                                         <p className="text-xs font-bold text-slate-800">
                                                             RIF: {activeCompany.tax_id}
                                                         </p>
                                                         <p className="text-xs text-slate-600 leading-tight">
                                                             {activeCompany.address}
                                                         </p>
+                                                        <p className="text-xs text-slate-600">
+                                                            Teléfono / WhatsApp: {activeCompany.phone}
+                                                        </p>
                                                         {activeCompany.email && (
                                                             <p className="text-xs text-slate-600">
-                                                                {activeCompany.email}
+                                                                Email: {activeCompany.email}
                                                             </p>
                                                         )}
-                                                        <p className="text-xs text-slate-600">
-                                                            WhatsApp: {activeCompany.phone}
-                                                        </p>
-                                                        <p className="text-xs text-slate-600">
-                                                            TikTok: {invoiceForm.company_social_handle || (`@${activeCompany.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.logistic`)}
-                                                        </p>
                                                     </div>
                                                 </div>
 
