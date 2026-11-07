@@ -776,9 +776,9 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                 {/* Logo & Marca del Sistema */}
                 <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
                     <img
-                        src="/images/corpoasia-round.png"
+                        src="/images/corpoasia-square.png"
                         alt="Inversiones CorpoAsia C.A."
-                        className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-contain shrink-0 shadow-2xs border border-slate-200"
+                        className="h-8 sm:h-9 w-auto object-contain rounded-md shrink-0 shadow-2xs border border-slate-200"
                     />
                     <div className="hidden xs:block h-6 w-px bg-slate-300"></div>
                     <div>
@@ -2651,13 +2651,13 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                     <div>
                                         {/* 1. CABECERA / MEMBRETE INSTITUCIONAL */}
                                         <div className="flex justify-between items-start gap-4 pb-4">
-                                            {/* Lado Izquierdo: Logo Redondo Oficial CorpoAsia y Datos de la Empresa Emisora */}
-                                            <div className="flex items-start gap-3.5 max-w-[380px]">
-                                                <div className="shrink-0 p-1 bg-white rounded-full border border-slate-300 shadow-2xs">
+                                            {/* Lado Izquierdo: Logo Oficial CorpoAsia y Datos de la Empresa Emisora */}
+                                            <div className="flex items-start gap-4 max-w-[420px]">
+                                                <div className="shrink-0 p-1 bg-white rounded-xl border border-slate-200 shadow-2xs">
                                                     <img
-                                                        src="/images/corpoasia-round.png"
+                                                        src="/images/corpoasia-square.png"
                                                         alt="Inversiones CorpoAsia C.A."
-                                                        className="h-16 w-16 sm:h-20 sm:w-20 rounded-full object-contain"
+                                                        className="h-20 sm:h-24 w-auto max-w-[110px] object-contain"
                                                     />
                                                 </div>
 
@@ -2916,13 +2916,13 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                                         <div className="space-y-4">
                                             {/* Cabecera Moaiven / Industrial */}
                                             <div className="flex justify-between items-start gap-4 pb-1">
-                                                {/* Lado Izquierdo: Logo Redondo y Datos de la Empresa Emisora en Fila */}
-                                                <div className="flex items-start gap-3.5 max-w-[420px]">
-                                                    <div className="shrink-0 p-1 bg-white rounded-full border border-slate-300 shadow-2xs mt-0.5">
+                                                {/* Lado Izquierdo: Logo Oficial CorpoAsia y Datos de la Empresa Emisora en Fila */}
+                                                <div className="flex items-start gap-4 max-w-[430px]">
+                                                    <div className="shrink-0 p-1 bg-white rounded-xl border border-slate-200 shadow-2xs mt-0.5">
                                                         <img
-                                                            src="/images/corpoasia-round.png"
+                                                            src="/images/corpoasia-square.png"
                                                             alt="Inversiones CorpoAsia C.A."
-                                                            className="h-16 w-16 sm:h-20 sm:w-20 rounded-full object-contain"
+                                                            className="h-20 sm:h-24 w-auto max-w-[110px] object-contain"
                                                         />
                                                     </div>
                                                     <div className="space-y-0.5 min-w-0">
