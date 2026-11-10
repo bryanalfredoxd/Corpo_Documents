@@ -27,6 +27,8 @@ class InvoiceController extends Controller
             'sale_condition' => ['required', 'string', 'max:100'],
             'sales_channel' => ['nullable', 'string', 'max:100'],
             'bcv_exchange_rate' => ['required', 'numeric', 'min:0.0001'],
+            'show_bs_conversion' => ['nullable', 'boolean'],
+            'signature_stamp' => ['nullable', 'string', 'in:auto,china,corpoasia,none'],
             'currency' => ['required', 'in:USD,VES'],
             'payment_method' => ['nullable', 'string', 'max:100'],
             'payment_reference' => ['nullable', 'string', 'max:100'],
@@ -79,6 +81,10 @@ class InvoiceController extends Controller
             $bcvRate = (float) $validated['bcv_exchange_rate'];
             $totalVes = round($totalUsd * $bcvRate, 2);
 
+            $technicalSpecs = is_array($validated['technical_specs'] ?? null) ? $validated['technical_specs'] : [];
+            $technicalSpecs['show_bs_conversion'] = $request->boolean('show_bs_conversion', true);
+            $technicalSpecs['signature_stamp'] = $validated['signature_stamp'] ?? 'auto';
+
             // Crear factura
             $invoice = Invoice::create([
                 'company_id' => $company->id,
@@ -95,6 +101,7 @@ class InvoiceController extends Controller
                 'sale_condition' => $validated['sale_condition'],
                 'sales_channel' => $validated['sales_channel'] ?? 'Oficina',
                 'bcv_exchange_rate' => $bcvRate,
+                'show_bs_conversion' => $request->boolean('show_bs_conversion', true),
                 'currency' => $validated['currency'],
                 'payment_method' => $validated['payment_method'] ?? 'PAGO MOVIL',
                 'payment_reference' => $validated['payment_reference'] ?? null,
@@ -109,7 +116,7 @@ class InvoiceController extends Controller
                 'shipping_terms_notes' => $validated['shipping_terms_notes'] ?? null,
                 'payment_terms_notes' => $validated['payment_terms_notes'] ?? $company->default_payment_terms,
                 'terms_conditions' => $validated['terms_conditions'] ?? $company->default_terms,
-                'technical_specs' => $validated['technical_specs'] ?? null,
+                'technical_specs' => $technicalSpecs,
                 'status' => 'emitida',
             ]);
 

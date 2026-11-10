@@ -48,6 +48,14 @@ input[type="number"] {
     }
 }
 
+/* Hoja A4 con pie de página fijado al final */
+.printable-a4-page {
+    min-height: 980px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
 /* Configuración de Hoja A4 para Impresión y PDF */
 @page {
     size: A4 portrait;
@@ -57,6 +65,13 @@ input[type="number"] {
 @media print {
     *, *::before, *::after {
         box-sizing: border-box !important;
+    }
+
+    .printable-a4-page {
+        min-height: 258mm !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
     }
 
     html, body {

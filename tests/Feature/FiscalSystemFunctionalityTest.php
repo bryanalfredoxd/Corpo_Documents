@@ -303,5 +303,47 @@ class FiscalSystemFunctionalityTest extends TestCase
             'address' => 'Barinitas',
         ]);
     }
+
+    public function test_invoice_can_be_created_in_solo_dolares_mode(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $user = User::first();
+        $company = Company::first();
+        $client = Client::first();
+
+        $response = $this->actingAs($user)->post('/invoices', [
+            'company_id' => $company->id,
+            'client_id' => $client->id,
+            'document_type' => 'cotizacion',
+            'document_subtitle' => 'PRESUPUESTO BICICLETAS',
+            'issue_date' => '2026-11-10',
+            'sale_condition' => 'Venta de Contado',
+            'sales_channel' => 'Oficina',
+            'bcv_exchange_rate' => 880.50,
+            'show_bs_conversion' => false,
+            'currency' => 'USD',
+            'payment_method' => 'EFECTIVO (USD)',
+            'shipping_cost' => 0,
+            'discount' => 0,
+            'tax_percentage' => 0,
+            'items' => [
+                [
+                    'description' => 'Bicicleta Montañera Rin 29',
+                    'details' => 'Color negro mate, cambios Shimano',
+                    'quantity' => 2,
+                    'unit' => 'UND',
+                    'unit_price' => 250.00,
+                    'is_tax_exempt' => true,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('invoices', [
+            'document_type' => 'cotizacion',
+            'total_usd' => 500.00,
+            'show_bs_conversion' => false,
+        ]);
+    }
 }
 

@@ -33,6 +33,7 @@ return new class extends Migration
             
             // Multimoneda y Tasa de Cambio BCV
             $table->decimal('bcv_exchange_rate', 14, 4)->default(1.0000); // Tasa oficial publicada por el BCV
+            $table->boolean('show_bs_conversion')->default(true); // Si se muestra o no la conversión en Bolívares
             $table->string('currency', 3)->default('USD'); // USD o VES
             
             // Formas de Pago
