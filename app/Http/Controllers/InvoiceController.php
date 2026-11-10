@@ -8,6 +8,7 @@ use App\Models\InvoiceItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class InvoiceController extends Controller
 {
@@ -85,8 +86,7 @@ class InvoiceController extends Controller
             $technicalSpecs['show_bs_conversion'] = $request->boolean('show_bs_conversion', true);
             $technicalSpecs['signature_stamp'] = $validated['signature_stamp'] ?? 'auto';
 
-            // Crear factura
-            $invoice = Invoice::create([
+            $invoiceData = [
                 'company_id' => $company->id,
                 'client_id' => $validated['client_id'],
                 'user_id' => $request->user()?->id,
@@ -101,7 +101,6 @@ class InvoiceController extends Controller
                 'sale_condition' => $validated['sale_condition'],
                 'sales_channel' => $validated['sales_channel'] ?? 'Oficina',
                 'bcv_exchange_rate' => $bcvRate,
-                'show_bs_conversion' => $request->boolean('show_bs_conversion', true),
                 'currency' => $validated['currency'],
                 'payment_method' => $validated['payment_method'] ?? 'PAGO MOVIL',
                 'payment_reference' => $validated['payment_reference'] ?? null,
@@ -118,7 +117,14 @@ class InvoiceController extends Controller
                 'terms_conditions' => $validated['terms_conditions'] ?? $company->default_terms,
                 'technical_specs' => $technicalSpecs,
                 'status' => 'emitida',
-            ]);
+            ];
+
+            if (Schema::hasColumn('invoices', 'show_bs_conversion')) {
+                $invoiceData['show_bs_conversion'] = $request->boolean('show_bs_conversion', true);
+            }
+
+            // Crear factura
+            $invoice = Invoice::create($invoiceData);
 
             // Guardar ítems
             foreach ($validated['items'] as $index => $itemData) {

@@ -93,5 +93,22 @@ class Invoice extends Model
     {
         return $this->hasMany(InvoiceItem::class)->orderBy('item_order');
     }
+
+    /**
+     * Accesor resiliente para el régimen de conversión a bolívares.
+     */
+    public function getShowBsConversionAttribute($value): bool
+    {
+        if ($value !== null) {
+            return (bool) $value;
+        }
+
+        $specs = $this->technical_specs;
+        if (is_array($specs) && isset($specs['show_bs_conversion'])) {
+            return (bool) $specs['show_bs_conversion'];
+        }
+
+        return true;
+    }
 }
 
