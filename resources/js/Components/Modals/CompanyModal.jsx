@@ -111,6 +111,130 @@ export default function CompanyModal({
                         />
                     </div>
 
+                    {/* Control de Numeración Independiente, Web y Términos por Defecto */}
+                    <div className="p-3 bg-slate-50 rounded-xl border-2 border-slate-200 space-y-3">
+                        <span className="text-[11px] font-black uppercase text-slate-700 tracking-wide block">
+                            Correlativos Independientes por Documento & Textos
+                        </span>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div>
+                                <label className="text-[11px] font-black text-black block mb-1">Próx. Factura ({newCompany.invoice_prefix || 'F-'})</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    placeholder="1"
+                                    value={newCompany.next_correlative || 1}
+                                    onChange={(e) => setNewCompany(prev => ({ ...prev, next_correlative: Number(e.target.value) }))}
+                                    className="h-8 w-full bg-white border-2 border-slate-300 rounded-lg px-2.5 text-xs font-mono font-black text-black"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-black text-black block mb-1">Próx. N° Control Fiscal</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    placeholder="1"
+                                    value={newCompany.next_control_number || 1}
+                                    onChange={(e) => setNewCompany(prev => ({ ...prev, next_control_number: Number(e.target.value) }))}
+                                    className="h-8 w-full bg-white border-2 border-slate-300 rounded-lg px-2.5 text-xs font-mono font-black text-black"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-black text-black block mb-1">Web / Redes Sociales</label>
+                                <input
+                                    type="text"
+                                    placeholder="www.empresa.com"
+                                    value={newCompany.website || ''}
+                                    onChange={(e) => setNewCompany(prev => ({ ...prev, website: e.target.value }))}
+                                    className="h-8 w-full bg-white border-2 border-slate-300 rounded-lg px-2.5 text-xs font-bold text-black"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Secuencias independientes: Proformas, Cotizaciones, Notas de Entrega */}
+                        <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-200">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-700 block">Proformas</label>
+                                <div className="flex gap-1">
+                                    <input
+                                        type="text"
+                                        placeholder="PROF-"
+                                        value={newCompany.proforma_prefix ?? 'PROF-'}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, proforma_prefix: e.target.value }))}
+                                        className="h-7 w-16 bg-white border border-slate-300 rounded px-1.5 text-[11px] font-mono font-black"
+                                        title="Prefijo de Proformas"
+                                    />
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={newCompany.next_proforma_correlative || 1}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, next_proforma_correlative: Number(e.target.value) }))}
+                                        className="h-7 w-full bg-white border border-slate-300 rounded px-1.5 text-[11px] font-mono font-black"
+                                        title="Siguiente N° de Proforma"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-700 block">Cotizaciones</label>
+                                <div className="flex gap-1">
+                                    <input
+                                        type="text"
+                                        placeholder="COT-"
+                                        value={newCompany.quote_prefix ?? 'COT-'}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, quote_prefix: e.target.value }))}
+                                        className="h-7 w-16 bg-white border border-slate-300 rounded px-1.5 text-[11px] font-mono font-black"
+                                        title="Prefijo de Cotizaciones"
+                                    />
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={newCompany.next_quote_correlative || 1}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, next_quote_correlative: Number(e.target.value) }))}
+                                        className="h-7 w-full bg-white border border-slate-300 rounded px-1.5 text-[11px] font-mono font-black"
+                                        title="Siguiente N° de Cotización"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-700 block">Notas Entrega</label>
+                                <div className="flex gap-1">
+                                    <input
+                                        type="text"
+                                        placeholder="NE-"
+                                        value={newCompany.delivery_note_prefix ?? 'NE-'}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, delivery_note_prefix: e.target.value }))}
+                                        className="h-7 w-16 bg-white border border-slate-300 rounded px-1.5 text-[11px] font-mono font-black"
+                                        title="Prefijo de Notas de Entrega"
+                                    />
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={newCompany.next_delivery_note_correlative || 1}
+                                        onChange={(e) => setNewCompany(prev => ({ ...prev, next_delivery_note_correlative: Number(e.target.value) }))}
+                                        className="h-7 w-full bg-white border border-slate-300 rounded px-1.5 text-[11px] font-mono font-black"
+                                        title="Siguiente N° de Nota de Entrega"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[11px] font-black text-black block mb-1">
+                                Términos y Condiciones por Defecto (Pie del PDF)
+                            </label>
+                            <textarea
+                                rows="2"
+                                placeholder="Cláusula legal, garantía o plazo de reclamos por defecto para esta empresa..."
+                                value={newCompany.default_terms || ''}
+                                onChange={(e) => setNewCompany(prev => ({ ...prev, default_terms: e.target.value }))}
+                                className="w-full bg-white border-2 border-slate-300 rounded-lg p-2 text-[11px] font-medium text-black"
+                            />
+                        </div>
+                    </div>
+
                     <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5 pt-2 border-t-2 border-slate-200">
                         <button
                             type="button"

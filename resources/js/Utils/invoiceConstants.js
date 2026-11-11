@@ -84,6 +84,42 @@ export function sprintfControl(series, num) {
 }
 
 /**
+ * Obtiene el correlativo proyectado independiente según el tipo de documento y empresa
+ */
+export function getProjectedCorrelativeForType(company, documentType) {
+    if (!company) return sprintfCorrelative('F-', 1);
+    switch (documentType) {
+        case 'proforma':
+            return sprintfCorrelative(company.proforma_prefix || 'PROF-', company.next_proforma_correlative || 1);
+        case 'cotizacion':
+            return sprintfCorrelative(company.quote_prefix || 'COT-', company.next_quote_correlative || 1);
+        case 'nota_entrega':
+            return sprintfCorrelative(company.delivery_note_prefix || 'NE-', company.next_delivery_note_correlative || 1);
+        case 'factura':
+        default:
+            return sprintfCorrelative(company.invoice_prefix || 'F-', company.next_correlative || 1);
+    }
+}
+
+/**
+ * Obtiene el número de control proyectado según el tipo de documento y empresa
+ */
+export function getProjectedControlForType(company, documentType) {
+    if (!company) return sprintfControl(0, 1);
+    switch (documentType) {
+        case 'proforma':
+            return sprintfControl(0, company.next_proforma_correlative || 1);
+        case 'cotizacion':
+            return sprintfControl(0, company.next_quote_correlative || 1);
+        case 'nota_entrega':
+            return sprintfControl(0, company.next_delivery_note_correlative || 1);
+        case 'factura':
+        default:
+            return sprintfControl(0, company.next_control_number || 1);
+    }
+}
+
+/**
  * Obtiene la ruta del sello y firma oficial según la configuración y tipo de documento
  */
 export function getSignatureStampUrl(signatureStamp, documentType) {
@@ -98,14 +134,34 @@ export function getSignatureStampUrl(signatureStamp, documentType) {
 }
 
 /**
+ * Filtra las cuentas bancarias activas de la empresa para imprimir en el PDF
+ */
+export function getCompanyBankAccountsForPdf(activeCompany, invoiceForm) {
+    if (invoiceForm?.show_bank_accounts === false) return [];
+    const accounts = (activeCompany?.bank_accounts || []).filter(a => a.is_active !== false);
+    if (accounts.length === 0) return [];
+    if (invoiceForm?.selected_bank_account_id && invoiceForm.selected_bank_account_id !== 'all') {
+        const selected = accounts.filter(a => String(a.id) === String(invoiceForm.selected_bank_account_id));
+        if (selected.length > 0) return selected;
+    }
+    return accounts;
+}
+
+/**
  * Genera la estructura inicial de una factura vacía lista para llenar
  */
 export const getEmptyInvoice = (company, companies = []) => ({
+    id: null,
+    correlative_number: null,
+    control_number: null,
+    status: 'emitida',
     company_id: company?.id || (companies.length > 0 ? companies[0].id : ''),
     client_id: '',
     document_type: 'factura',
     document_subtitle: '',
     signature_stamp: 'auto',
+    show_bank_accounts: true,
+    selected_bank_account_id: 'all',
     order_number: '#' + (company?.next_control_number || 1),
     issue_date: getCaracasDate(),
     due_date: getCaracasDate(8),
@@ -115,9 +171,11 @@ export const getEmptyInvoice = (company, companies = []) => ({
     sales_channel: 'Oficina / Presencial',
     bcv_exchange_rate: 876.80,
     show_bs_conversion: true,
+    show_item_images: true,
     currency: 'USD',
     payment_method: 'PAGO MOVIL',
     payment_reference: '',
+    payment_terms_notes: '',
     shipping_cost: 0,
     discount: 0,
     tax_percentage: 16.00,
@@ -134,7 +192,7 @@ export const getEmptyInvoice = (company, companies = []) => ({
     company_social_handle: '',
     technical_specs: defaultTechnicalSpecs.map(s => ({ ...s })),
     items: [
-        { description: '', details: '', quantity: 1, unit: 'unid', unit_price: '', is_tax_exempt: false, image_url: null }
+        { product_id: null, description: '', details: '', quantity: 1, unit: 'unid', unit_price: '', is_tax_exempt: false, image_url: null, show_image: true }
     ]
 });
 

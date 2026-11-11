@@ -11,12 +11,12 @@ export default function MetricCards({
 }) {
     return (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 no-print">
-            {/* Tarjeta 1: Total Facturado */}
+            {/* Tarjeta 1: Total Facturado Real (Facturas Fiscales no anuladas) */}
             <div className="bg-white rounded-xl sm:rounded-2xl border-2 border-slate-300 p-2.5 sm:p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between min-w-0 overflow-hidden">
                 <div>
                     <div className="flex items-center justify-between gap-1.5 min-w-0 mb-1">
                         <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 truncate min-w-0 flex-1">
-                            Total Facturado (DB)
+                            Facturado Real ({stats.fiscal_invoices_count || 0})
                         </span>
                         <div className="p-1 sm:p-2 bg-emerald-50 text-emerald-700 rounded-md sm:rounded-xl border border-emerald-200 shrink-0">
                             <DollarSign className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
@@ -29,33 +29,38 @@ export default function MetricCards({
                         ${Number(stats.total_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                 </div>
-                <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs">
-                    <span className="font-bold text-slate-600 hidden sm:inline">Acumulado en BD</span>
-                    <span className="font-mono font-black text-emerald-800 bg-emerald-100/80 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
-                        USD ($)
+                <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px] sm:text-[11px]">
+                    <span className="font-mono font-black text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded truncate" title="Facturas marcadas como Pagadas">
+                        Cobrado: ${Number(stats.total_collected_usd || 0).toFixed(0)}
+                    </span>
+                    <span className="font-mono font-black text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded truncate" title="Facturas Emitidas pendientes por cobrar">
+                        x Cobrar: ${Number(stats.total_receivable_usd || 0).toFixed(0)}
                     </span>
                 </div>
             </div>
 
-            {/* Tarjeta 2: Documentos Emitidos */}
+            {/* Tarjeta 2: Proformas & Cotizaciones Activas */}
             <div className="bg-white rounded-xl sm:rounded-2xl border-2 border-slate-300 p-2.5 sm:p-5 shadow-xs hover:border-slate-400 hover:shadow-sm transition-all flex flex-col justify-between min-w-0 overflow-hidden">
                 <div>
                     <div className="flex items-center justify-between gap-1.5 min-w-0 mb-1">
                         <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 truncate min-w-0 flex-1">
-                            Documentos Emitidos
+                            Cotizado / Proformas ({stats.quotes_count || 0})
                         </span>
                         <div className="p-1 sm:p-2 bg-blue-50 text-blue-700 rounded-md sm:rounded-xl border border-blue-200 shrink-0">
                             <Receipt className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                         </div>
                     </div>
-                    <span className="text-base sm:text-2xl font-black text-blue-900 font-mono block truncate">
-                        {stats.invoices_count || invoicesCount}
+                    <span
+                        className="text-base sm:text-2xl font-black text-blue-900 font-mono block truncate"
+                        title={`Total en Proformas y Cotizaciones activas: $${Number(stats.total_quoted_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                    >
+                        ${Number(stats.total_quoted_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                 </div>
                 <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs">
-                    <span className="font-bold text-slate-600 hidden sm:inline">Comprobantes válidos</span>
+                    <span className="font-bold text-slate-600 hidden sm:inline">En presupuestos</span>
                     <span className="font-mono font-black text-blue-900 bg-blue-100/80 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
-                        Registros
+                        {stats.invoices_count || invoicesCount} docs totales
                     </span>
                 </div>
             </div>
@@ -81,7 +86,7 @@ export default function MetricCards({
                     </span>
                 </div>
                 <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs">
-                    <span className="font-bold text-slate-600 hidden sm:inline">Emisores en BD</span>
+                    <span className="font-bold text-slate-600 hidden sm:inline">Emisores registrados</span>
                     <span className="font-bold text-slate-800 bg-slate-100 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
                         Activas
                     </span>
@@ -109,7 +114,7 @@ export default function MetricCards({
                     </span>
                 </div>
                 <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs">
-                    <span className="font-bold text-slate-600 hidden sm:inline">Directorio en BD</span>
+                    <span className="font-bold text-slate-600 hidden sm:inline">Directorio de clientes</span>
                     <span className="font-mono font-black text-emerald-900 bg-emerald-100/80 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
                         Activos
                     </span>

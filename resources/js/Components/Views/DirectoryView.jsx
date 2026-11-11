@@ -1,4 +1,5 @@
 import React from 'react';
+import { router } from '@inertiajs/react';
 import {
     Building2,
     Users2,
@@ -11,9 +12,11 @@ import {
     MapPin,
     Edit3,
     Receipt,
-    User
+    User,
+    Archive
 } from 'lucide-react';
 import { sprintfCorrelative, sprintfControl, getEmptyInvoice } from '../../Utils/invoiceConstants';
+import { useFeedback } from '../../Contexts/FeedbackContext';
 
 export default function DirectoryView({
     companies = [],
@@ -32,6 +35,39 @@ export default function DirectoryView({
     onOpenCreateClient,
     onOpenEditClient
 }) {
+    const { confirm, notify } = useFeedback();
+
+    const handleArchiveCompany = async (comp) => {
+        const ok = await confirm({
+            title: 'Archivar Empresa Emisora',
+            message: `¿Deseas archivar "${comp.name}" del directorio?\n\nTodas sus facturas y documentos históricos se conservarán intactos en el Libro de Ventas.`,
+            confirmLabel: 'Archivar Empresa',
+            variant: 'danger',
+        });
+        if (!ok) return;
+
+        router.delete(`/companies/${comp.id}`, {
+            preserveScroll: true,
+            onSuccess: () => notify.info(`Empresa "${comp.name}" archivada correctamente.`),
+            onError: (err) => notify.error(Object.values(err).join(', ') || 'No se pudo archivar la empresa.'),
+        });
+    };
+
+    const handleArchiveClient = async (client) => {
+        const ok = await confirm({
+            title: 'Archivar Cliente',
+            message: `¿Deseas archivar al cliente "${client.name}"?\n\nSus facturas históricas se conservarán intactas.`,
+            confirmLabel: 'Archivar Cliente',
+            variant: 'danger',
+        });
+        if (!ok) return;
+
+        router.delete(`/clients/${client.id}`, {
+            preserveScroll: true,
+            onSuccess: () => notify.info(`Cliente "${client.name}" archivado correctamente.`),
+            onError: (err) => notify.error(Object.values(err).join(', ') || 'No se pudo archivar el cliente.'),
+        });
+    };
     // Filtrar empresas emisoras
     const filteredCompanies = companies.filter(comp => {
         if (!searchQuery) return true;
@@ -166,7 +202,7 @@ export default function DirectoryView({
                             Directorio de Clientes y Adquirentes (Compradores y Receptores)
                         </strong>
                         <p className="text-slate-700 font-medium mt-0.5">
-                            Base de datos de personas naturales y jurídicas a quienes les vendemos y emitimos documentos fiscales. Puedes registrar nuevos clientes rápidamente con validación y autocompletado oficial mediante CNE / SENIAT.
+                            Registro de personas naturales y jurídicas a quienes les vendemos y emitimos documentos fiscales. Puedes registrar nuevos clientes rápidamente con validación y autocompletado oficial mediante CNE / SENIAT.
                         </p>
                     </div>
                 )}
@@ -269,19 +305,35 @@ export default function DirectoryView({
                                                 )}
                                             </div>
 
-                                            {/* Secuencia y Correlativos */}
-                                            <div className="mt-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[11px] grid grid-cols-2 gap-2 font-mono">
-                                                <div>
-                                                    <span className="text-slate-600 block text-[10px] font-sans font-bold">Prefijo / Próx:</span>
-                                                    <strong className="text-blue-900 font-black">
-                                                        {sprintfCorrelative(comp.invoice_prefix || 'F-', comp.next_correlative || 1)}
-                                                    </strong>
+                                            {/* Secuencias y Correlativos Independientes */}
+                                            <div className="mt-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[11px] space-y-2 font-mono">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <span className="text-slate-600 block text-[10px] font-sans font-bold">Próx. Factura:</span>
+                                                        <strong className="text-blue-900 font-black">
+                                                            {sprintfCorrelative(comp.invoice_prefix || 'F-', comp.next_correlative || 1)}
+                                                        </strong>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-600 block text-[10px] font-sans font-bold">Control Fiscal:</span>
+                                                        <strong className="text-slate-900 font-black">
+                                                            {sprintfControl(0, comp.next_control_number || 1)}
+                                                        </strong>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <span className="text-slate-600 block text-[10px] font-sans font-bold">Control:</span>
-                                                    <strong className="text-slate-900 font-black">
-                                                        {sprintfControl(0, comp.next_control_number || 1)}
-                                                    </strong>
+                                                <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-200 text-[10px]">
+                                                    <div className="truncate">
+                                                        <span className="text-slate-500 font-sans block text-[9px]">Proforma</span>
+                                                        <strong className="text-amber-900">{comp.proforma_prefix || 'PROF-'}{comp.next_proforma_correlative || 1}</strong>
+                                                    </div>
+                                                    <div className="truncate">
+                                                        <span className="text-slate-500 font-sans block text-[9px]">Cotiz.</span>
+                                                        <strong className="text-purple-900">{comp.quote_prefix || 'COT-'}{comp.next_quote_correlative || 1}</strong>
+                                                    </div>
+                                                    <div className="truncate">
+                                                        <span className="text-slate-500 font-sans block text-[9px]">Nota Ent.</span>
+                                                        <strong className="text-emerald-900">{comp.delivery_note_prefix || 'NE-'}{comp.next_delivery_note_correlative || 1}</strong>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -315,6 +367,16 @@ export default function DirectoryView({
                                                     <Edit3 className="w-3.5 h-3.5 text-blue-700" />
                                                     <span>Editar</span>
                                                 </button>
+                                                {companies.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleArchiveCompany(comp)}
+                                                        className="h-8 px-2 rounded-lg border border-red-200 hover:bg-red-50 text-red-700 text-xs font-black flex items-center gap-1 cursor-pointer transition-colors"
+                                                        title="Archivar empresa sin perder su historial de facturas"
+                                                    >
+                                                        <Archive className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                             </div>
 
                                             <button
@@ -407,7 +469,7 @@ export default function DirectoryView({
                                     </div>
 
                                     <div className="mt-5 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1.5">
                                             <button
                                                 type="button"
                                                 onClick={() => onOpenEditClient(client)}
@@ -417,7 +479,15 @@ export default function DirectoryView({
                                                 <Edit3 className="w-3.5 h-3.5 text-blue-700" />
                                                 <span>Editar</span>
                                             </button>
-                                            <span className="text-xs font-bold text-slate-600 truncate max-w-[130px]" title={client.notes || 'Cliente Registrado'}>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleArchiveClient(client)}
+                                                className="h-8 px-2 rounded-lg border border-red-200 hover:bg-red-50 text-red-700 text-xs font-black flex items-center gap-1 cursor-pointer transition-colors"
+                                                title="Archivar cliente sin perder historial de facturas"
+                                            >
+                                                <Archive className="w-3.5 h-3.5" />
+                                            </button>
+                                            <span className="text-xs font-bold text-slate-600 truncate max-w-[110px]" title={client.notes || 'Cliente Registrado'}>
                                                 {client.notes || 'Cliente Registrado'}
                                             </span>
                                         </div>
@@ -426,7 +496,7 @@ export default function DirectoryView({
                                             onClick={() => {
                                                 setInvoiceForm({
                                                     ...getEmptyInvoice(activeCompany, companies),
-                                                    client_id: client.id
+                                                    client_id: client.id,
                                                 });
                                                 setCurrentView('generador-pdf');
                                             }}

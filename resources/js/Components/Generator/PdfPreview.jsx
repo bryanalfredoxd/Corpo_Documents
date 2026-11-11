@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { useReactToPrint } from 'react-to-print';
 import { FileText, Layers, Printer, Download } from 'lucide-react';
 import PdfTemplateClassic from '../Templates/PdfTemplateClassic';
 import PdfTemplateModern from '../Templates/PdfTemplateModern';
@@ -19,6 +20,31 @@ export default function PdfPreview({
     totalUsd,
     totalVes
 }) {
+    const printSheetRef = useRef(null);
+
+    const handleReactPrint = useReactToPrint({
+        contentRef: printSheetRef,
+        documentTitle: projectedCorrelative || 'Documento',
+    });
+
+    const handlePrintAction = () => {
+        setMobileEditorTab?.('preview');
+        setTimeout(() => {
+            if (typeof handleReactPrint === 'function') {
+                handleReactPrint();
+            } else {
+                handlePrintDocument?.();
+            }
+        }, 80);
+    };
+
+    const handleDownloadPdf = () => {
+        if (invoiceForm?.id) {
+            window.location.assign(`/invoices/${invoiceForm.id}/pdf?format=${encodeURIComponent(selectedPdfFormat || 'formato-1')}`);
+            return;
+        }
+        handlePrintAction();
+    };
     return (
         <div className={`lg:col-span-7 space-y-4 print:space-y-0 print:!w-full print:!m-0 print:!p-0 print:!block ${
             mobileEditorTab === 'preview' ? 'block' : 'hidden lg:block'
@@ -77,7 +103,7 @@ export default function PdfPreview({
                 <div className="flex items-center space-x-2 w-full sm:w-auto">
                     <button
                         type="button"
-                        onClick={handlePrintDocument}
+                        onClick={handlePrintAction}
                         className="h-8 sm:h-9 px-3.5 bg-white border-2 border-slate-400 hover:bg-slate-200 text-black text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors flex-1 sm:flex-initial"
                     >
                         <Printer className="w-4 h-4 text-black" />
@@ -85,18 +111,22 @@ export default function PdfPreview({
                     </button>
                     <button
                         type="button"
-                        onClick={handlePrintDocument}
+                        onClick={handleDownloadPdf}
+                        title={invoiceForm?.id ? 'Descargar PDF directo generado por el servidor' : 'Guardar vista previa como PDF'}
                         className="h-8 sm:h-9 px-3.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors flex-1 sm:flex-initial"
                     >
                         <Download className="w-4 h-4 text-white" />
-                        <span>Guardar PDF</span>
+                        <span>{invoiceForm?.id ? 'Descargar PDF' : 'Guardar PDF'}</span>
                     </button>
                 </div>
             </div>
 
             {/* CONTENEDOR DE HOJA FÍSICA A4 EN VIVO */}
             <div className="overflow-x-auto -mx-2 sm:mx-0 p-1 sm:p-0 print:overflow-visible print:!m-0 print:!p-0 print:!w-full">
-                <div className="min-w-[620px] lg:min-w-0 bg-white rounded-lg shadow-sm p-4 sm:p-8 md:p-10 text-slate-900 text-xs font-sans relative printable-sheet border border-slate-200 print:min-w-0 print:!w-full print:!m-0 print:!p-0 print:!border-none print:!shadow-none print:!rounded-none print:!bg-white">
+                <div
+                    ref={printSheetRef}
+                    className="min-w-[620px] lg:min-w-0 bg-white rounded-lg shadow-sm p-4 sm:p-8 md:p-10 text-slate-900 text-xs font-sans relative printable-sheet border border-slate-200 print:min-w-0 print:!w-full print:!m-0 print:!p-0 print:!border-none print:!shadow-none print:!rounded-none print:!bg-white"
+                >
                     {selectedPdfFormat === 'formato-1' ? (
                         <PdfTemplateClassic
                             activeCompany={activeCompany}
@@ -118,6 +148,7 @@ export default function PdfPreview({
                             projectedControlNumber={projectedControlNumber}
                             taxAmount={taxAmount}
                             totalUsd={totalUsd}
+                            totalVes={totalVes}
                         />
                     )}
                 </div>

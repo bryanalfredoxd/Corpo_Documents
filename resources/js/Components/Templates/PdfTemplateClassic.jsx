@@ -15,7 +15,18 @@ export default function PdfTemplateClassic({
     const stampUrl = getSignatureStampUrl(invoiceForm.signature_stamp, invoiceForm.document_type);
 
     return (
-        <div className="printable-a4-page text-slate-900 text-xs">
+        <div className="printable-a4-page text-slate-900 text-xs relative">
+            {/* Marca de agua para Documentos Anulados o Borradores */}
+            {(invoiceForm.status === 'anulada' || invoiceForm.status === 'borrador') && (
+                <div className="pointer-events-none select-none fixed sm:absolute inset-0 flex items-center justify-center z-10 opacity-15">
+                    <span className={`text-6xl sm:text-7xl font-black uppercase tracking-widest -rotate-35 border-8 px-6 py-2 rounded-2xl ${
+                        invoiceForm.status === 'anulada' ? 'text-red-700 border-red-700' : 'text-amber-600 border-amber-600'
+                    }`}>
+                        {invoiceForm.status === 'anulada' ? 'ANULADA' : 'BORRADOR'}
+                    </span>
+                </div>
+            )}
+
             <div>
                 {/* 1. CABECERA / MEMBRETE INSTITUCIONAL */}
             <div className="flex justify-between items-center gap-4 pb-4">
@@ -43,6 +54,11 @@ export default function PdfTemplateClassic({
                         {activeCompany.email && (
                             <p className="text-xs text-slate-700">
                                 Email: {activeCompany.email}
+                            </p>
+                        )}
+                        {activeCompany.website && (
+                            <p className="text-xs text-slate-700">
+                                Web / Red: {activeCompany.website}
                             </p>
                         )}
                     </div>
@@ -94,10 +110,22 @@ export default function PdfTemplateClassic({
                                 <span className="col-span-4 text-slate-600 font-bold">Teléfono:</span>
                                 <span className="col-span-8 text-slate-900">{currentSelectedClient.phone || 'N/A'}</span>
                             </div>
+                            {currentSelectedClient.email && (
+                                <div className="grid grid-cols-12 gap-1">
+                                    <span className="col-span-4 text-slate-600 font-bold">Email:</span>
+                                    <span className="col-span-8 text-slate-800 truncate">{currentSelectedClient.email}</span>
+                                </div>
+                            )}
                             {currentSelectedClient.address && (
                                 <div className="grid grid-cols-12 gap-1">
                                     <span className="col-span-4 text-slate-600 font-bold">Dirección:</span>
                                     <span className="col-span-8 text-slate-800">{currentSelectedClient.address}</span>
+                                </div>
+                            )}
+                            {invoiceForm.delivery_address && invoiceForm.delivery_address !== currentSelectedClient.address && (
+                                <div className="grid grid-cols-12 gap-1">
+                                    <span className="col-span-4 text-slate-600 font-bold">Entrega:</span>
+                                    <span className="col-span-8 text-slate-900 font-semibold">{invoiceForm.delivery_address}</span>
                                 </div>
                             )}
                         </div>
@@ -130,14 +158,21 @@ export default function PdfTemplateClassic({
                                 </span>
                             </div>
                         )}
-                        {(invoiceForm.document_type === 'proforma' || invoiceForm.document_type === 'cotizacion') && (
+                        {(invoiceForm.document_type === 'proforma' || invoiceForm.document_type === 'cotizacion') ? (
                             <div className="grid grid-cols-12 gap-1">
                                 <span className="col-span-4 text-slate-600 font-bold">Validez:</span>
                                 <span className="col-span-8 font-bold text-blue-900">
                                     {invoiceForm.offer_validity_days || 8} días continuos
                                 </span>
                             </div>
-                        )}
+                        ) : invoiceForm.due_date ? (
+                            <div className="grid grid-cols-12 gap-1">
+                                <span className="col-span-4 text-slate-600 font-bold">Vencimiento:</span>
+                                <span className="col-span-8 font-mono font-bold text-slate-900">
+                                    {invoiceForm.due_date}
+                                </span>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             </div>
@@ -160,7 +195,7 @@ export default function PdfTemplateClassic({
                                 <td className="py-3 px-2 text-center font-mono font-bold text-slate-800">{idx + 1}</td>
                                 <td className="py-3 px-3">
                                     <div className="flex items-start gap-3">
-                                        {it.image_url && (
+                                        {invoiceForm.show_item_images !== false && it.show_image !== false && it.image_url && (
                                             <div className="shrink-0 w-14 h-14 rounded-lg border border-slate-300 bg-white p-1 flex items-center justify-center shadow-2xs">
                                                 <img
                                                     src={it.image_url}
@@ -216,6 +251,7 @@ export default function PdfTemplateClassic({
                             <span className="font-mono font-bold text-slate-950">{invoiceForm.payment_reference}</span>
                         </p>
                     )}
+
                     {invoiceForm.show_bs_conversion !== false && (
                         <div className="border-l-2 border-slate-400 pl-2.5 mt-3 py-0.5 text-[10px] text-slate-600 italic leading-snug">
                             Monto en Bolívares (VES) calculado según la Tasa BS indicada a la fecha de la transacción.
@@ -232,6 +268,12 @@ export default function PdfTemplateClassic({
                         <div className="flex justify-between py-1 border-b border-slate-200">
                             <span className="font-sans font-bold text-slate-700">Flete / Delivery:</span>
                             <span className="font-bold text-slate-900">${Number(invoiceForm.shipping_cost).toFixed(2)}</span>
+                        </div>
+                    )}
+                    {Number(invoiceForm.discount || 0) > 0 && (
+                        <div className="flex justify-between py-1 border-b border-slate-200 text-emerald-800">
+                            <span className="font-sans font-bold">Descuento:</span>
+                            <span className="font-bold">-${Number(invoiceForm.discount).toFixed(2)}</span>
                         </div>
                     )}
                     <div className="flex justify-between py-1 border-b-2 border-slate-950">

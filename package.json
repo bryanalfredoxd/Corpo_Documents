@@ -26,6 +26,9 @@
         "@laravel/multiplex": "^0.4.1"
     },
     "dependencies": {
-        "lucide-react": "^1.68.0"
+        "browser-image-compression": "^2.0.2",
+        "lucide-react": "^1.68.0",
+        "react-to-print": "^3.3.0",
+        "recharts": "^3.10.1"
     }
 }

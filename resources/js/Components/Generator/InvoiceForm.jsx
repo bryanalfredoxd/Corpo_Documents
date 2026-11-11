@@ -1,4 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
+import {
+    Combobox,
+    ComboboxInput,
+    ComboboxButton,
+    ComboboxOptions,
+    ComboboxOption
+} from '@headlessui/react';
 import {
     FileText,
     Plus,
@@ -8,13 +16,24 @@ import {
     Layers,
     Sparkles,
     Save,
-    Eye
+    Eye,
+    Package,
+    BookmarkPlus,
+    Copy,
+    FileEdit,
+    ArrowRightLeft,
+    ChevronDown,
+    Search,
+    X
 } from 'lucide-react';
 import { getDocumentTypeInfo } from '../../Utils/invoiceConstants';
+import { compressImageToDataUrl } from '../../Utils/imageCompression';
+import { useFeedback } from '../../Contexts/FeedbackContext';
 
 export default function InvoiceForm({
     companies = [],
     clients = [],
+    products = [],
     activeCompany,
     selectedCompanyId,
     setSelectedCompanyId,
@@ -37,17 +56,88 @@ export default function InvoiceForm({
     handleSubmitInvoice,
     isSubmittingInvoice,
     onOpenCreateClient,
+    onOpenProductPicker,
+    onQuickSaveToCatalog,
     setCurrentView,
     mobileEditorTab,
     setMobileEditorTab
 }) {
+    const { confirm, notify } = useFeedback();
+    const [clientQuery, setClientQuery] = useState('');
+
+    const selectedClientOption = clients.find((cl) => String(cl.id) === String(invoiceForm.client_id)) || null;
+    const filteredClients = clientQuery.trim() === ''
+        ? clients
+        : clients.filter((cl) =>
+            `${cl.name || ''} ${cl.tax_id || ''} ${cl.phone || ''}`
+                .toLowerCase()
+                .includes(clientQuery.trim().toLowerCase())
+        );
+
     return (
         <form
-            onSubmit={handleSubmitInvoice}
+            onSubmit={(e) => handleSubmitInvoice(e)}
             className={`lg:col-span-5 bg-white rounded-xl border-2 border-slate-300 shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5 no-print ${
                 mobileEditorTab === 'formulario' ? 'block' : 'hidden lg:block'
             }`}
         >
+            {/* Banner si se está editando un documento guardado */}
+            {invoiceForm.id && (
+                <div className="p-2.5 bg-amber-50 border-2 border-amber-300 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="min-w-0 flex-1">
+                        <span className="font-black text-amber-950 block leading-tight">
+                            ✏️ Editando: {invoiceForm.correlative_number}
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-800 block">
+                            Los cambios actualizarán este documento sin duplicar su correlativo.
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        {invoiceForm.document_type !== 'factura' && invoiceForm.status !== 'anulada' && invoiceForm.status !== 'borrador' && (
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    const ok = await confirm({
+                                        title: 'Convertir a Factura Fiscal',
+                                        message: `¿Convertir "${invoiceForm.correlative_number}" en una Factura Fiscal oficial con un nuevo correlativo?\n\nSe clonarán los productos, cliente y montos.`,
+                                        confirmLabel: 'Convertir a Factura',
+                                        variant: 'primary',
+                                    });
+                                    if (!ok) return;
+                                    router.post(`/invoices/${invoiceForm.id}/convert-to-invoice`, {}, {
+                                        onSuccess: () => {
+                                            notify.success('Documento convertido a Factura Fiscal exitosamente.');
+                                            setCurrentView('libro-fiscal');
+                                        },
+                                        onError: (err) => notify.error(Object.values(err).join(', ') || 'No se pudo convertir el documento.'),
+                                    });
+                                }}
+                                className="h-7 px-2.5 bg-purple-700 hover:bg-purple-800 rounded-lg text-[10px] font-black text-white flex items-center gap-1 cursor-pointer shadow-2xs"
+                                title="Generar Factura Fiscal oficial a partir de este documento"
+                            >
+                                <ArrowRightLeft className="w-3 h-3" />
+                                <span>→ Factura</span>
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setInvoiceForm(prev => ({
+                                ...prev,
+                                id: null,
+                                correlative_number: null,
+                                control_number: null,
+                                status: 'emitida'
+                            }))}
+                            className="h-7 px-2.5 bg-white hover:bg-amber-100 border border-amber-400 rounded-lg text-[10px] font-black text-amber-950 flex items-center gap-1 cursor-pointer"
+                            title="Desvincular para generar una nueva factura con estos datos"
+                        >
+                            <Copy className="w-3 h-3" />
+                            <span>Clonar como Nuevo</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Cabecera del Formulario con Selector Segmentado de Tipo de Documento */}
             <div className="border-b-2 border-slate-200 pb-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
@@ -132,18 +222,76 @@ export default function InvoiceForm({
                             <span>Nuevo Cliente (CNE)</span>
                         </button>
                     </div>
-                    <select
-                        value={invoiceForm.client_id || ''}
-                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, client_id: e.target.value ? Number(e.target.value) : '' }))}
-                        className="h-9 w-full bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    <Combobox
+                        immediate
+                        value={selectedClientOption}
+                        onChange={(cl) => setInvoiceForm(prev => ({ ...prev, client_id: cl ? Number(cl.id) : '' }))}
+                        onClose={() => setClientQuery('')}
                     >
-                        <option value="">-- Seleccionar Cliente Registrado --</option>
-                        {clients.map(cl => (
-                            <option key={cl.id} value={cl.id}>
-                                {cl.name} ({cl.tax_id})
-                            </option>
-                        ))}
-                    </select>
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+                            <ComboboxInput
+                                displayValue={(cl) => (cl ? `${cl.name} (${cl.tax_id})` : '')}
+                                onChange={(e) => setClientQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && filteredClients.length === 0) {
+                                        e.preventDefault();
+                                    }
+                                }}
+                                placeholder="Buscar cliente por nombre, cédula o RIF..."
+                                className="h-9 w-full bg-white border border-slate-300 rounded-lg pl-8 pr-14 text-xs font-black text-black placeholder:font-bold placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                            />
+                            {selectedClientOption && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setInvoiceForm(prev => ({ ...prev, client_id: '' }));
+                                        setClientQuery('');
+                                    }}
+                                    className="absolute right-8 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                                    title="Quitar cliente seleccionado"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                            <ComboboxButton className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-600 hover:text-black cursor-pointer">
+                                <ChevronDown className="w-4 h-4" />
+                            </ComboboxButton>
+
+                            <ComboboxOptions className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white border-2 border-slate-900 shadow-2xl py-1 text-xs">
+                                {filteredClients.length === 0 ? (
+                                    <div className="px-3 py-2.5 text-slate-500 font-bold italic">
+                                        Sin coincidencias para "{clientQuery}"
+                                    </div>
+                                ) : (
+                                    filteredClients.map((cl) => (
+                                        <ComboboxOption
+                                            key={cl.id}
+                                            value={cl}
+                                            className={({ focus, selected }) =>
+                                                `px-3 py-2 cursor-pointer flex items-center justify-between gap-2 ${
+                                                    focus
+                                                        ? 'bg-blue-700 text-white'
+                                                        : selected
+                                                        ? 'bg-blue-50 text-blue-950 font-black'
+                                                        : 'text-slate-900 font-bold'
+                                                }`
+                                            }
+                                        >
+                                            {({ focus }) => (
+                                                <>
+                                                    <span className="truncate uppercase">{cl.name}</span>
+                                                    <span className={`font-mono text-[11px] shrink-0 ${focus ? 'text-blue-100' : 'text-slate-500'}`}>
+                                                        {cl.tax_id}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </ComboboxOption>
+                                    ))
+                                )}
+                            </ComboboxOptions>
+                        </div>
+                    </Combobox>
 
                     {/* Chip resumen del cliente seleccionado */}
                     {currentSelectedClient ? (
@@ -375,6 +523,8 @@ export default function InvoiceForm({
                     </div>
                 </div>
 
+                {/* Cuentas bancarias omitidas por diseño */}
+
                 {/* Sello y Firma Emisor */}
                 <div className="bg-white p-2.5 rounded-lg border border-slate-300 space-y-1.5 shadow-2xs">
                     <div className="flex justify-between items-center">
@@ -462,11 +612,38 @@ export default function InvoiceForm({
                         className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
                     />
                 </div>
+
+                {/* Vencimiento, Dirección de Entrega y Notas de Pago (visibles en el PDF) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="min-w-0">
+                        <label className="text-xs font-black text-black block mb-1 truncate">
+                            Fecha Vencimiento (Opcional)
+                        </label>
+                        <input
+                            type="date"
+                            value={invoiceForm.due_date || ''}
+                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, due_date: e.target.value }))}
+                            className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-bold text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        />
+                    </div>
+                    <div className="min-w-0">
+                        <label className="text-xs font-black text-black block mb-1 truncate">
+                            Dirección de Entrega (Si difiere)
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Opcional: dirección distinta a la fiscal"
+                            value={invoiceForm.delivery_address || ''}
+                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, delivery_address: e.target.value }))}
+                            className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-bold text-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* SECCIÓN 3: RENGLONES / ÍTEMS DINÁMICOS */}
             <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                         <label className="text-xs font-black text-black">
                             Renglones a Facturar
@@ -475,18 +652,55 @@ export default function InvoiceForm({
                             {invoiceForm.items.length}
                         </span>
                     </div>
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            type="button"
+                            onClick={onOpenProductPicker}
+                            className="h-8 px-2.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                            title="Elegir productos ya guardados en el catálogo"
+                        >
+                            <Package className="w-3.5 h-3.5" />
+                            <span>Del Catálogo ({products.length})</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleAddItem}
+                            className="h-8 px-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                            title="Añadir un renglón vacío manualmente"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Manual</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Control Maestro para Mostrar u Ocultar Imágenes de Productos en este PDF */}
+                <div className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-100 rounded-xl border border-slate-300">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Camera className="w-4 h-4 text-blue-700 shrink-0" />
+                        <span className="text-[11px] font-black text-slate-800 truncate">
+                            Imágenes de productos en el PDF
+                        </span>
+                    </div>
                     <button
                         type="button"
-                        onClick={handleAddItem}
-                        className="h-8 px-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                        onClick={() => setInvoiceForm(prev => ({ ...prev, show_item_images: prev.show_item_images === false }))}
+                        className={`h-7 px-3 rounded-lg text-[11px] font-black transition-all cursor-pointer border shrink-0 ${
+                            invoiceForm.show_item_images !== false
+                                ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-800 shadow-2xs'
+                                : 'bg-white hover:bg-slate-200 text-slate-700 border-slate-300'
+                        }`}
                     >
-                        <Plus className="w-4 h-4" />
-                        <span>Añadir Renglón</span>
+                        {invoiceForm.show_item_images !== false ? '✓ Mostrar imágenes' : '✕ Ocultas en PDF'}
                     </button>
                 </div>
 
                 <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                    {invoiceForm.items.map((it, idx) => (
+                    {invoiceForm.items.map((it, idx) => {
+                        const alreadyInCatalog = products.some(
+                            p => p.name.trim().toLowerCase() === (it.description || '').trim().toLowerCase()
+                        );
+                        return (
                         <div key={idx} className="p-3.5 bg-slate-50 rounded-xl border border-slate-300 text-xs space-y-2.5 shadow-2xs hover:border-slate-400 transition-colors">
                             <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                                 <span className="font-black text-black text-xs flex items-center gap-1.5">
@@ -494,8 +708,27 @@ export default function InvoiceForm({
                                         {idx + 1}
                                     </span>
                                     <span>Renglón #{idx + 1}</span>
+                                    {it.product_id && (
+                                        <span
+                                            className="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 border border-indigo-300 rounded text-[10px] font-black"
+                                            title="Vinculado al catálogo para control de inventario y estadísticas"
+                                        >
+                                            📦 Catálogo
+                                        </span>
+                                    )}
                                 </span>
                                 <div className="flex items-center gap-2">
+                                    {!it.product_id && !alreadyInCatalog && it.description && it.unit_price !== '' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onQuickSaveToCatalog(it)}
+                                            className="h-6 px-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 text-indigo-800 rounded text-[10px] font-black flex items-center gap-1 cursor-pointer transition-colors"
+                                            title="Guardar este producto en el catálogo para futuras facturas"
+                                        >
+                                            <BookmarkPlus className="w-3 h-3" />
+                                            <span>Guardar en Catálogo</span>
+                                        </button>
+                                    )}
                                     <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] font-bold text-slate-700 select-none">
                                         <input
                                             type="checkbox"
@@ -554,11 +787,23 @@ export default function InvoiceForm({
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-1.5 text-[11px] font-black text-emerald-800">
                                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                                <span>Foto cargada para el PDF</span>
+                                                <span>Foto disponible</span>
                                             </div>
-                                            <p className="text-[10px] text-slate-500 truncate">
-                                                Se mostrará junto a la descripción del renglón en la cotización/proforma.
-                                            </p>
+                                            {invoiceForm.show_item_images === false ? (
+                                                <p className="text-[10px] font-bold text-amber-700 mt-0.5">
+                                                    Oculta por configuración general de este documento.
+                                                </p>
+                                            ) : (
+                                                <label className="inline-flex items-center gap-1.5 mt-1 cursor-pointer text-[11px] font-bold text-slate-700 select-none">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={it.show_image !== false}
+                                                        onChange={(e) => handleItemChange(idx, 'show_image', e.target.checked)}
+                                                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                                                    />
+                                                    <span>Mostrar esta foto en el PDF</span>
+                                                </label>
+                                            )}
                                         </div>
                                         <button
                                             type="button"
@@ -578,15 +823,11 @@ export default function InvoiceForm({
                                                 type="file"
                                                 accept="image/*"
                                                 className="hidden"
-                                                onChange={(e) => {
+                                                onChange={async (e) => {
                                                     const file = e.target.files?.[0];
-                                                    if (file) {
-                                                        const reader = new FileReader();
-                                                        reader.onload = (ev) => {
-                                                            handleItemChange(idx, 'image_url', ev.target.result);
-                                                        };
-                                                        reader.readAsDataURL(file);
-                                                    }
+                                                    if (!file) return;
+                                                    const { dataUrl } = await compressImageToDataUrl(file);
+                                                    handleItemChange(idx, 'image_url', dataUrl);
                                                 }}
                                             />
                                         </label>
@@ -660,7 +901,8 @@ export default function InvoiceForm({
                                 </div>
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
@@ -921,9 +1163,25 @@ export default function InvoiceForm({
                         <input
                             type="number"
                             step="0.01"
+                            min="0"
                             value={invoiceForm.shipping_cost}
-                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, shipping_cost: Number(e.target.value) }))}
+                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, shipping_cost: Math.max(0, Number(e.target.value)) }))}
                             className="h-8 w-full bg-white border border-slate-300 rounded-md pl-6 pr-2 text-right font-mono font-black text-xs text-black"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-between items-center text-emerald-900">
+                    <span>Descuento Comercial (-$):</span>
+                    <div className="relative w-28">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600">-$</span>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={invoiceForm.discount}
+                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, discount: Math.max(0, Number(e.target.value)) }))}
+                            className="h-8 w-full bg-white border border-emerald-300 rounded-md pl-7 pr-2 text-right font-mono font-black text-xs text-emerald-900"
                         />
                     </div>
                 </div>
@@ -1012,6 +1270,20 @@ export default function InvoiceForm({
                 </div>
             </div>
 
+            {/* Términos y Condiciones de Entrega (Pie del PDF) */}
+            <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-black text-black block">
+                    Términos y Condiciones de Entrega (Pie del PDF)
+                </label>
+                <textarea
+                    rows={2}
+                    placeholder="Cláusulas legales, garantía, devoluciones o notas de entrega..."
+                    value={invoiceForm.terms_conditions || ''}
+                    onChange={(e) => setInvoiceForm(prev => ({ ...prev, terms_conditions: e.target.value }))}
+                    className="w-full bg-slate-50 focus:bg-white border border-slate-300 rounded-xl p-2.5 text-[11px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+            </div>
+
             {/* Botón Móvil para Ver la Hoja A4 directamente */}
             <div className="lg:hidden pt-1">
                 <button
@@ -1024,14 +1296,37 @@ export default function InvoiceForm({
                 </button>
             </div>
 
-            <button
-                type="submit"
-                disabled={isSubmittingInvoice}
-                className="h-12 w-full bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer disabled:opacity-50"
-            >
-                <Save className="w-4 h-4 text-emerald-300" />
-                <span>{isSubmittingInvoice ? 'Guardando en BD...' : 'GUARDAR FACTURA EN BASE DE DATOS'}</span>
-            </button>
+            <div className="space-y-2 pt-1">
+                <button
+                    type="submit"
+                    disabled={isSubmittingInvoice}
+                    className="h-12 w-full bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer disabled:opacity-50"
+                >
+                    <Save className="w-4 h-4 text-emerald-300" />
+                    <span>
+                        {isSubmittingInvoice
+                            ? 'Guardando...'
+                            : invoiceForm.id
+                            ? (invoiceForm.status === 'borrador' ? 'EMITIR Y ASIGNAR CORRELATIVO OFICIAL' : 'ACTUALIZAR DOCUMENTO EXISTENTE')
+                            : 'GUARDAR DOCUMENTO'}
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    disabled={isSubmittingInvoice}
+                    onClick={(e) => handleSubmitInvoice(e, 'borrador')}
+                    className="h-10 w-full bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 text-amber-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+                    title="Guarda el documento sin consumir números de correlativo fiscal"
+                >
+                    <FileEdit className="w-4 h-4 text-amber-700" />
+                    <span>
+                        {invoiceForm.id && invoiceForm.status === 'borrador'
+                            ? 'Actualizar Borrador (Sin emitir)'
+                            : 'Guardar como Borrador (Sin consumir correlativo)'}
+                    </span>
+                </button>
+            </div>
         </form>
     );
 }

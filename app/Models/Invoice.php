@@ -15,6 +15,7 @@ class Invoice extends Model
         'company_id',
         'client_id',
         'user_id',
+        'parent_invoice_id',
         'document_type',
         'document_subtitle',
         'correlative_number',
@@ -62,6 +63,11 @@ class Invoice extends Model
         'technical_specs' => 'array',
     ];
 
+    protected $appends = [
+        'paid_amount_usd',
+        'balance_due_usd',
+    ];
+
     /**
      * Empresa emisora (con su logo e identificación fiscal).
      */
@@ -92,6 +98,69 @@ class Invoice extends Model
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class)->orderBy('item_order');
+    }
+
+    /**
+     * Documento origen (ej. Proforma o Cotización) desde el cual se generó esta factura.
+     */
+    public function parentInvoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class, 'parent_invoice_id');
+    }
+
+    /**
+     * Facturas o documentos derivados a partir de esta cotización o proforma.
+     */
+    public function childInvoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class, 'parent_invoice_id');
+    }
+
+    /**
+     * Abonos y pagos parciales registrados contra este documento.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(InvoicePayment::class)->orderByDesc('payment_date')->orderByDesc('id');
+    }
+
+    /**
+     * Registros de auditoría de quién creó, modificó, cobró o anuló el documento.
+     */
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(InvoiceAuditLog::class)->orderByDesc('id');
+    }
+
+    /**
+     * Total abonado en USD hasta la fecha.
+     */
+    public function getPaidAmountUsdAttribute(): float
+    {
+        if ($this->relationLoaded('payments')) {
+            $sum = round((float) $this->payments->sum('amount_usd'), 2);
+            if ($sum > 0) {
+                return $sum;
+            }
+        }
+
+        if ($this->status === 'pagada') {
+            return (float) $this->total_usd;
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * Saldo pendiente por cobrar en USD.
+     */
+    public function getBalanceDueUsdAttribute(): float
+    {
+        if (in_array($this->status, ['pagada', 'anulada'], true)) {
+            return 0.0;
+        }
+
+        return max(0.0, round((float) $this->total_usd - $this->paid_amount_usd, 2));
     }
 
     /**

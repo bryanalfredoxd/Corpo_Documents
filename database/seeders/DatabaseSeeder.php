@@ -24,6 +24,8 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Administrador Fiscal',
                 'password' => Hash::make('password123'),
+                'role' => 'admin',
+                'is_active' => true,
             ]
         );
 

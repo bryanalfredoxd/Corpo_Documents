@@ -153,4 +153,14 @@ class ClientController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Desactivar lógicamente un cliente sin perder el historial de sus documentos fiscales.
+     */
+    public function destroy(Client $client): RedirectResponse
+    {
+        $client->update(['is_active' => false]);
+
+        return redirect()->back()->with('success', "Cliente \"{$client->name}\" archivado del directorio. Sus facturas históricas se conservan.");
+    }
 }

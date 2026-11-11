@@ -8,11 +8,24 @@ export default function PdfTemplateModern({
     projectedCorrelative,
     projectedControlNumber,
     taxAmount,
-    totalUsd
+    totalUsd,
+    totalVes = 0
 }) {
     const stampUrl = getSignatureStampUrl(invoiceForm.signature_stamp, invoiceForm.document_type);
+
     return (
-        <div className="text-slate-900 text-xs">
+        <div className="text-slate-900 text-xs relative">
+            {/* Marca de agua para Documentos Anulados o Borradores */}
+            {(invoiceForm.status === 'anulada' || invoiceForm.status === 'borrador') && (
+                <div className="pointer-events-none select-none fixed sm:absolute inset-0 flex items-center justify-center z-10 opacity-15">
+                    <span className={`text-6xl sm:text-7xl font-black uppercase tracking-widest -rotate-35 border-8 px-6 py-2 rounded-2xl ${
+                        invoiceForm.status === 'anulada' ? 'text-red-700 border-red-700' : 'text-amber-600 border-amber-600'
+                    }`}>
+                        {invoiceForm.status === 'anulada' ? 'ANULADA' : 'BORRADOR'}
+                    </span>
+                </div>
+            )}
+
             {/* ---------- PÁGINA 1: FICHA TÉCNICA & DATOS DEL CLIENTE ---------- */}
             <div className="space-y-4">
                 {/* Cabecera Moaiven / Industrial */}
@@ -40,6 +53,11 @@ export default function PdfTemplateModern({
                             {activeCompany.email && (
                                 <p className="text-xs text-slate-600">
                                     Email: {activeCompany.email}
+                                </p>
+                            )}
+                            {(invoiceForm.company_social_handle || activeCompany.website) && (
+                                <p className="text-xs text-slate-600">
+                                    Web / Red: {invoiceForm.company_social_handle || activeCompany.website}
                                 </p>
                             )}
                         </div>
@@ -100,6 +118,14 @@ export default function PdfTemplateModern({
                                 {currentSelectedClient?.phone || '_____________________________________________________'}
                             </span>
                         </div>
+                        {currentSelectedClient?.email && (
+                            <div className="grid grid-cols-12 gap-2">
+                                <span className="col-span-4 font-bold text-slate-800">Correo electrónico</span>
+                                <span className="col-span-8 text-black font-medium border-b border-dotted border-slate-400 pb-0.5">
+                                    {currentSelectedClient.email}
+                                </span>
+                            </div>
+                        )}
                         <div className="grid grid-cols-12 gap-2">
                             <span className="col-span-4 font-bold text-slate-800">Dirección de entrega</span>
                             <span className="col-span-8 text-black font-medium border-b border-dotted border-slate-400 pb-0.5">
@@ -125,7 +151,7 @@ export default function PdfTemplateModern({
                                 </span>
                             </h3>
                         </div>
-                        {invoiceForm.items[0]?.image_url && (
+                        {invoiceForm.show_item_images !== false && invoiceForm.items[0]?.show_image !== false && invoiceForm.items[0]?.image_url && (
                             <div className="w-16 h-16 rounded-lg border border-slate-300 p-1 bg-white shrink-0 shadow-2xs flex items-center justify-center">
                                 <img
                                     src={invoiceForm.items[0].image_url}
@@ -199,7 +225,7 @@ export default function PdfTemplateModern({
                         {invoiceForm.items.map((it, idx) => (
                             <div key={idx} className="flex justify-between items-center px-3 py-2 border-b border-slate-200">
                                 <div className="flex items-center gap-2.5">
-                                    {it.image_url && (
+                                    {invoiceForm.show_item_images !== false && it.show_image !== false && it.image_url && (
                                         <div className="w-8 h-8 rounded border border-slate-300 p-0.5 bg-white shrink-0 flex items-center justify-center">
                                             <img src={it.image_url} alt="" className="max-h-full max-w-full object-contain rounded" />
                                         </div>
@@ -227,6 +253,14 @@ export default function PdfTemplateModern({
                                 {invoiceForm.customs_text || (taxAmount > 0 ? `USD ${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'INCLUIDO')}
                             </span>
                         </div>
+                        {Number(invoiceForm.discount || 0) > 0 && (
+                            <div className="flex justify-between px-3 py-2 border-b border-slate-200 bg-emerald-50/70 text-emerald-800">
+                                <span className="font-bold">Descuento comercial aplicado</span>
+                                <span className="font-mono font-bold">
+                                    -USD {Number(invoiceForm.discount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        )}
 
                         {/* Fila Total DDP en Navy Blue */}
                         <div className="bg-[#0E1C33] text-white px-3 py-2.5 flex justify-between items-center font-black text-xs uppercase tracking-wide">
@@ -235,6 +269,14 @@ export default function PdfTemplateModern({
                                 USD {totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </span>
                         </div>
+                        {invoiceForm.show_bs_conversion !== false && (
+                            <div className="bg-slate-100 text-[#0E1C33] px-3 py-1.5 flex justify-between items-center text-[11px] font-bold border-t border-slate-300">
+                                <span>Equivalente en Bolívares (Tasa Bs. {Number(invoiceForm.bcv_exchange_rate || 0).toFixed(2)}):</span>
+                                <span className="font-mono font-black">
+                                    TOTAL VES: Bs. {Number(totalVes || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -244,6 +286,13 @@ export default function PdfTemplateModern({
                         CONDICIONES DE PAGO
                     </div>
                     <div className="text-xs">
+                        <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-slate-700">
+                            <span>Condición: <strong className="text-black">{invoiceForm.sale_condition || 'Venta de Contado'}</strong> • Canal: <strong className="text-black">{invoiceForm.sales_channel || 'Oficina / Presencial'}</strong></span>
+                            <span>
+                                Medio: <strong className="text-black uppercase">{invoiceForm.payment_method || 'TRANSFERENCIA'}</strong>
+                                {invoiceForm.payment_reference ? ` (Ref: ${invoiceForm.payment_reference})` : ''}
+                            </span>
+                        </div>
                         <div className="grid grid-cols-12 px-3 py-2.5 border-b border-slate-200 bg-white items-center">
                             <div className="col-span-2 font-black text-sm text-[#0E1C33]">{invoiceForm.payment_milestone_1_pct || 70}%</div>
                             <div className="col-span-10 text-slate-800">
@@ -274,6 +323,15 @@ export default function PdfTemplateModern({
                         {invoiceForm.shipping_terms_notes || 'Tiempo de carga: una vez confirmada la compra del equipo en China, el mismo cuenta con un plazo de hasta veinte (20) días hábiles para ser cargado en puerto, sujeto a la disponibilidad de espacio (booking) ofrecida por la naviera.'}
                     </div>
                 </div>
+
+                {(invoiceForm.terms_conditions || activeCompany.default_terms) && (
+                    <div className="border border-slate-200 rounded-xs p-2.5 bg-slate-50 text-[11px] text-slate-700 leading-relaxed">
+                        <span className="font-black text-[#0E1C33] uppercase text-[10px] block mb-0.5">
+                            Términos y Condiciones de Entrega:
+                        </span>
+                        {invoiceForm.terms_conditions || activeCompany.default_terms}
+                    </div>
+                )}
 
                 {/* Firmas de Aceptación */}
                 <div className="grid grid-cols-2 gap-12 text-center text-xs pt-8">

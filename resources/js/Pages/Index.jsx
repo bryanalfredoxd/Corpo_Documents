@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 
@@ -6,8 +6,8 @@ import axios from 'axios';
 import { getCaracasDate } from '../Utils/dateUtils';
 import {
     getEmptyInvoice,
-    sprintfCorrelative,
-    sprintfControl,
+    getProjectedCorrelativeForType,
+    getProjectedControlForType,
     defaultTechnicalSpecs
 } from '../Utils/invoiceConstants';
 
@@ -16,41 +16,117 @@ import TopBar from '../Components/Layout/TopBar';
 import SecondaryNav from '../Components/Layout/SecondaryNav';
 import FlashBanner from '../Components/Layout/FlashBanner';
 import MetricCards from '../Components/Metrics/MetricCards';
+import ExecutiveCharts from '../Components/Metrics/ExecutiveCharts';
 
 // Vistas Modulares Principales
 import DocumentsView from '../Components/Views/DocumentsView';
 import DirectoryView from '../Components/Views/DirectoryView';
+import ProductsView from '../Components/Views/ProductsView';
 import GeneratorView from '../Components/Views/GeneratorView';
+import AuditView from '../Components/Views/AuditView';
+import { FeedbackProvider, useFeedback } from '../Contexts/FeedbackContext';
 
 // Modales Modulares
 import CompanyModal from '../Components/Modals/CompanyModal';
 import ClientModal from '../Components/Modals/ClientModal';
+import ProductModal from '../Components/Modals/ProductModal';
+import ProductPickerModal from '../Components/Modals/ProductPickerModal';
+import InvoicePaymentsModal from '../Components/Modals/InvoicePaymentsModal';
+import SalesBookExportModal from '../Components/Modals/SalesBookExportModal';
+import InvoiceAuditModal from '../Components/Modals/InvoiceAuditModal';
 
-export default function Index({ companies = [], clients = [], invoices = [], stats = {} }) {
+function IndexContent({
+    companies = [],
+    clients = [],
+    invoices = [],
+    products = [],
+    stats = {},
+    chartData = {},
+    statusCounts = {},
+    filters = {},
+    auditLogs = {},
+    auditSummary = {}
+}) {
     const { flash = {} } = usePage().props;
+    const { notify, confirm } = useFeedback();
 
-    // Vistas principales: 'libro-fiscal' | 'directorio' | 'generador-pdf'
+    // Estado AJAX local para la tabla de Libro de Ventas (sin recargas de página)
+    const [ajaxInvoices, setAjaxInvoices] = useState(invoices);
+    const [ajaxStatusCounts, setAjaxStatusCounts] = useState(statusCounts);
+    const [ajaxFilters, setAjaxFilters] = useState(filters);
+    const [isLoadingTable, setIsLoadingTable] = useState(false);
+
+    useEffect(() => {
+        setAjaxInvoices(invoices);
+    }, [invoices]);
+
+    useEffect(() => {
+        setAjaxStatusCounts(statusCounts);
+    }, [statusCounts]);
+
+    useEffect(() => {
+        setAjaxFilters(filters);
+    }, [filters]);
+
+    const invoiceList = Array.isArray(ajaxInvoices) ? ajaxInvoices : (ajaxInvoices?.data || []);
+    const totalInvoicesCount = stats?.invoices_count ?? (!Array.isArray(ajaxInvoices) && ajaxInvoices?.total !== undefined ? ajaxInvoices.total : invoiceList.length);
+
+    // Vistas principales: 'libro-fiscal' | 'directorio' | 'catalogo' | 'generador-pdf' | 'auditoria'
     const [currentView, setCurrentView] = useState('libro-fiscal');
 
     // Selector de Formato de Plantilla PDF: 'formato-1' (Fiscal) | 'formato-2' (Industrial Moaiven)
     const [selectedPdfFormat, setSelectedPdfFormat] = useState('formato-1');
 
-    // Filtros de directorio
+    // Filtros de directorio y búsqueda sincronizada
     const [directorySection, setDirectorySection] = useState('empresas-emisoras');
     const [directoryType, setDirectoryType] = useState('todos'); // todos | empresas | personas
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(filters?.search || '');
+    const isFirstSearchRender = useRef(true);
 
-    // Paginación del Libro Fiscal (10 por página)
-    const [invoicePage, setInvoicePage] = useState(1);
-    const invoicePageSize = 10;
+    // Filtrado y paginación AJAX vía Axios (sin recargar la página)
+    const fetchInvoicesAjax = async (overrides = {}) => {
+        const nextParams = {
+            search: overrides.search !== undefined ? overrides.search : searchQuery,
+            status: overrides.status !== undefined ? overrides.status : (ajaxFilters?.status || 'todos'),
+            company_id: overrides.company_id !== undefined ? overrides.company_id : (ajaxFilters?.company_id || 'all'),
+            document_type: overrides.document_type !== undefined ? overrides.document_type : (ajaxFilters?.document_type || 'all'),
+            page: overrides.page !== undefined ? overrides.page : 1,
+        };
+
+        setIsLoadingTable(true);
+        try {
+            const response = await axios.get('/invoices/query', { params: nextParams });
+            setAjaxInvoices(response.data.invoices);
+            setAjaxStatusCounts(response.data.statusCounts);
+            setAjaxFilters(response.data.filters);
+        } catch (err) {
+            notify.error('No se pudieron cargar los documentos. Intenta nuevamente.');
+        } finally {
+            setIsLoadingTable(false);
+        }
+    };
 
     useEffect(() => {
-        setInvoicePage(1);
-    }, [searchQuery]);
+        if (isFirstSearchRender.current) {
+            isFirstSearchRender.current = false;
+            return;
+        }
+        if (currentView !== 'libro-fiscal') return;
 
-    // Modales de creación / edición
+        const timer = setTimeout(() => {
+            if ((searchQuery || '') !== (ajaxFilters?.search || '')) {
+                fetchInvoicesAjax({ search: searchQuery, page: 1 });
+            }
+        }, 280);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, currentView]);
+
+    // Modales de creación / edición / reportes / auditoría
     const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [auditModalInvoiceId, setAuditModalInvoiceId] = useState(null);
 
     // Empresa activa seleccionada para facturación (multi-empresa con logos)
     const [selectedCompanyId, setSelectedCompanyId] = useState(
@@ -148,15 +224,20 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         setCurrentView('generador-pdf');
     };
 
-    // Actualizar company_id y términos cuando cambia activeCompany
+    // Actualizar company_id y términos por defecto solo cuando es documento nuevo (sin sobrescribir documentos cargados)
     useEffect(() => {
         if (activeCompany) {
-            setInvoiceForm(prev => ({
-                ...prev,
-                company_id: activeCompany.id,
-                terms_conditions: activeCompany.default_terms || prev.terms_conditions,
-                order_number: '#' + (activeCompany.next_control_number || 1)
-            }));
+            setInvoiceForm(prev => {
+                if (prev.id) {
+                    return { ...prev, company_id: activeCompany.id };
+                }
+                return {
+                    ...prev,
+                    company_id: activeCompany.id,
+                    terms_conditions: activeCompany.default_terms || prev.terms_conditions,
+                    order_number: '#' + (activeCompany.next_control_number || 1)
+                };
+            });
         }
     }, [activeCompany?.id]);
 
@@ -169,18 +250,22 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
     const itemsSubtotal = invoiceForm.items.reduce((acc, it) => acc + (Number(it.quantity || 0) * Number(it.unit_price || 0)), 0);
     const taxableBase = invoiceForm.items.filter(it => !it.is_tax_exempt).reduce((acc, it) => acc + (Number(it.quantity || 0) * Number(it.unit_price || 0)), 0);
     const taxAmount = (taxableBase * Number(invoiceForm.tax_percentage || 0)) / 100;
-    const totalUsd = itemsSubtotal + Number(invoiceForm.shipping_cost || 0) - Number(invoiceForm.discount || 0) + taxAmount;
+    const totalUsd = Math.max(0, itemsSubtotal + Number(invoiceForm.shipping_cost || 0) - Number(invoiceForm.discount || 0) + taxAmount);
     const totalVes = totalUsd * Number(invoiceForm.bcv_exchange_rate || 1);
 
-    // Correlativo y control proyectados
-    const projectedCorrelative = sprintfCorrelative(activeCompany.invoice_prefix || 'F-', activeCompany.next_correlative || 1);
-    const projectedControlNumber = sprintfControl(0, activeCompany.next_control_number || 1);
+    // Correlativo y control proyectados según tipo de documento (o reales del documento cargado)
+    const projectedCorrelative = invoiceForm.id && invoiceForm.correlative_number
+        ? invoiceForm.correlative_number
+        : getProjectedCorrelativeForType(activeCompany, invoiceForm.document_type);
+    const projectedControlNumber = invoiceForm.id && invoiceForm.control_number
+        ? invoiceForm.control_number
+        : getProjectedControlForType(activeCompany, invoiceForm.document_type);
 
     // Manejadores de renglones / ítems
     const handleAddItem = () => {
         setInvoiceForm(prev => ({
             ...prev,
-            items: [...prev.items, { description: '', details: '', quantity: 1, unit: 'unid', unit_price: 0, is_tax_exempt: false, image_url: null }]
+            items: [...prev.items, { product_id: null, description: '', details: '', quantity: 1, unit: 'unid', unit_price: 0, is_tax_exempt: false, image_url: null, show_image: true }]
         }));
     };
 
@@ -241,31 +326,66 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         }));
     };
 
-    // Envío del formulario de factura a Laravel
+    // Envío del formulario de factura a Laravel (Crear, Actualizar o Guardar Borrador)
     const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
-    const handleSubmitInvoice = (e) => {
-        e.preventDefault();
+    const handleSubmitInvoice = (e, forcedStatus = null) => {
+        if (e && e.preventDefault) e.preventDefault();
         if (!invoiceForm.client_id) {
-            alert('Por favor seleccione un cliente antes de guardar la factura, o regístrelo mediante el botón "+ Nuevo Cliente".');
+            notify.warning('Por favor seleccione un cliente antes de guardar el documento, o regístrelo mediante "+ Nuevo Cliente".');
             return;
         }
         setIsSubmittingInvoice(true);
-        router.post('/invoices', invoiceForm, {
+
+        const targetStatus = forcedStatus || (invoiceForm.status === 'borrador' ? 'emitida' : (invoiceForm.status || 'emitida'));
+        const payload = {
+            ...invoiceForm,
+            pdf_format: selectedPdfFormat,
+            status: targetStatus,
+        };
+
+        const callbacks = {
             onSuccess: () => {
                 setIsSubmittingInvoice(false);
+                notify.success(invoiceForm.id ? 'Documento actualizado correctamente.' : 'Documento emitido y guardado correctamente.');
                 setCurrentView('libro-fiscal');
             },
             onError: (err) => {
                 setIsSubmittingInvoice(false);
-                alert('Por favor verifica los campos obligatorios: ' + Object.values(err).join(', '));
+                notify.error('Verifica los campos obligatorios: ' + Object.values(err).join(', '));
             }
-        });
+        };
+
+        if (invoiceForm.id) {
+            router.put(`/invoices/${invoiceForm.id}`, payload, callbacks);
+        } else {
+            router.post('/invoices', payload, callbacks);
+        }
     };
 
     // Cargar una factura en el visor y formulario
     const handleLoadInvoiceToEditor = (inv) => {
         setSelectedCompanyId(inv.company_id);
+
+        const rawSpecs = inv.technical_specs;
+        let parsedSpecs;
+        if (Array.isArray(rawSpecs)) {
+            parsedSpecs = rawSpecs;
+        } else if (Array.isArray(rawSpecs?.specs)) {
+            parsedSpecs = rawSpecs.specs;
+        } else if (rawSpecs && typeof rawSpecs === 'object') {
+            const numericKeys = Object.keys(rawSpecs).filter(k => !isNaN(Number(k)));
+            parsedSpecs = numericKeys.length > 0
+                ? numericKeys.sort((a, b) => Number(a) - Number(b)).map(k => rawSpecs[k])
+                : defaultTechnicalSpecs.map(s => ({ ...s }));
+        } else {
+            parsedSpecs = defaultTechnicalSpecs.map(s => ({ ...s }));
+        }
+
         setInvoiceForm({
+            id: inv.id,
+            correlative_number: inv.correlative_number,
+            control_number: inv.control_number,
+            status: inv.status || 'emitida',
             company_id: inv.company_id,
             client_id: inv.client_id,
             document_type: inv.document_type || 'factura',
@@ -279,10 +399,12 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
             sales_channel: inv.sales_channel || 'Oficina',
             bcv_exchange_rate: Number(inv.bcv_exchange_rate || 876.80),
             show_bs_conversion: inv.show_bs_conversion !== undefined ? Boolean(inv.show_bs_conversion) : (inv.technical_specs?.show_bs_conversion !== undefined ? Boolean(inv.technical_specs.show_bs_conversion) : true),
+            show_item_images: inv.technical_specs?.show_item_images !== undefined ? Boolean(inv.technical_specs.show_item_images) : true,
             signature_stamp: inv.signature_stamp || inv.technical_specs?.signature_stamp || 'auto',
             currency: inv.currency || 'USD',
             payment_method: inv.payment_method || 'PAGO MOVIL',
             payment_reference: inv.payment_reference || '',
+            payment_terms_notes: '',
             shipping_cost: Number(inv.shipping_cost || 0),
             discount: Number(inv.discount || 0),
             tax_percentage: Number(inv.tax_percentage || 16),
@@ -296,19 +418,26 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
             payment_milestone_2_pct: inv.technical_specs?.payment_milestone_2_pct || 30,
             payment_milestone_2_text: inv.technical_specs?.payment_milestone_2_text || '15 días antes de la llegada del equipo al puerto de destino en Venezuela.',
             company_social_handle: inv.technical_specs?.company_social_handle || '',
-            technical_specs: Array.isArray(inv.technical_specs) ? inv.technical_specs : (Array.isArray(inv.technical_specs?.specs) ? inv.technical_specs.specs : defaultTechnicalSpecs.map(s => ({ ...s }))),
+            technical_specs: parsedSpecs,
             items: (inv.items && inv.items.length > 0)
-                ? inv.items.map(it => ({
-                    description: it.description,
-                    details: it.details || '',
-                    quantity: Number(it.quantity),
-                    unit: it.unit,
-                    unit_price: Number(it.unit_price),
-                    is_tax_exempt: !!it.is_tax_exempt,
-                    image_url: it.image_url || null
-                }))
-                : [{ description: 'Servicio general', details: '', quantity: 1, unit: 'unid', unit_price: 100, is_tax_exempt: false, image_url: null }]
+                ? inv.items.map((it, idx) => {
+                    const hiddenOrders = Array.isArray(inv.technical_specs?.hidden_image_orders) ? inv.technical_specs.hidden_image_orders : [];
+                    const orderNum = it.item_order || (idx + 1);
+                    return {
+                        product_id: it.product_id || null,
+                        description: it.description,
+                        details: it.details || '',
+                        quantity: Number(it.quantity),
+                        unit: it.unit,
+                        unit_price: Number(it.unit_price),
+                        is_tax_exempt: !!it.is_tax_exempt,
+                        image_url: it.image_url || null,
+                        show_image: !hiddenOrders.includes(orderNum)
+                    };
+                })
+                : [{ product_id: null, description: 'Servicio general', details: '', quantity: 1, unit: 'unid', unit_price: 100, is_tax_exempt: false, image_url: null, show_image: true }]
         });
+        setSelectedPdfFormat(inv.technical_specs?.pdf_format || (inv.document_type === 'proforma' ? 'formato-2' : 'formato-1'));
         setCurrentView('generador-pdf');
     };
 
@@ -320,20 +449,24 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         }, 120);
     };
 
+    const emptyCompanyState = {
+        name: '', trade_name: '', tax_id: '', phone: '', email: '',
+        address: '', city: '', state: '', website: '', invoice_prefix: 'F-',
+        next_correlative: 1, next_control_number: 1,
+        proforma_prefix: 'PROF-', next_proforma_correlative: 1,
+        quote_prefix: 'COT-', next_quote_correlative: 1,
+        delivery_note_prefix: 'NE-', next_delivery_note_correlative: 1,
+        default_terms: '', default_payment_terms: ''
+    };
+
     // Estado para nueva empresa y edición
     const [editingCompany, setEditingCompany] = useState(null);
-    const [newCompany, setNewCompany] = useState({
-        name: '', trade_name: '', tax_id: '', phone: '', email: '',
-        address: '', city: '', state: '', invoice_prefix: 'F-', default_terms: ''
-    });
+    const [newCompany, setNewCompany] = useState(emptyCompanyState);
     const [isSavingCompany, setIsSavingCompany] = useState(false);
 
     const handleOpenCreateCompany = () => {
         setEditingCompany(null);
-        setNewCompany({
-            name: '', trade_name: '', tax_id: '', phone: '', email: '',
-            address: '', city: '', state: '', invoice_prefix: 'F-', default_terms: ''
-        });
+        setNewCompany(emptyCompanyState);
         setIsCompanyModalOpen(true);
     };
 
@@ -348,8 +481,18 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
             address: comp.address || '',
             city: comp.city || '',
             state: comp.state || '',
+            website: comp.website || '',
             invoice_prefix: comp.invoice_prefix || 'F-',
-            default_terms: comp.default_terms || ''
+            next_correlative: comp.next_correlative || 1,
+            next_control_number: comp.next_control_number || 1,
+            proforma_prefix: comp.proforma_prefix || 'PROF-',
+            next_proforma_correlative: comp.next_proforma_correlative || 1,
+            quote_prefix: comp.quote_prefix || 'COT-',
+            next_quote_correlative: comp.next_quote_correlative || 1,
+            delivery_note_prefix: comp.delivery_note_prefix || 'NE-',
+            next_delivery_note_correlative: comp.next_delivery_note_correlative || 1,
+            default_terms: comp.default_terms || '',
+            default_payment_terms: comp.default_payment_terms || ''
         });
         setIsCompanyModalOpen(true);
     };
@@ -369,20 +512,25 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                     setIsSavingCompany(false);
                     setIsCompanyModalOpen(false);
                     setEditingCompany(null);
+                    notify.success('Empresa actualizada correctamente.');
                 },
-                onError: () => setIsSavingCompany(false)
+                onError: (err) => {
+                    setIsSavingCompany(false);
+                    notify.error(Object.values(err).join(', ') || 'No se pudo actualizar la empresa.');
+                }
             });
         } else {
             router.post('/companies', payload, {
                 onSuccess: () => {
                     setIsSavingCompany(false);
                     setIsCompanyModalOpen(false);
-                    setNewCompany({
-                        name: '', trade_name: '', tax_id: '', phone: '', email: '',
-                        address: '', city: '', state: '', invoice_prefix: 'F-', default_terms: ''
-                    });
+                    setNewCompany(emptyCompanyState);
+                    notify.success('Empresa registrada exitosamente.');
                 },
-                onError: () => setIsSavingCompany(false)
+                onError: (err) => {
+                    setIsSavingCompany(false);
+                    notify.error(Object.values(err).join(', ') || 'No se pudo registrar la empresa.');
+                }
             });
         }
     };
@@ -538,8 +686,197 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
         }
     };
 
-    const handleLogout = () => {
-        if (confirm('¿Desea cerrar la sesión del sistema?')) {
+    // Estado para Catálogo de Productos, Abonos y Modal Selector
+    const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+    const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+    const [paymentModalInvoiceId, setPaymentModalInvoiceId] = useState(null);
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [productForm, setProductForm] = useState({
+        code: '', name: '', details: '', category: 'General',
+        unit: 'unid', unit_price: '', is_tax_exempt: false,
+        track_inventory: false, stock: 0, min_stock: 0, technical_specs: null,
+        image_url: null, imageFile: null, imagePreview: null, remove_image: false
+    });
+    const [isSavingProduct, setIsSavingProduct] = useState(false);
+
+    const handleOpenCreateProduct = () => {
+        setEditingProduct(null);
+        setProductForm({
+            code: '', name: '', details: '', category: 'General',
+            unit: 'unid', unit_price: '', is_tax_exempt: false,
+            track_inventory: false, stock: 0, min_stock: 0, technical_specs: null,
+            image_url: null, imageFile: null, imagePreview: null, remove_image: false
+        });
+        setIsProductModalOpen(true);
+    };
+
+    const handleOpenEditProduct = (prod) => {
+        setEditingProduct(prod);
+        setProductForm({
+            code: prod.code || '',
+            name: prod.name || '',
+            details: prod.details || '',
+            category: prod.category || 'General',
+            unit: prod.unit || 'unid',
+            unit_price: prod.unit_price !== undefined ? prod.unit_price : '',
+            is_tax_exempt: !!prod.is_tax_exempt,
+            track_inventory: !!prod.track_inventory,
+            stock: prod.stock !== undefined && prod.stock !== null ? Number(prod.stock) : 0,
+            min_stock: prod.min_stock !== undefined && prod.min_stock !== null ? Number(prod.min_stock) : 0,
+            technical_specs: prod.technical_specs || null,
+            image_url: prod.image_url || null,
+            imageFile: null,
+            imagePreview: null,
+            remove_image: false
+        });
+        setIsProductModalOpen(true);
+    };
+
+    const handleSubmitProduct = (e) => {
+        e.preventDefault();
+        setIsSavingProduct(true);
+
+        const specsObj = productForm.technical_specs;
+        const hasSpecs = specsObj && (
+            (Array.isArray(specsObj.specs) && specsObj.specs.length > 0) ||
+            Boolean(specsObj.equipment_year) ||
+            Boolean(specsObj.equipment_vin)
+        );
+
+        const payload = {
+            code: productForm.code || null,
+            name: productForm.name,
+            details: productForm.details || null,
+            category: productForm.category || 'General',
+            unit: productForm.unit || 'unid',
+            unit_price: Number(productForm.unit_price || 0),
+            is_tax_exempt: productForm.is_tax_exempt ? 1 : 0,
+            track_inventory: productForm.track_inventory ? 1 : 0,
+            stock: Number(productForm.stock || 0),
+            min_stock: Number(productForm.min_stock || 0),
+            technical_specs: hasSpecs ? JSON.stringify(specsObj) : '',
+            remove_image: productForm.remove_image ? 1 : 0,
+        };
+
+        if (productForm.imageFile) {
+            payload.image = productForm.imageFile;
+        }
+
+        if (editingProduct) {
+            router.post(`/products/${editingProduct.id}`, { _method: 'put', ...payload }, {
+                forceFormData: true,
+                onSuccess: () => {
+                    setIsSavingProduct(false);
+                    setIsProductModalOpen(false);
+                    setEditingProduct(null);
+                    notify.success('Producto actualizado en el catálogo.');
+                },
+                onError: (err) => {
+                    setIsSavingProduct(false);
+                    notify.error('Error al actualizar producto: ' + Object.values(err).join(', '));
+                }
+            });
+        } else {
+            router.post('/products', payload, {
+                forceFormData: true,
+                onSuccess: () => {
+                    setIsSavingProduct(false);
+                    setIsProductModalOpen(false);
+                    notify.success('Producto registrado en el catálogo.');
+                },
+                onError: (err) => {
+                    setIsSavingProduct(false);
+                    notify.error('Error al registrar producto: ' + Object.values(err).join(', '));
+                }
+            });
+        }
+    };
+
+    // Insertar producto del catálogo dentro de los renglones de la factura/proforma actual
+    const handleSelectProductForInvoice = (product) => {
+        const newItem = {
+            product_id: product.id,
+            description: product.name,
+            details: product.details || '',
+            quantity: 1,
+            unit: product.unit || 'unid',
+            unit_price: Number(product.unit_price || 0),
+            is_tax_exempt: !!product.is_tax_exempt,
+            image_url: product.image_url || null,
+            show_image: true
+        };
+
+        // Cargar ficha técnica dinámica del producto si tiene configurada (Formato 2 Industrial)
+        const prodSpecs = product.technical_specs;
+        const specUpdates = {};
+        if (Array.isArray(prodSpecs) && prodSpecs.length > 0) {
+            specUpdates.technical_specs = prodSpecs.map(s => ({ ...s }));
+        } else if (prodSpecs && typeof prodSpecs === 'object') {
+            if (Array.isArray(prodSpecs.specs) && prodSpecs.specs.length > 0) {
+                specUpdates.technical_specs = prodSpecs.specs.map(s => ({ ...s }));
+            }
+            if (prodSpecs.equipment_year) {
+                specUpdates.equipment_year = prodSpecs.equipment_year;
+            }
+            if (prodSpecs.equipment_vin) {
+                specUpdates.equipment_vin = prodSpecs.equipment_vin;
+            }
+        }
+
+        setInvoiceForm(prev => {
+            const first = prev.items[0];
+            const isFirstBlank = prev.items.length === 1 && !first.description && (first.unit_price === '' || first.unit_price === null || Number(first.unit_price) === 0);
+            if (isFirstBlank) {
+                return { ...prev, ...specUpdates, items: [newItem] };
+            }
+            return { ...prev, ...specUpdates, items: [...prev.items, newItem] };
+        });
+    };
+
+    const handleInvoiceWithProduct = (product) => {
+        handleSelectProductForInvoice(product);
+        setCurrentView('generador-pdf');
+    };
+
+    const handleQuickSaveToCatalog = (item) => {
+        if (!item.description || item.unit_price === '') return;
+
+        const payload = {
+            name: item.description,
+            details: item.details || null,
+            category: 'General',
+            unit: item.unit || 'unid',
+            unit_price: Number(item.unit_price || 0),
+            is_tax_exempt: item.is_tax_exempt ? 1 : 0,
+            image_url: item.image_url || null,
+        };
+
+        if (selectedPdfFormat === 'formato-2' && Array.isArray(invoiceForm.technical_specs) && invoiceForm.technical_specs.length > 0) {
+            payload.technical_specs = {
+                equipment_year: invoiceForm.equipment_year || '',
+                equipment_vin: invoiceForm.equipment_vin || '',
+                specs: invoiceForm.technical_specs,
+            };
+        }
+
+        router.post('/products', payload, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => notify.success(`"${item.description}" guardado en el catálogo.`),
+            onError: (err) => {
+                notify.error('No se pudo guardar en el catálogo: ' + Object.values(err).join(', '));
+            }
+        });
+    };
+
+    const handleLogout = async () => {
+        const ok = await confirm({
+            title: 'Cerrar Sesión',
+            message: '¿Deseas cerrar tu sesión actual en Corpo Documents?',
+            confirmLabel: 'Cerrar Sesión',
+            variant: 'warning',
+        });
+        if (ok) {
             router.post('/logout');
         }
     };
@@ -565,9 +902,10 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
             <SecondaryNav
                 currentView={currentView}
                 setCurrentView={setCurrentView}
-                invoicesCount={invoices.length}
+                invoicesCount={totalInvoicesCount}
                 companiesCount={companies.length}
                 clientsCount={clients.length}
+                productsCount={products.length}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 invoiceForm={invoiceForm}
@@ -581,10 +919,10 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
             <main className="flex-1 p-3 sm:p-4 md:p-6 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full print:space-y-0 print:bg-white">
 
                 {/* MÉTRICAS CONTABLES */}
-                {currentView !== 'generador-pdf' && (
+                {currentView !== 'generador-pdf' && currentView !== 'auditoria' && (
                     <MetricCards
                         stats={stats}
-                        invoicesCount={invoices.length}
+                        invoicesCount={totalInvoicesCount}
                         companiesCount={companies.length}
                         clientsCount={clients.length}
                         onOpenCreateCompany={handleOpenCreateCompany}
@@ -592,17 +930,27 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                     />
                 )}
 
+                {currentView === 'libro-fiscal' && (
+                    <ExecutiveCharts chartData={chartData} />
+                )}
+
                 {/* VISTA 1: LIBRO DE FACTURACIÓN Y ARCHIVO */}
                 {currentView === 'libro-fiscal' && (
                     <DocumentsView
-                        invoices={invoices}
+                        invoices={ajaxInvoices}
+                        companies={companies}
+                        filters={ajaxFilters}
+                        statusCounts={ajaxStatusCounts}
                         searchQuery={searchQuery}
-                        invoicePage={invoicePage}
-                        setInvoicePage={setInvoicePage}
-                        invoicePageSize={invoicePageSize}
+                        isLoadingTable={isLoadingTable}
+                        onFilterChange={(partial) => fetchInvoicesAjax({ ...partial, page: 1 })}
+                        onPageChange={(page) => fetchInvoicesAjax({ page })}
                         handleNewInvoice={handleNewInvoice}
                         handleLoadInvoiceToEditor={handleLoadInvoiceToEditor}
                         handlePrintDocument={handlePrintDocument}
+                        onOpenPaymentsModal={(inv) => setPaymentModalInvoiceId(inv.id)}
+                        onOpenExportModal={() => setIsExportModalOpen(true)}
+                        onOpenAuditModal={(inv) => setAuditModalInvoiceId(inv.id)}
                     />
                 )}
 
@@ -627,11 +975,23 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                     />
                 )}
 
-                {/* VISTA 3: TALLER DE EMISIÓN & PDF EN VIVO */}
+                {/* VISTA 3: CATÁLOGO DE PRODUCTOS */}
+                {currentView === 'catalogo' && (
+                    <ProductsView
+                        products={products}
+                        searchQuery={searchQuery}
+                        onOpenCreateProduct={handleOpenCreateProduct}
+                        onOpenEditProduct={handleOpenEditProduct}
+                        onInvoiceWithProduct={handleInvoiceWithProduct}
+                    />
+                )}
+
+                {/* VISTA 4: TALLER DE EMISIÓN & PDF EN VIVO */}
                 {currentView === 'generador-pdf' && (
                     <GeneratorView
                         companies={companies}
                         clients={clients}
+                        products={products}
                         activeCompany={activeCompany}
                         selectedCompanyId={selectedCompanyId}
                         setSelectedCompanyId={setSelectedCompanyId}
@@ -658,9 +1018,19 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                         isSubmittingInvoice={isSubmittingInvoice}
                         handlePrintDocument={handlePrintDocument}
                         onOpenCreateClient={handleOpenCreateClient}
+                        onOpenProductPicker={() => setIsProductPickerOpen(true)}
+                        onQuickSaveToCatalog={handleQuickSaveToCatalog}
                         setCurrentView={setCurrentView}
                         mobileEditorTab={mobileEditorTab}
                         setMobileEditorTab={setMobileEditorTab}
+                    />
+                )}
+
+                {/* VISTA 5: BITÁCORA DE AUDITORÍA Y ACTIVIDAD */}
+                {currentView === 'auditoria' && (
+                    <AuditView
+                        initialLogs={auditLogs}
+                        initialSummary={auditSummary}
                     />
                 )}
             </main>
@@ -692,6 +1062,56 @@ export default function Index({ companies = [], clients = [], invoices = [], sta
                 handleConsultCne={handleConsultCne}
                 cneAlert={cneAlert}
             />
+
+            {/* MODAL 3: REGISTRAR / EDITAR PRODUCTO */}
+            <ProductModal
+                isOpen={isProductModalOpen}
+                onClose={() => setIsProductModalOpen(false)}
+                editingProduct={editingProduct}
+                productForm={productForm}
+                setProductForm={setProductForm}
+                onSubmit={handleSubmitProduct}
+                isSavingProduct={isSavingProduct}
+            />
+
+            {/* MODAL 4: SELECTOR RÁPIDO DEL CATÁLOGO PARA FACTURAS */}
+            <ProductPickerModal
+                isOpen={isProductPickerOpen}
+                onClose={() => setIsProductPickerOpen(false)}
+                products={products}
+                onSelectProduct={handleSelectProductForInvoice}
+                onOpenCreateProduct={handleOpenCreateProduct}
+            />
+
+            {/* MODAL 5: CONTROL DE ABONOS / PAGOS PARCIALES */}
+            <InvoicePaymentsModal
+                isOpen={Boolean(paymentModalInvoiceId)}
+                onClose={() => setPaymentModalInvoiceId(null)}
+                invoice={invoiceList.find(i => i.id === paymentModalInvoiceId) || null}
+            />
+
+            {/* MODAL 7: EXPORTAR LIBRO DE VENTAS (CSV / EXCEL SENIAT) */}
+            <SalesBookExportModal
+                isOpen={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                companies={companies}
+                defaultCompanyId={ajaxFilters?.company_id || 'all'}
+            />
+
+            {/* MODAL 8: HISTORIAL DE AUDITORÍA DEL DOCUMENTO */}
+            <InvoiceAuditModal
+                isOpen={Boolean(auditModalInvoiceId)}
+                onClose={() => setAuditModalInvoiceId(null)}
+                invoice={invoiceList.find(i => i.id === auditModalInvoiceId) || null}
+            />
         </div>
+    );
+}
+
+export default function Index(props) {
+    return (
+        <FeedbackProvider>
+            <IndexContent {...props} />
+        </FeedbackProvider>
     );
 }
