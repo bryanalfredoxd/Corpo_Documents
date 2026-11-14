@@ -6,6 +6,7 @@ import PdfPreview from '../Generator/PdfPreview';
 export default function GeneratorView({
     companies = [],
     clients = [],
+    clientCategories = [],
     products = [],
     activeCompany,
     selectedCompanyId,
@@ -33,6 +34,7 @@ export default function GeneratorView({
     isSubmittingInvoice,
     handlePrintDocument,
     onOpenCreateClient,
+    onOpenClientCategoryManager,
     onOpenProductPicker,
     onQuickSaveToCatalog,
     setCurrentView,
@@ -76,6 +78,7 @@ export default function GeneratorView({
                 <InvoiceForm
                     companies={companies}
                     clients={clients}
+                    clientCategories={clientCategories}
                     products={products}
                     activeCompany={activeCompany}
                     selectedCompanyId={selectedCompanyId}
@@ -99,6 +102,7 @@ export default function GeneratorView({
                     handleSubmitInvoice={handleSubmitInvoice}
                     isSubmittingInvoice={isSubmittingInvoice}
                     onOpenCreateClient={onOpenCreateClient}
+                    onOpenClientCategoryManager={onOpenClientCategoryManager}
                     onOpenProductPicker={onOpenProductPicker}
                     onQuickSaveToCatalog={onQuickSaveToCatalog}
                     setCurrentView={setCurrentView}

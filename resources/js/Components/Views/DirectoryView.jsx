@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
 import {
     Building2,
@@ -13,14 +13,17 @@ import {
     Edit3,
     Receipt,
     User,
-    Archive
+    Archive,
+    Tag,
+    Settings2
 } from 'lucide-react';
-import { sprintfCorrelative, sprintfControl, getEmptyInvoice } from '../../Utils/invoiceConstants';
+import { sprintfCorrelative, sprintfControl, getEmptyInvoice, CLIENT_CATEGORIES, getClientCategoryBadge } from '../../Utils/invoiceConstants';
 import { useFeedback } from '../../Contexts/FeedbackContext';
 
 export default function DirectoryView({
     companies = [],
     clients = [],
+    clientCategories = [],
     searchQuery = '',
     directorySection = 'empresas-emisoras',
     setDirectorySection,
@@ -33,9 +36,11 @@ export default function DirectoryView({
     onOpenCreateCompany,
     onOpenEditCompany,
     onOpenCreateClient,
-    onOpenEditClient
+    onOpenEditClient,
+    onOpenClientCategoryManager
 }) {
     const { confirm, notify } = useFeedback();
+    const [clientCategoryFilter, setClientCategoryFilter] = useState('all');
 
     const handleArchiveCompany = async (comp) => {
         const ok = await confirm({
@@ -88,11 +93,22 @@ export default function DirectoryView({
             (c.name && c.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
             (c.tax_id && c.tax_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
             (c.email && c.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (c.phone && c.phone.toLowerCase().includes(searchQuery.toLowerCase()));
+            (c.phone && c.phone.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (c.category && c.category.toLowerCase().includes(searchQuery.toLowerCase()));
 
         if (!matchesSearch) return false;
         if (directoryType === 'empresas') return c.type === 'empresa';
         if (directoryType === 'personas') return c.type === 'persona';
+
+        if (clientCategoryFilter !== 'all') {
+            const clCat = (c.category || 'General').toLowerCase();
+            const filterCat = clientCategoryFilter.toLowerCase();
+            const filterKeyword = filterCat.split(' ')[0];
+            if (clCat !== filterCat && !clCat.includes(filterKeyword)) {
+                return false;
+            }
+        }
+
         return true;
     });
 
@@ -402,26 +418,109 @@ export default function DirectoryView({
 
             {/* PESTAÑA: CLIENTES RECEPTORES */}
             {directorySection === 'clientes' && (
-                <div>
+                <div className="space-y-4">
+                    {/* Barra de Filtros por Rubro / Sección del Negocio */}
+                    <div className="bg-white p-3 sm:p-4 rounded-xl border-2 border-slate-300 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-black flex items-center gap-1.5">
+                                    <Tag className="w-4 h-4 text-blue-700" />
+                                    <span>Filtrar por Rubro o Sección del Cliente:</span>
+                                </span>
+                                {onOpenClientCategoryManager && (
+                                    <button
+                                        type="button"
+                                        onClick={onOpenClientCategoryManager}
+                                        className="text-[11px] font-black text-blue-700 hover:text-blue-900 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-lg cursor-pointer transition-colors"
+                                        title="Administrar, agregar, renombrar o editar secciones comerciales"
+                                    >
+                                        <Settings2 className="w-3.5 h-3.5" />
+                                        <span>⚙️ Gestionar Secciones</span>
+                                    </button>
+                                )}
+                            </div>
+                            {clientCategoryFilter !== 'all' && (
+                                <button
+                                    type="button"
+                                    onClick={() => setClientCategoryFilter('all')}
+                                    className="text-[11px] font-black text-blue-700 hover:text-blue-900 cursor-pointer underline"
+                                >
+                                    Ver Todos ({clients.length})
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                            <button
+                                type="button"
+                                onClick={() => setClientCategoryFilter('all')}
+                                className={`h-8 px-3 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 border ${
+                                    clientCategoryFilter === 'all'
+                                        ? 'bg-black text-white border-black shadow-2xs'
+                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+                                }`}
+                            >
+                                Todos ({clients.length})
+                            </button>
+                            {(clientCategories.length > 0 ? clientCategories : CLIENT_CATEGORIES).map(cat => {
+                                const catName = cat.name || cat.id;
+                                const count = clients.filter(c => (c.category || '').toLowerCase().trim() === catName.toLowerCase().trim()).length;
+                                const isSelected = clientCategoryFilter.toLowerCase().trim() === catName.toLowerCase().trim();
+                                const badgeInfo = getClientCategoryBadge(catName, clientCategories);
+
+                                return (
+                                    <button
+                                        key={cat.id || catName}
+                                        type="button"
+                                        onClick={() => setClientCategoryFilter(catName)}
+                                        className={`h-8 px-3 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 border flex items-center gap-1.5 ${
+                                            isSelected
+                                                ? 'bg-blue-700 text-white border-blue-900 shadow-2xs'
+                                                : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+                                        }`}
+                                    >
+                                        <span>{cat.icon || badgeInfo.icon}</span>
+                                        <span>{catName}</span>
+                                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${isSelected ? 'bg-blue-900 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                                            {count}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {filteredClients.length === 0 ? (
                         <div className="bg-white rounded-2xl border-2 border-slate-300 p-12 text-center space-y-3">
                             <Users2 className="w-12 h-12 text-slate-400 mx-auto" />
                             <h4 className="text-sm font-black text-slate-900 uppercase">No se encontraron clientes</h4>
                             <p className="text-xs text-slate-600 max-w-md mx-auto">
-                                {searchQuery ? `No hay clientes que coincidan con "${searchQuery}".` : 'No hay clientes registrados en esta categoría.'}
+                                {searchQuery ? `No hay clientes que coincidan con "${searchQuery}".` : 'No hay clientes registrados en esta categoría o rubro.'}
                             </p>
-                            <button
-                                type="button"
-                                onClick={onOpenCreateClient}
-                                className="inline-flex items-center gap-2 h-9 px-4 bg-blue-700 text-white text-xs font-black rounded-lg hover:bg-blue-800 cursor-pointer"
-                            >
-                                <Plus className="w-4 h-4 text-white" />
-                                <span>Registrar Primer Cliente</span>
-                            </button>
+                            <div className="flex items-center justify-center gap-2 pt-2">
+                                {clientCategoryFilter !== 'all' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setClientCategoryFilter('all')}
+                                        className="h-9 px-4 bg-slate-200 hover:bg-slate-300 text-black text-xs font-black rounded-lg cursor-pointer"
+                                    >
+                                        Quitar Filtro de Rubro
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={onOpenCreateClient}
+                                    className="inline-flex items-center gap-2 h-9 px-4 bg-blue-700 text-white text-xs font-black rounded-lg hover:bg-blue-800 cursor-pointer"
+                                >
+                                    <Plus className="w-4 h-4 text-white" />
+                                    <span>Registrar Primer Cliente</span>
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {filteredClients.map((client) => (
+                            {filteredClients.map((client) => {
+                                const catBadge = getClientCategoryBadge(client.category, clientCategories);
+                                return (
                                 <div
                                     key={client.id}
                                     className="bg-white rounded-2xl border-2 border-slate-300 shadow-xs p-5 flex flex-col justify-between hover:border-slate-400 hover:shadow-sm transition-all"
@@ -437,10 +536,21 @@ export default function DirectoryView({
                                                     {client.type === 'empresa' ? <Building2 className="w-6 h-6" /> : <User className="w-6 h-6" />}
                                                 </div>
                                                 <div>
-                                                    <span className="text-[11px] font-black uppercase text-slate-600 block">
-                                                        {client.type === 'empresa' ? 'Cliente Jurídico' : 'Cliente Natural'}
-                                                    </span>
-                                                    <h3 className="text-sm font-black text-black leading-tight mt-0.5">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-[10px] font-black uppercase text-slate-600 block">
+                                                            {client.type === 'empresa' ? 'Cliente Jurídico' : 'Cliente Natural'}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setClientCategoryFilter(client.category || 'Comercial General')}
+                                                            title="Filtrar por este rubro"
+                                                            className={`text-[10px] font-black px-2 py-0.5 rounded-md border flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity ${catBadge.badge}`}
+                                                        >
+                                                            <span>{catBadge.icon}</span>
+                                                            <span>{client.category || 'Comercial General'}</span>
+                                                        </button>
+                                                    </div>
+                                                    <h3 className="text-sm font-black text-black leading-tight mt-1">
                                                         {client.name}
                                                     </h3>
                                                 </div>
@@ -507,7 +617,8 @@ export default function DirectoryView({
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                            );
+                        })}
                         </div>
                     )}
                 </div>

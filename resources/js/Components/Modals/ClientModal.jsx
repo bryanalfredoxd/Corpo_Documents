@@ -7,8 +7,11 @@ import {
     AlertCircle,
     Loader2,
     Sparkles,
-    Save
+    Save,
+    Tag,
+    Settings2
 } from 'lucide-react';
+import { CLIENT_CATEGORIES, getClientCategoryBadge } from '../../Utils/invoiceConstants';
 
 export default function ClientModal({
     isOpen,
@@ -16,6 +19,8 @@ export default function ClientModal({
     editingClient,
     newClient,
     setNewClient,
+    clientCategories = [],
+    onOpenClientCategoryManager,
     onSubmit,
     isSavingClient,
     isConsultingCne,
@@ -23,6 +28,8 @@ export default function ClientModal({
     cneAlert
 }) {
     if (!isOpen) return null;
+
+    const categoriesList = clientCategories.length > 0 ? clientCategories : CLIENT_CATEGORIES;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs no-print">
@@ -153,7 +160,73 @@ export default function ClientModal({
                                 value={newClient.tax_id}
                                 onChange={(e) => setNewClient(prev => ({ ...prev, tax_id: e.target.value }))}
                                 className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black font-mono uppercase"
+                            >
+                            </input>
+                        </div>
+                    </div>
+
+                    {/* RUBRO / SERVICIO DEL CLIENTE (Clasificación por sección para facturación) */}
+                    <div className="bg-slate-50 border-2 border-slate-300 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <label className="text-xs font-black text-black flex items-center gap-1.5">
+                                <Tag className="w-3.5 h-3.5 text-blue-700" />
+                                <span>Rubro o Sección del Cliente *</span>
+                            </label>
+                            {onOpenClientCategoryManager && (
+                                <button
+                                    type="button"
+                                    onClick={onOpenClientCategoryManager}
+                                    className="text-[11px] font-black text-blue-700 hover:text-blue-900 flex items-center gap-1 cursor-pointer"
+                                    title="Crear, editar o configurar nuevas secciones de clientes"
+                                >
+                                    <Settings2 className="w-3.5 h-3.5 text-blue-700" />
+                                    <span>⚙️ Gestionar Secciones</span>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Botones de selección rápida de rubro */}
+                        <div className="flex flex-wrap gap-1.5">
+                            {categoriesList.map(cat => {
+                                const catName = cat.name || cat.id;
+                                const isActive = (newClient.category || 'Comercial General').toLowerCase().trim() === catName.toLowerCase().trim();
+                                const badgeInfo = getClientCategoryBadge(catName, clientCategories);
+
+                                return (
+                                    <button
+                                        key={cat.id || catName}
+                                        type="button"
+                                        onClick={() => setNewClient(prev => ({ ...prev, category: catName }))}
+                                        className={`text-[11px] font-black px-2.5 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                                            isActive
+                                                ? 'bg-blue-700 text-white border-blue-900 shadow-2xs'
+                                                : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+                                        }`}
+                                    >
+                                        <span>{cat.icon || badgeInfo.icon}</span>
+                                        <span>{catName}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Campo editable con datalist para categorías personalizadas */}
+                        <div className="relative">
+                            <input
+                                type="text"
+                                list="client-category-presets"
+                                placeholder="Escribe o selecciona un rubro específico (puedes crear uno nuevo escribiéndolo aquí)..."
+                                value={newClient.category || 'Comercial General'}
+                                onChange={(e) => setNewClient(prev => ({ ...prev, category: e.target.value }))}
+                                className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-3 text-xs font-black text-black"
                             />
+                            <datalist id="client-category-presets">
+                                {categoriesList.map(cat => (
+                                    <option key={cat.id || cat.name} value={cat.name || cat.id}>
+                                        {cat.description || cat.desc || ''}
+                                    </option>
+                                ))}
+                            </datalist>
                         </div>
                     </div>
 

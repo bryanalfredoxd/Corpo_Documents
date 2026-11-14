@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\ClientCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class ClientController extends Controller
 {
@@ -17,6 +19,7 @@ class ClientController extends Controller
     {
         $validated = $request->validate([
             'type' => ['required', 'in:persona,empresa'],
+            'category' => ['nullable', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'tax_id' => ['required', 'string', 'max:50', 'unique:clients,tax_id'],
             'email' => ['nullable', 'email', 'max:255'],
@@ -27,8 +30,18 @@ class ClientController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        $categoryName = !empty(trim($validated['category'] ?? '')) ? trim($validated['category']) : 'Comercial General';
+
+        if (Schema::hasTable('client_categories')) {
+            ClientCategory::firstOrCreate(
+                ['name' => $categoryName],
+                ['icon' => '🏷️', 'color' => 'blue', 'is_active' => true]
+            );
+        }
+
         Client::create([
             'type' => $validated['type'],
+            'category' => $categoryName,
             'name' => $validated['name'],
             'tax_id' => strtoupper(trim($validated['tax_id'])),
             'email' => $validated['email'] ?? null,
@@ -50,6 +63,7 @@ class ClientController extends Controller
     {
         $validated = $request->validate([
             'type' => ['required', 'in:persona,empresa'],
+            'category' => ['nullable', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'tax_id' => ['required', 'string', 'max:50', 'unique:clients,tax_id,' . $client->id],
             'email' => ['nullable', 'email', 'max:255'],
@@ -60,8 +74,18 @@ class ClientController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        $categoryName = !empty(trim($validated['category'] ?? '')) ? trim($validated['category']) : 'Comercial General';
+
+        if (Schema::hasTable('client_categories')) {
+            ClientCategory::firstOrCreate(
+                ['name' => $categoryName],
+                ['icon' => '🏷️', 'color' => 'blue', 'is_active' => true]
+            );
+        }
+
         $client->update([
             'type' => $validated['type'],
+            'category' => $categoryName,
             'name' => $validated['name'],
             'tax_id' => strtoupper(trim($validated['tax_id'])),
             'email' => $validated['email'] ?? null,

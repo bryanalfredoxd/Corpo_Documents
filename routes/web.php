@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ClientCategoryController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CompanyBankAccountController;
 use App\Http\Controllers\CompanyController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Models\Client;
+use App\Models\ClientCategory;
 use App\Models\Company;
 use App\Models\Invoice;
 use App\Models\Product;
@@ -22,6 +24,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/', function (Request $request) {
         $companies = Company::with('bankAccounts')->where('is_active', true)->get();
         $clients = Client::where('is_active', true)->orderBy('name')->get();
+        $clientCategories = collect();
+        if (Schema::hasTable('client_categories')) {
+            $clientCategories = ClientCategory::where('is_active', true)->orderBy('name')->get();
+        }
 
         $paginatedResult = InvoiceController::queryPaginatedInvoices($request);
         $auditResult = InvoiceController::queryAuditLogs(new Request());
@@ -204,6 +210,7 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('Index', [
             'companies' => $companies,
             'clients' => $clients,
+            'clientCategories' => $clientCategories,
             'invoices' => $paginatedResult['invoices'],
             'products' => $products,
             'stats' => $stats,
@@ -236,6 +243,11 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
     Route::delete('/clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
     Route::post('/clients/consult-cne', [ClientController::class, 'consultCne'])->name('clients.consult-cne');
+
+    // Secciones y Rubros de Clientes configurables por el usuario
+    Route::post('/client-categories', [ClientCategoryController::class, 'store'])->name('client-categories.store');
+    Route::put('/client-categories/{clientCategory}', [ClientCategoryController::class, 'update'])->name('client-categories.update');
+    Route::delete('/client-categories/{clientCategory}', [ClientCategoryController::class, 'destroy'])->name('client-categories.destroy');
 
     Route::post('/products', [ProductController::class, 'store'])->name('products.store');
     Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');

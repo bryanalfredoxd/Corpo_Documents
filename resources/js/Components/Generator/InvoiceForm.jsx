@@ -24,15 +24,19 @@ import {
     ArrowRightLeft,
     ChevronDown,
     Search,
-    X
+    X,
+    User,
+    Tag,
+    Settings2
 } from 'lucide-react';
-import { getDocumentTypeInfo } from '../../Utils/invoiceConstants';
+import { getDocumentTypeInfo, CLIENT_CATEGORIES, getClientCategoryBadge } from '../../Utils/invoiceConstants';
 import { compressImageToDataUrl } from '../../Utils/imageCompression';
 import { useFeedback } from '../../Contexts/FeedbackContext';
 
 export default function InvoiceForm({
     companies = [],
     clients = [],
+    clientCategories = [],
     products = [],
     activeCompany,
     selectedCompanyId,
@@ -56,6 +60,7 @@ export default function InvoiceForm({
     handleSubmitInvoice,
     isSubmittingInvoice,
     onOpenCreateClient,
+    onOpenClientCategoryManager,
     onOpenProductPicker,
     onQuickSaveToCatalog,
     setCurrentView,
@@ -64,15 +69,31 @@ export default function InvoiceForm({
 }) {
     const { confirm, notify } = useFeedback();
     const [clientQuery, setClientQuery] = useState('');
+    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
 
     const selectedClientOption = clients.find((cl) => String(cl.id) === String(invoiceForm.client_id)) || null;
-    const filteredClients = clientQuery.trim() === ''
-        ? clients
-        : clients.filter((cl) =>
-            `${cl.name || ''} ${cl.tax_id || ''} ${cl.phone || ''}`
-                .toLowerCase()
-                .includes(clientQuery.trim().toLowerCase())
-        );
+    const filteredClients = clients.filter((cl) => {
+        // 1. Filtrar por categoría / rubro si no es 'all'
+        if (selectedCategoryFilter !== 'all') {
+            const clCat = (cl.category || 'General').toLowerCase();
+            const filterCat = selectedCategoryFilter.toLowerCase();
+            const filterKeyword = filterCat.split(' ')[0];
+            if (clCat !== filterCat && !clCat.includes(filterKeyword)) {
+                return false;
+            }
+        }
+
+        // 2. Filtrar por búsqueda de texto (nombre, tax_id, teléfono, o rubro)
+        if (clientQuery.trim() !== '') {
+            const q = clientQuery.trim().toLowerCase();
+            const searchCorpus = `${cl.name || ''} ${cl.tax_id || ''} ${cl.phone || ''} ${cl.category || ''}`.toLowerCase();
+            if (!searchCorpus.includes(q)) {
+                return false;
+            }
+        }
+
+        return true;
+    });
 
     return (
         <form
@@ -208,10 +229,11 @@ export default function InvoiceForm({
                 </div>
 
                 {/* Cliente Receptor */}
-                <div>
-                    <div className="flex justify-between items-center mb-1">
-                        <label className="text-xs font-black text-black">
-                            Cliente / Adquiriente *
+                <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                        <label className="text-xs font-black text-black flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-blue-700" />
+                            <span>Cliente / Adquiriente *</span>
                         </label>
                         <button
                             type="button"
@@ -222,6 +244,53 @@ export default function InvoiceForm({
                             <span>Nuevo Cliente (CNE)</span>
                         </button>
                     </div>
+
+                    {/* Filtro por Sección / Rubro para selección rápida */}
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none text-[11px] font-black">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0 mr-0.5">Rubro:</span>
+                        {[
+                            { id: 'all', label: 'Todos', icon: '👥' },
+                            ...(clientCategories.length > 0 ? clientCategories : CLIENT_CATEGORIES)
+                        ].map(cat => {
+                            const catName = cat.name || cat.id;
+                            const isSelected = selectedCategoryFilter.toLowerCase().trim() === catName.toLowerCase().trim();
+                            const count = cat.id === 'all'
+                                ? clients.length
+                                : clients.filter(c => (c.category || '').toLowerCase().trim() === catName.toLowerCase().trim()).length;
+                            const badgeInfo = getClientCategoryBadge(catName, clientCategories);
+
+                            return (
+                                <button
+                                    key={cat.id || catName}
+                                    type="button"
+                                    onClick={() => setSelectedCategoryFilter(cat.id === 'all' ? 'all' : catName)}
+                                    className={`px-2 py-0.5 rounded-lg border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 text-[11px] font-black ${
+                                        isSelected
+                                            ? 'bg-blue-700 text-white border-blue-900 shadow-2xs'
+                                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                    }`}
+                                >
+                                    <span>{cat.icon || badgeInfo.icon}</span>
+                                    <span>{cat.shortLabel || catName}</span>
+                                    <span className={`text-[10px] px-1 rounded-full font-mono ${isSelected ? 'bg-blue-900 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                        {count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                        {onOpenClientCategoryManager && (
+                            <button
+                                type="button"
+                                onClick={onOpenClientCategoryManager}
+                                className="h-6 px-1.5 rounded-md text-blue-700 hover:bg-blue-50 border border-blue-300 cursor-pointer shrink-0 transition-colors flex items-center gap-1 text-[10px] font-black ml-auto"
+                                title="Crear o configurar nuevas secciones de clientes"
+                            >
+                                <Settings2 className="w-3 h-3 text-blue-700" />
+                                <span>+ Sección</span>
+                            </button>
+                        )}
+                    </div>
+
                     <Combobox
                         immediate
                         value={selectedClientOption}
@@ -261,33 +330,41 @@ export default function InvoiceForm({
                             <ComboboxOptions className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white border-2 border-slate-900 shadow-2xl py-1 text-xs">
                                 {filteredClients.length === 0 ? (
                                     <div className="px-3 py-2.5 text-slate-500 font-bold italic">
-                                        Sin coincidencias para "{clientQuery}"
+                                        Sin coincidencias {selectedCategoryFilter !== 'all' ? `en el rubro seleccionado` : ''} {clientQuery ? `para "${clientQuery}"` : ''}
                                     </div>
                                 ) : (
-                                    filteredClients.map((cl) => (
-                                        <ComboboxOption
-                                            key={cl.id}
-                                            value={cl}
-                                            className={({ focus, selected }) =>
-                                                `px-3 py-2 cursor-pointer flex items-center justify-between gap-2 ${
-                                                    focus
-                                                        ? 'bg-blue-700 text-white'
-                                                        : selected
-                                                        ? 'bg-blue-50 text-blue-950 font-black'
-                                                        : 'text-slate-900 font-bold'
-                                                }`
-                                            }
-                                        >
-                                            {({ focus }) => (
-                                                <>
-                                                    <span className="truncate uppercase">{cl.name}</span>
-                                                    <span className={`font-mono text-[11px] shrink-0 ${focus ? 'text-blue-100' : 'text-slate-500'}`}>
-                                                        {cl.tax_id}
-                                                    </span>
-                                                </>
-                                            )}
-                                        </ComboboxOption>
-                                    ))
+                                    filteredClients.map((cl) => {
+                                        const catBadge = getClientCategoryBadge(cl.category, clientCategories);
+                                        return (
+                                            <ComboboxOption
+                                                key={cl.id}
+                                                value={cl}
+                                                className={({ focus, selected }) =>
+                                                    `px-3 py-2 cursor-pointer flex items-center justify-between gap-2 border-b border-slate-100 last:border-0 ${
+                                                        focus
+                                                            ? 'bg-blue-700 text-white'
+                                                            : selected
+                                                            ? 'bg-blue-50 text-blue-950 font-black'
+                                                            : 'text-slate-900 font-bold'
+                                                    }`
+                                                }
+                                            >
+                                                {({ focus }) => (
+                                                    <div className="flex items-center justify-between gap-2 w-full min-w-0">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="truncate uppercase text-xs font-black">{cl.name}</span>
+                                                            <span className={`text-[10px] font-black px-1.5 py-0.2 rounded border shrink-0 ${focus ? 'bg-blue-800 text-white border-blue-600' : catBadge.badge}`}>
+                                                                {catBadge.icon} {cl.category || 'Comercial General'}
+                                                            </span>
+                                                        </div>
+                                                        <span className={`font-mono text-[11px] shrink-0 ${focus ? 'text-blue-100' : 'text-slate-500'}`}>
+                                                            {cl.tax_id}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </ComboboxOption>
+                                        );
+                                    })
                                 )}
                             </ComboboxOptions>
                         </div>
@@ -304,9 +381,19 @@ export default function InvoiceForm({
                                     {currentSelectedClient.address || currentSelectedClient.phone || 'Cliente Registrado'}
                                 </span>
                             </div>
-                            <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded shrink-0 uppercase">
-                                {currentSelectedClient.type === 'empresa' ? 'Jurídico' : 'Natural'}
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                {(() => {
+                                    const badge = getClientCategoryBadge(currentSelectedClient.category, clientCategories);
+                                    return (
+                                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${badge.badge}`}>
+                                            {badge.icon} {currentSelectedClient.category || 'Comercial General'}
+                                        </span>
+                                    );
+                                })()}
+                                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded shrink-0 uppercase">
+                                    {currentSelectedClient.type === 'empresa' ? 'Jurídico' : 'Natural'}
+                                </span>
+                            </div>
                         </div>
                     ) : (
                         <div className="mt-2 p-2 bg-white rounded-lg border border-dashed border-slate-300 text-xs text-slate-500 flex items-center justify-between">

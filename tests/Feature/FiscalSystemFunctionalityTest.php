@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Client;
+use App\Models\ClientCategory;
 use App\Models\Company;
 use App\Models\CompanyBankAccount;
 use App\Models\Invoice;
@@ -1646,6 +1647,270 @@ class FiscalSystemFunctionalityTest extends TestCase
         $this->assertNotNull($topItem);
         $this->assertEquals(10000.0, (float) $topItem['vendido_usd']);
         $this->assertEquals(2.0, (float) $topItem['unidades']);
+    }
+
+    public function test_client_can_be_created_with_custom_or_preset_category(): void
+    {
+        $user = User::factory()->create();
+
+        // 1. Cliente de Maquinaria Agrícola
+        $this->actingAs($user)->post('/clients', [
+            'type' => 'empresa',
+            'category' => 'Maquinaria Agrícola',
+            'name' => 'Agropecuaria El Samán C.A.',
+            'tax_id' => 'J-12345678-0',
+            'phone' => '+58 414 111 2233',
+            'address' => 'Calabozo, Guárico',
+        ])->assertSessionHas('success');
+
+        $this->assertDatabaseHas('clients', [
+            'tax_id' => 'J-12345678-0',
+            'category' => 'Maquinaria Agrícola',
+        ]);
+
+        // 2. Cliente de Insumos Agrícolas / Semilleros
+        $this->actingAs($user)->post('/clients', [
+            'type' => 'persona',
+            'category' => 'Insumos Agrícolas / Semilleros',
+            'name' => 'Pedro Semilleros',
+            'tax_id' => 'V-19876543',
+            'phone' => '+58 412 333 4455',
+            'address' => 'Turén, Portuguesa',
+        ])->assertSessionHas('success');
+
+        $this->assertDatabaseHas('clients', [
+            'tax_id' => 'V-19876543',
+            'category' => 'Insumos Agrícolas / Semilleros',
+        ]);
+
+        // 3. Cliente de Equipos Médicos (Estetoscopios, etc.)
+        $this->actingAs($user)->post('/clients', [
+            'type' => 'empresa',
+            'category' => 'Equipos Médicos',
+            'name' => 'Centro Médico San Judas C.A.',
+            'tax_id' => 'J-98765432-1',
+            'phone' => '+58 424 555 6677',
+            'address' => 'Caracas, Dto. Capital',
+        ])->assertSessionHas('success');
+
+        $this->assertDatabaseHas('clients', [
+            'tax_id' => 'J-98765432-1',
+            'category' => 'Equipos Médicos',
+        ]);
+
+        // 4. Cliente de Servicios de Importación China
+        $this->actingAs($user)->post('/clients', [
+            'type' => 'empresa',
+            'category' => 'Servicios de Importación',
+            'name' => 'Logística & Tránsitos del Caribe C.A.',
+            'tax_id' => 'J-55667788-9',
+            'phone' => '+58 416 777 8899',
+            'address' => 'Puerto Cabello, Carabobo',
+        ])->assertSessionHas('success');
+
+        $this->assertDatabaseHas('clients', [
+            'tax_id' => 'J-55667788-9',
+            'category' => 'Servicios de Importación',
+        ]);
+    }
+
+    public function test_client_category_defaults_to_comercial_general_when_omitted(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post('/clients', [
+            'type' => 'persona',
+            'name' => 'Cliente General Sin Categoria',
+            'tax_id' => 'V-33445566',
+            'phone' => '+58 414 000 1122',
+        ])->assertSessionHas('success');
+
+        $this->assertDatabaseHas('clients', [
+            'tax_id' => 'V-33445566',
+            'category' => 'Comercial General',
+        ]);
+    }
+
+    public function test_client_category_can_be_updated(): void
+    {
+        $user = User::factory()->create();
+        $client = Client::create([
+            'type' => 'persona',
+            'category' => 'General',
+            'name' => 'Doctor José Gregorio',
+            'tax_id' => 'V-44556677',
+            'phone' => '+58 412 123 4567',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)->put("/clients/{$client->id}", [
+            'type' => 'persona',
+            'category' => 'Equipos Médicos',
+            'name' => 'Doctor José Gregorio',
+            'tax_id' => 'V-44556677',
+            'phone' => '+58 412 123 4567',
+        ])->assertSessionHas('success');
+
+        $this->assertDatabaseHas('clients', [
+            'id' => $client->id,
+            'category' => 'Equipos Médicos',
+        ]);
+    }
+
+    public function test_dashboard_provides_clients_with_category_for_filtering(): void
+    {
+        $user = User::factory()->create();
+        Client::create([
+            'type' => 'empresa',
+            'category' => 'Equipos Médicos',
+            'name' => 'Clínica Especializada S.A.',
+            'tax_id' => 'J-77889900-1',
+            'phone' => '+58 414 999 0011',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->get('/');
+        $response->assertStatus(200);
+
+        $props = $response->viewData('page')['props'];
+        $this->assertArrayHasKey('clients', $props);
+
+        $medicalClient = collect($props['clients'])->firstWhere('tax_id', 'J-77889900-1');
+        $this->assertNotNull($medicalClient);
+        $this->assertEquals('Equipos Médicos', $medicalClient['category']);
+    }
+
+    public function test_user_can_create_custom_client_category(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/client-categories', [
+            'name' => 'Ferretería Industrial',
+            'description' => 'Tornillería, herramientas pesadas y discos de corte',
+            'icon' => '🔧',
+            'color' => 'rose',
+        ]);
+
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('client_categories', [
+            'name' => 'Ferretería Industrial',
+            'icon' => '🔧',
+            'color' => 'rose',
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_updating_client_category_name_synchronizes_associated_clients(): void
+    {
+        $user = User::factory()->create();
+
+        $cat = ClientCategory::create([
+            'name' => 'Repuestos Marinos',
+            'description' => 'Motores fuera de borda',
+            'icon' => '⚓',
+            'color' => 'indigo',
+            'is_active' => true,
+        ]);
+
+        $client = Client::create([
+            'type' => 'empresa',
+            'category' => 'Repuestos Marinos',
+            'name' => 'Marina del Este C.A.',
+            'tax_id' => 'J-12998877-2',
+            'phone' => '+58 414 123 4567',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->put("/client-categories/{$cat->id}", [
+            'name' => 'Náutica y Repuestos Marinos',
+            'description' => 'Motores y hélices',
+            'icon' => '🛥️',
+            'color' => 'sky',
+        ]);
+
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('client_categories', [
+            'id' => $cat->id,
+            'name' => 'Náutica y Repuestos Marinos',
+            'icon' => '🛥️',
+        ]);
+
+        // Verificar que el cliente actualizó su rubro automáticamente
+        $this->assertDatabaseHas('clients', [
+            'id' => $client->id,
+            'category' => 'Náutica y Repuestos Marinos',
+        ]);
+    }
+
+    public function test_deleting_client_category_reassigns_clients_to_comercial_general(): void
+    {
+        $user = User::factory()->create();
+
+        $cat = ClientCategory::create([
+            'name' => 'Sección Temporal',
+            'icon' => '📦',
+            'color' => 'purple',
+            'is_active' => true,
+        ]);
+
+        $client = Client::create([
+            'type' => 'persona',
+            'category' => 'Sección Temporal',
+            'name' => 'Cliente Con Rubro Temporal',
+            'tax_id' => 'V-99887766',
+            'phone' => '+58 412 999 8877',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->delete("/client-categories/{$cat->id}");
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('client_categories', [
+            'id' => $cat->id,
+        ]);
+
+        // El cliente debe haber sido reasignado de manera segura a Comercial General
+        $this->assertDatabaseHas('clients', [
+            'id' => $client->id,
+            'category' => 'Comercial General',
+        ]);
+    }
+
+    public function test_client_creation_with_new_category_auto_registers_in_client_categories(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post('/clients', [
+            'type' => 'empresa',
+            'category' => 'Energía Solar y Baterías',
+            'name' => 'Solar Power Venezuela C.A.',
+            'tax_id' => 'J-44332211-0',
+            'phone' => '+58 414 000 8899',
+        ])->assertSessionHas('success');
+
+        $this->assertDatabaseHas('clients', [
+            'tax_id' => 'J-44332211-0',
+            'category' => 'Energía Solar y Baterías',
+        ]);
+
+        // La categoría debió haberse registrado en la tabla client_categories
+        $this->assertDatabaseHas('client_categories', [
+            'name' => 'Energía Solar y Baterías',
+        ]);
+    }
+
+    public function test_dashboard_provides_client_categories_collection(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/');
+        $response->assertStatus(200);
+
+        $props = $response->viewData('page')['props'];
+        $this->assertArrayHasKey('clientCategories', $props);
+        $this->assertNotEmpty($props['clientCategories']);
     }
 }
 

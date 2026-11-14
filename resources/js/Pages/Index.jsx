@@ -29,6 +29,7 @@ import { FeedbackProvider, useFeedback } from '../Contexts/FeedbackContext';
 // Modales Modulares
 import CompanyModal from '../Components/Modals/CompanyModal';
 import ClientModal from '../Components/Modals/ClientModal';
+import ClientCategoryModal from '../Components/Modals/ClientCategoryModal';
 import ProductModal from '../Components/Modals/ProductModal';
 import ProductPickerModal from '../Components/Modals/ProductPickerModal';
 import InvoicePaymentsModal from '../Components/Modals/InvoicePaymentsModal';
@@ -38,6 +39,7 @@ import InvoiceAuditModal from '../Components/Modals/InvoiceAuditModal';
 function IndexContent({
     companies = [],
     clients = [],
+    clientCategories = [],
     invoices = [],
     products = [],
     stats = {},
@@ -125,6 +127,7 @@ function IndexContent({
     // Modales de creación / edición / reportes / auditoría
     const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+    const [isClientCategoryModalOpen, setIsClientCategoryModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [auditModalInvoiceId, setAuditModalInvoiceId] = useState(null);
 
@@ -550,7 +553,7 @@ function IndexContent({
         setEditingClient(null);
         setCneAlert(null);
         setNewClient({
-            type: 'persona', nacionalidad: 'V', cedulaNumber: '', tax_id: '',
+            type: 'persona', category: 'General', nacionalidad: 'V', cedulaNumber: '', tax_id: '',
             name: '', phone: '', phone_secondary: '', email: '', address: '',
             contact_person: '', notes: ''
         });
@@ -569,6 +572,7 @@ function IndexContent({
         }
         setNewClient({
             type: client.type || 'persona',
+            category: client.category || 'General',
             nacionalidad: nac,
             cedulaNumber: num,
             tax_id: client.tax_id || '',
@@ -637,6 +641,7 @@ function IndexContent({
 
         const payload = {
             type: newClient.type,
+            category: newClient.category || 'General',
             name: newClient.name,
             tax_id: newClient.tax_id,
             phone: newClient.phone,
@@ -670,7 +675,7 @@ function IndexContent({
                     setIsClientModalOpen(false);
                     setCneAlert(null);
                     setNewClient({
-                        type: 'persona', nacionalidad: 'V', cedulaNumber: '', tax_id: '',
+                        type: 'persona', category: 'General', nacionalidad: 'V', cedulaNumber: '', tax_id: '',
                         name: '', phone: '', phone_secondary: '', email: '', address: '',
                         contact_person: '', notes: ''
                     });
@@ -959,6 +964,7 @@ function IndexContent({
                     <DirectoryView
                         companies={companies}
                         clients={clients}
+                        clientCategories={clientCategories}
                         searchQuery={searchQuery}
                         directorySection={directorySection}
                         setDirectorySection={setDirectorySection}
@@ -972,6 +978,7 @@ function IndexContent({
                         onOpenEditCompany={handleOpenEditCompany}
                         onOpenCreateClient={handleOpenCreateClient}
                         onOpenEditClient={handleOpenEditClient}
+                        onOpenClientCategoryManager={() => setIsClientCategoryModalOpen(true)}
                     />
                 )}
 
@@ -991,6 +998,7 @@ function IndexContent({
                     <GeneratorView
                         companies={companies}
                         clients={clients}
+                        clientCategories={clientCategories}
                         products={products}
                         activeCompany={activeCompany}
                         selectedCompanyId={selectedCompanyId}
@@ -1018,6 +1026,7 @@ function IndexContent({
                         isSubmittingInvoice={isSubmittingInvoice}
                         handlePrintDocument={handlePrintDocument}
                         onOpenCreateClient={handleOpenCreateClient}
+                        onOpenClientCategoryManager={() => setIsClientCategoryModalOpen(true)}
                         onOpenProductPicker={() => setIsProductPickerOpen(true)}
                         onQuickSaveToCatalog={handleQuickSaveToCatalog}
                         setCurrentView={setCurrentView}
@@ -1056,11 +1065,21 @@ function IndexContent({
                 editingClient={editingClient}
                 newClient={newClient}
                 setNewClient={setNewClient}
+                clientCategories={clientCategories}
+                onOpenClientCategoryManager={() => setIsClientCategoryModalOpen(true)}
                 onSubmit={handleSubmitClient}
                 isSavingClient={isSavingClient}
                 isConsultingCne={isConsultingCne}
                 handleConsultCne={handleConsultCne}
                 cneAlert={cneAlert}
+            />
+
+            {/* MODAL 2.5: GESTIONAR SECCIONES Y RUBROS DE CLIENTES */}
+            <ClientCategoryModal
+                isOpen={isClientCategoryModalOpen}
+                onClose={() => setIsClientCategoryModalOpen(false)}
+                clientCategories={clientCategories}
+                clients={clients}
             />
 
             {/* MODAL 3: REGISTRAR / EDITAR PRODUCTO */}
