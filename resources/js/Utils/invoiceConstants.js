@@ -171,6 +171,8 @@ export const getEmptyInvoice = (company, companies = []) => ({
     sales_channel: 'Oficina / Presencial',
     bcv_exchange_rate: 876.80,
     show_bs_conversion: true,
+    show_totals: true,
+    show_suggested_price: false,
     show_item_images: true,
     currency: 'USD',
     payment_method: 'PAGO MOVIL',
@@ -192,7 +194,7 @@ export const getEmptyInvoice = (company, companies = []) => ({
     company_social_handle: '',
     technical_specs: defaultTechnicalSpecs.map(s => ({ ...s })),
     items: [
-        { product_id: null, description: '', details: '', quantity: 1, unit: 'unid', unit_price: '', is_tax_exempt: false, image_url: null, show_image: true }
+        { product_id: null, description: '', details: '', quantity: 1, unit: 'unid', unit_price: '', suggested_price: '', is_tax_exempt: false, image_url: null, show_image: true }
     ]
 });
 

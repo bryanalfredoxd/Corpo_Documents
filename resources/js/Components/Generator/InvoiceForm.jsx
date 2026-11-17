@@ -27,7 +27,8 @@ import {
     X,
     User,
     Tag,
-    Settings2
+    Settings2,
+    Calculator
 } from 'lucide-react';
 import { getDocumentTypeInfo, CLIENT_CATEGORIES, getClientCategoryBadge } from '../../Utils/invoiceConstants';
 import { compressImageToDataUrl } from '../../Utils/imageCompression';
@@ -452,6 +453,95 @@ export default function InvoiceForm({
                     )}
                 </div>
 
+                {/* Sumatoria y Totales del Documento (Solicitud de consignación del jefe) */}
+                <div className="bg-white p-2.5 rounded-lg border border-slate-300 space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                            <Calculator className="w-3.5 h-3.5 text-indigo-700" />
+                            <span>Sumatoria de Totales en el Documento (PDF):</span>
+                        </label>
+                        <span className="text-[10px] font-bold text-slate-500">
+                            {invoiceForm.show_totals !== false ? 'Modo Estándar' : 'Modo Consignación'}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setInvoiceForm(prev => ({ ...prev, show_totals: true }))}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                                invoiceForm.show_totals !== false
+                                    ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                            }`}
+                        >
+                            <span>✓ Con Sumatoria Total</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setInvoiceForm(prev => ({ ...prev, show_totals: false }))}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                                invoiceForm.show_totals === false
+                                    ? 'bg-amber-700 text-white border-amber-800 shadow-2xs'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                            }`}
+                        >
+                            <span>🚫 Sin Sumatoria (Consignación)</span>
+                        </button>
+                    </div>
+                    {invoiceForm.show_totals === false && (
+                        <p className="text-[10px] font-bold text-amber-900 bg-amber-50 px-2 py-1 rounded border border-amber-300">
+                            ✓ Modo Consignación activo: El PDF mostrará los productos con sus precios sugeridos, pero no sumará ni reflejará un monto total al pie.
+                        </p>
+                    )}
+                </div>
+
+                {/* Control de Precio Sugerido en el PDF */}
+                <div className="bg-white p-2.5 rounded-lg border border-slate-300 space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                            <Tag className="w-3.5 h-3.5 text-red-600" />
+                            <span>Precio Sugerido (PVP) en el Documento (PDF):</span>
+                        </label>
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                            invoiceForm.show_suggested_price
+                                ? 'bg-red-100 text-red-800 border border-red-300'
+                                : 'bg-slate-100 text-slate-600 border border-slate-300'
+                        }`}>
+                            {invoiceForm.show_suggested_price ? 'Visible al Cliente' : 'Oculto al Cliente'}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setInvoiceForm(prev => ({ ...prev, show_suggested_price: false }))}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                                !invoiceForm.show_suggested_price
+                                    ? 'bg-slate-800 text-white border-slate-900 shadow-2xs'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                            }`}
+                        >
+                            <span>🔒 Ocultar (Factura Fiscal)</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setInvoiceForm(prev => ({ ...prev, show_suggested_price: true }))}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                                invoiceForm.show_suggested_price
+                                    ? 'bg-red-700 text-white border-red-800 shadow-2xs'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                            }`}
+                        >
+                            <span>🏷️ Mostrar PVP (Consignación)</span>
+                        </button>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium">
+                        {invoiceForm.show_suggested_price
+                            ? '✓ El cliente verá el Precio Sugerido en el PDF (ideal para entregas a consignación o listas de distribuidores).'
+                            : '✓ En Facturas Fiscales normales el cliente solo ve el precio final de venta acordado sin precios sugeridos.'
+                        }
+                    </p>
+                </div>
+
                 {/* Fecha y Tasa BS */}
                 <div className="grid grid-cols-2 gap-3">
                     <div className="min-w-0">
@@ -534,7 +624,19 @@ export default function InvoiceForm({
                                 <button
                                     key={pill.val}
                                     type="button"
-                                    onClick={() => setInvoiceForm(prev => ({ ...prev, sale_condition: pill.val }))}
+                                    onClick={() => {
+                                        const isConsign = pill.val.toLowerCase().includes('consign');
+                                        setInvoiceForm(prev => ({
+                                            ...prev,
+                                            sale_condition: pill.val,
+                                            ...(isConsign
+                                                ? { show_totals: false, show_suggested_price: true }
+                                                : (prev.document_type === 'factura'
+                                                    ? { show_totals: true, show_suggested_price: false }
+                                                    : {})
+                                            )
+                                        }));
+                                    }}
                                     className={`text-[10px] font-black px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
                                         invoiceForm.sale_condition === pill.val
                                             ? 'bg-blue-700 text-white border-blue-700 shadow-2xs'
@@ -925,14 +1027,15 @@ export default function InvoiceForm({
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-black">
-                                <div>
-                                    <span className="text-black block mb-0.5 text-[11px]">Cant.</span>
-                                    <div className="flex items-center border border-slate-300 rounded-md bg-white overflow-hidden h-8">
+                            {/* Fila A: Cantidad, Unidad y Total del Renglón */}
+                            <div className="grid grid-cols-12 gap-2 text-xs font-black items-end">
+                                <div className="col-span-5 sm:col-span-4">
+                                    <span className="text-slate-800 block mb-1 text-[11px] font-bold">Cantidad</span>
+                                    <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden h-8.5 shadow-2xs">
                                         <button
                                             type="button"
                                             onClick={() => handleItemChange(idx, 'quantity', Math.max(1, Number(it.quantity || 1) - 1))}
-                                            className="px-2 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
+                                            className="px-2.5 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
                                         >
                                             -
                                         </button>
@@ -947,44 +1050,104 @@ export default function InvoiceForm({
                                         <button
                                             type="button"
                                             onClick={() => handleItemChange(idx, 'quantity', Number(it.quantity || 0) + 1)}
-                                            className="px-2 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
+                                            className="px-2.5 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
                                         >
                                             +
                                         </button>
                                     </div>
                                 </div>
 
-                                <div>
-                                    <span className="text-black block mb-0.5 text-[11px]">Unidad</span>
+                                <div className="col-span-3 sm:col-span-3">
+                                    <span className="text-slate-800 block mb-1 text-[11px] font-bold">Unidad</span>
                                     <input
                                         type="text"
                                         value={it.unit}
                                         placeholder="unid"
                                         onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
-                                        className="h-8 w-full bg-white border border-slate-300 rounded-md px-2 text-center font-mono font-black text-xs"
+                                        className="h-8.5 w-full bg-white border border-slate-300 rounded-lg px-2 text-center font-mono font-bold text-xs shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-600"
                                     />
                                 </div>
 
-                                <div>
-                                    <span className="text-black block mb-0.5 text-[11px]">P. Unit ($)</span>
+                                <div className="col-span-4 sm:col-span-5">
+                                    <span className="text-slate-800 block mb-1 text-[11px] font-bold truncate">
+                                        {invoiceForm.show_totals !== false ? 'Total Renglón ($)' : 'Modalidad'}
+                                    </span>
+                                    {invoiceForm.show_totals !== false ? (
+                                        <div className="h-8.5 flex items-center justify-end px-3 bg-blue-50 border border-blue-200 rounded-lg font-mono font-black text-blue-900 text-xs shadow-2xs">
+                                            ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
+                                        </div>
+                                    ) : (
+                                        <div className="h-8.5 flex items-center justify-center px-2 bg-amber-50 border border-amber-300 rounded-lg font-sans font-bold text-amber-900 text-xs text-center shadow-2xs" title="Modo consignación activo: sin sumatoria acumulada en el pie">
+                                            Consignación
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Fila B: Estructura de Precios (Precio Base y PVP Sugerido) */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                                {/* 1. Precio Base / Unitario */}
+                                <div className="p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs space-y-1.5">
+                                    <div className="flex items-center justify-between gap-1">
+                                        <span className="text-[11px] font-black text-slate-800 whitespace-nowrap">
+                                            Precio Base ($) *
+                                        </span>
+                                        {it.suggested_price && Number(it.suggested_price) > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleItemChange(idx, 'unit_price', Number(it.suggested_price))}
+                                                className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors whitespace-nowrap"
+                                                title="Copiar el Precio Sugerido como Precio Unitario"
+                                            >
+                                                ← Copiar Sugerido
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="relative">
-                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">$</span>
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">$</span>
                                         <input
                                             type="number"
                                             step="0.01"
                                             required
+                                            placeholder="0.00"
                                             value={it.unit_price}
                                             onChange={(e) => handleItemChange(idx, 'unit_price', e.target.value)}
-                                            className="h-8 w-full bg-white border border-slate-300 rounded-md pl-5 pr-2 text-right font-mono font-black text-xs text-black"
+                                            className="h-8.5 w-full bg-slate-50/50 border border-slate-300 rounded-md pl-6 pr-2.5 text-right font-mono font-black text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
                                         />
                                     </div>
+                                    <span className="text-[10px] font-medium text-slate-500 block">
+                                        Precio unitario de venta/costo.
+                                    </span>
                                 </div>
 
-                                <div>
-                                    <span className="text-black block mb-0.5 text-[11px]">Total ($)</span>
-                                    <div className="h-8 flex items-center justify-end px-2 bg-blue-50 border border-blue-200 rounded-md font-mono font-black text-blue-900 text-xs">
-                                        ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
+                                {/* 2. Precio Sugerido de Venta al Público (PVP) */}
+                                <div className="p-2.5 bg-red-50/50 rounded-lg border border-red-200 shadow-2xs space-y-1.5">
+                                    <div className="flex items-center justify-between gap-1">
+                                        <span className="text-[11px] font-black text-red-700 flex items-center gap-1 whitespace-nowrap">
+                                            <Tag className="w-3 h-3 text-red-600 shrink-0" />
+                                            <span>PVP Sugerido ($)</span>
+                                        </span>
+                                        <span className="text-[9px] font-bold text-red-700 bg-red-100/80 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                                            Venta Público
+                                        </span>
                                     </div>
+                                    <div className="relative">
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-red-600">$</span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="Opcional (Ej: 1100.00)"
+                                            value={it.suggested_price || ''}
+                                            onChange={(e) => handleItemChange(idx, 'suggested_price', e.target.value)}
+                                            className="h-8.5 w-full bg-white border border-red-300 rounded-md pl-6 pr-2.5 text-right font-mono font-black text-xs text-red-700 placeholder:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                            title="Precio de venta sugerido al público / cliente final"
+                                        />
+                                    </div>
+                                    <span className="text-[10px] font-medium text-red-700 block">
+                                        {invoiceForm.show_suggested_price
+                                            ? '✓ Se reflejará en el PDF al cliente'
+                                            : 'Oculto en PDF (activo solo en consignación)'}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -1330,28 +1493,44 @@ export default function InvoiceForm({
                 </div>
 
                 {/* Banner de Gran Total */}
-                <div className="p-4 bg-slate-900 text-white rounded-xl space-y-1.5 shadow-sm">
+                <div className={`p-4 rounded-xl space-y-1.5 shadow-sm ${
+                    invoiceForm.show_totals !== false
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-amber-950 text-amber-100 border-2 border-amber-600'
+                }`}>
                     <div className="flex justify-between items-baseline">
-                        <span className="text-xs font-black uppercase text-slate-300 tracking-wider">
-                            TOTAL FACTURA (USD)
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-300">
+                            {invoiceForm.show_totals !== false ? 'TOTAL FACTURA (USD)' : 'MODO SIN SUMATORIA (CONSIGNACIÓN)'}
                         </span>
-                        <span className="text-2xl font-mono font-black text-emerald-400">
-                            ${totalUsd.toFixed(2)}
-                        </span>
+                        {invoiceForm.show_totals !== false ? (
+                            <span className="text-2xl font-mono font-black text-emerald-400">
+                                ${totalUsd.toFixed(2)}
+                            </span>
+                        ) : (
+                            <span className="text-xs font-black text-amber-300 uppercase bg-amber-900/80 px-2 py-0.5 rounded border border-amber-600">
+                                Precios unitarios / PVP en PDF
+                            </span>
+                        )}
                     </div>
-                    {invoiceForm.show_bs_conversion !== false ? (
-                        <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-700 text-xs">
-                            <span className="font-bold text-slate-300">Total en Bolívares (VES):</span>
-                            <span className="font-mono font-black text-white text-base">
-                                Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                            </span>
-                        </div>
+                    {invoiceForm.show_totals !== false ? (
+                        invoiceForm.show_bs_conversion !== false ? (
+                            <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-700 text-xs">
+                                <span className="font-bold text-slate-300">Total en Bolívares (VES):</span>
+                                <span className="font-mono font-black text-white text-base">
+                                    Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        ) : (
+                            <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-700 text-xs">
+                                <span className="font-bold text-slate-400">Régimen:</span>
+                                <span className="font-mono font-black text-emerald-400 text-xs uppercase tracking-wide">
+                                    SOLO DÓLARES (USD)
+                                </span>
+                            </div>
+                        )
                     ) : (
-                        <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-700 text-xs">
-                            <span className="font-bold text-slate-400">Régimen:</span>
-                            <span className="font-mono font-black text-emerald-400 text-xs uppercase tracking-wide">
-                                SOLO DÓLARES (USD)
-                            </span>
+                        <div className="pt-1.5 border-t border-amber-800 text-[11px] text-amber-200">
+                            ✓ No se mostrará sumatoria ni monto acumulado total al pie del documento. Los clientes verán los precios referenciales individuales por renglón.
                         </div>
                     )}
                 </div>

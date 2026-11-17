@@ -313,8 +313,8 @@
                 <th style="width: 5%; text-align: center;">#</th>
                 <th style="width: 47%;">DESCRIPCIÓN DEL PRODUCTO</th>
                 <th style="width: 14%; text-align: center;">CANT.</th>
-                <th style="width: 17%; text-align: right;">PRECIO UNIT. ($)</th>
-                <th style="width: 17%; text-align: right;">TOTAL ($)</th>
+                <th style="width: 17%; text-align: right;">{{ $showTotals ? 'PRECIO UNIT. ($)' : 'PRECIO BASE ($)' }}</th>
+                <th style="width: 17%; text-align: right;">{{ $showTotals ? 'TOTAL ($)' : (!empty($showSuggestedPrice) ? 'PVP SUGERIDO ($)' : 'MODALIDAD') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -334,6 +334,11 @@
                                     @if(!empty($item['details']))
                                         <div style="font-size: 7.8pt; color: #475569; margin-top: 2px;">{!! nl2br(e($item['details'])) !!}</div>
                                     @endif
+                                    @if($showTotals && !empty($showSuggestedPrice) && !empty($item['suggested_price']) && (float) $item['suggested_price'] > 0)
+                                        <div style="font-size: 7.8pt; color: #dc2626; font-weight: bold; margin-top: 2px;">
+                                            PVP Sugerido: ${{ number_format((float) $item['suggested_price'], 2, '.', '') }}
+                                        </div>
+                                    @endif
                                 </td>
                             </tr>
                         </table>
@@ -348,9 +353,19 @@
                         @endif
                     </td>
                     <td class="mono" style="text-align: right; font-weight: bold; color: #020617;">
-                        ${{ number_format($item['total'], 2, '.', '') }}
-                        @if($item['is_tax_exempt'])
-                            <span style="font-size: 7pt; color: #1e3a8a; font-weight: bold;">(E)</span>
+                        @if($showTotals)
+                            ${{ number_format($item['total'], 2, '.', '') }}
+                            @if($item['is_tax_exempt'])
+                                <span style="font-size: 7pt; color: #1e3a8a; font-weight: bold;">(E)</span>
+                            @endif
+                        @else
+                            @if(!empty($showSuggestedPrice) && !empty($item['suggested_price']) && (float) $item['suggested_price'] > 0)
+                                <span style="color: #dc2626; font-weight: bold;">${{ number_format((float) $item['suggested_price'], 2, '.', '') }}</span>
+                            @elseif(empty($showSuggestedPrice))
+                                <span style="font-size: 7.5pt; color: #0f766e; font-weight: bold;">CONSIGNACIÓN</span>
+                            @else
+                                <span style="color: #64748b; font-weight: normal;">—</span>
+                            @endif
                         @endif
                     </td>
                 </tr>
@@ -380,40 +395,47 @@
                 @endif
             </td>
             <td style="width: 50%; vertical-align: top; padding-left: 16px;">
-                <table>
-                    <tr class="totals-row">
-                        <td style="font-weight: bold; color: #334155;">Subtotal:</td>
-                        <td class="mono" style="text-align: right; font-weight: bold;">${{ number_format((float) $invoice->subtotal, 2, '.', '') }}</td>
-                    </tr>
-                    @if((float) $invoice->shipping_cost > 0)
+                @if($showTotals)
+                    <table>
                         <tr class="totals-row">
-                            <td style="font-weight: bold; color: #334155;">Flete / Delivery:</td>
-                            <td class="mono" style="text-align: right; font-weight: bold;">${{ number_format((float) $invoice->shipping_cost, 2, '.', '') }}</td>
+                            <td style="font-weight: bold; color: #334155;">Subtotal:</td>
+                            <td class="mono" style="text-align: right; font-weight: bold;">${{ number_format((float) $invoice->subtotal, 2, '.', '') }}</td>
                         </tr>
-                    @endif
-                    @if((float) $invoice->discount > 0)
-                        <tr class="totals-row" style="color: #065f46;">
-                            <td style="font-weight: bold;">Descuento:</td>
-                            <td class="mono" style="text-align: right; font-weight: bold;">-${{ number_format((float) $invoice->discount, 2, '.', '') }}</td>
+                        @if((float) $invoice->shipping_cost > 0)
+                            <tr class="totals-row">
+                                <td style="font-weight: bold; color: #334155;">Flete / Delivery:</td>
+                                <td class="mono" style="text-align: right; font-weight: bold;">${{ number_format((float) $invoice->shipping_cost, 2, '.', '') }}</td>
+                            </tr>
+                        @endif
+                        @if((float) $invoice->discount > 0)
+                            <tr class="totals-row" style="color: #065f46;">
+                                <td style="font-weight: bold;">Descuento:</td>
+                                <td class="mono" style="text-align: right; font-weight: bold;">-${{ number_format((float) $invoice->discount, 2, '.', '') }}</td>
+                            </tr>
+                        @endif
+                        <tr class="totals-row totals-iva">
+                            <td style="font-weight: bold; color: #334155;">
+                                {{ (float) $invoice->tax_percentage === 0.0 ? 'IVA (0% Exento / Neto):' : 'IVA (' . number_format((float) $invoice->tax_percentage, 0) . '%):' }}
+                            </td>
+                            <td class="mono" style="text-align: right; font-weight: bold;">${{ number_format((float) $invoice->tax_amount, 2, '.', '') }}</td>
                         </tr>
-                    @endif
-                    <tr class="totals-row totals-iva">
-                        <td style="font-weight: bold; color: #334155;">
-                            {{ (float) $invoice->tax_percentage === 0.0 ? 'IVA (0% Exento / Neto):' : 'IVA (' . number_format((float) $invoice->tax_percentage, 0) . '%):' }}
-                        </td>
-                        <td class="mono" style="text-align: right; font-weight: bold;">${{ number_format((float) $invoice->tax_amount, 2, '.', '') }}</td>
-                    </tr>
-                    <tr class="totals-final">
-                        <td>TOTAL USD:</td>
-                        <td class="mono" style="text-align: right;">${{ number_format((float) $invoice->total_usd, 2, '.', '') }}</td>
-                    </tr>
-                    @if($showBsConversion)
-                        <tr class="totals-ves">
-                            <td style="color: #334155;">TOTAL VES:</td>
-                            <td class="mono" style="text-align: right;">Bs. {{ number_format((float) $invoice->total_ves, 2, ',', '.') }}</td>
+                        <tr class="totals-final">
+                            <td>TOTAL USD:</td>
+                            <td class="mono" style="text-align: right;">${{ number_format((float) $invoice->total_usd, 2, '.', '') }}</td>
                         </tr>
-                    @endif
-                </table>
+                        @if($showBsConversion)
+                            <tr class="totals-ves">
+                                <td style="color: #334155;">TOTAL VES:</td>
+                                <td class="mono" style="text-align: right;">Bs. {{ number_format((float) $invoice->total_ves, 2, ',', '.') }}</td>
+                            </tr>
+                        @endif
+                    </table>
+                @else
+                    <div style="border: 1px dashed #cbd5e1; border-radius: 4px; padding: 10px 12px; background-color: #f8fafc; font-size: 8pt; color: #475569;">
+                        <strong style="color: #0f172a; text-transform: uppercase; display: block; margin-bottom: 3px;">Documento sin sumatoria final</strong>
+                        Control de mercancía o equipos por renglón / consignación con precios referenciales individuales sin liquidación acumulada al pie.
+                    </div>
+                @endif
             </td>
         </tr>
     </table>

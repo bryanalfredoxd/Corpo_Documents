@@ -230,52 +230,66 @@ export default function PdfTemplateModern({
                                             <img src={it.image_url} alt="" className="max-h-full max-w-full object-contain rounded" />
                                         </div>
                                     )}
-                                    <span className="font-medium text-slate-800">
-                                        {it.description || 'Equipo (FOB China)'} {it.quantity > 1 ? `(${it.quantity} ${it.unit})` : ''}
-                                    </span>
+                                    <div>
+                                        <span className="font-medium text-slate-800">
+                                            {it.description || 'Equipo (FOB China)'} {it.quantity > 1 ? `(${it.quantity} ${it.unit})` : ''}
+                                        </span>
+                                        {Boolean(invoiceForm.show_suggested_price) && it.suggested_price && Number(it.suggested_price) > 0 && (
+                                            <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.2 rounded inline-block ml-2">
+                                                PVP Sugerido: USD {Number(it.suggested_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <span className="font-mono font-bold text-slate-900">
-                                    USD {Number(it.quantity * it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    {invoiceForm.show_totals !== false
+                                        ? `USD ${Number(it.quantity * it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                        : `USD ${Number((Boolean(invoiceForm.show_suggested_price) && it.suggested_price) ? it.suggested_price : it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                    }
                                 </span>
                             </div>
                         ))}
-                        {Number(invoiceForm.shipping_cost || 0) > 0 && (
-                            <div className="flex justify-between px-3 py-2 border-b border-slate-200 bg-[#F4F5F7]">
-                                <span className="font-medium text-slate-800">Flete y seguro internacional</span>
-                                <span className="font-mono font-bold text-slate-900">
-                                    USD {Number(invoiceForm.shipping_cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                        )}
-                        <div className="flex justify-between px-3 py-2 border-b border-slate-200">
-                            <span className="font-medium text-slate-800">Nacionalización, aranceles y aduana en Venezuela</span>
-                            <span className="font-mono font-bold text-slate-900">
-                                {invoiceForm.customs_text || (taxAmount > 0 ? `USD ${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'INCLUIDO')}
-                            </span>
-                        </div>
-                        {Number(invoiceForm.discount || 0) > 0 && (
-                            <div className="flex justify-between px-3 py-2 border-b border-slate-200 bg-emerald-50/70 text-emerald-800">
-                                <span className="font-bold">Descuento comercial aplicado</span>
-                                <span className="font-mono font-bold">
-                                    -USD {Number(invoiceForm.discount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                        )}
+                        {invoiceForm.show_totals !== false && (
+                            <>
+                                {Number(invoiceForm.shipping_cost || 0) > 0 && (
+                                    <div className="flex justify-between px-3 py-2 border-b border-slate-200 bg-[#F4F5F7]">
+                                        <span className="font-medium text-slate-800">Flete y seguro internacional</span>
+                                        <span className="font-mono font-bold text-slate-900">
+                                            USD {Number(invoiceForm.shipping_cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between px-3 py-2 border-b border-slate-200">
+                                    <span className="font-medium text-slate-800">Nacionalización, aranceles y aduana en Venezuela</span>
+                                    <span className="font-mono font-bold text-slate-900">
+                                        {invoiceForm.customs_text || (taxAmount > 0 ? `USD ${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'INCLUIDO')}
+                                    </span>
+                                </div>
+                                {Number(invoiceForm.discount || 0) > 0 && (
+                                    <div className="flex justify-between px-3 py-2 border-b border-slate-200 bg-emerald-50/70 text-emerald-800">
+                                        <span className="font-bold">Descuento comercial aplicado</span>
+                                        <span className="font-mono font-bold">
+                                            -USD {Number(invoiceForm.discount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                )}
 
-                        {/* Fila Total DDP en Navy Blue */}
-                        <div className="bg-[#0E1C33] text-white px-3 py-2.5 flex justify-between items-center font-black text-xs uppercase tracking-wide">
-                            <span>TOTAL DDP — Puesto en destino, Venezuela</span>
-                            <span className="font-mono text-base text-white">
-                                USD {totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </span>
-                        </div>
-                        {invoiceForm.show_bs_conversion !== false && (
-                            <div className="bg-slate-100 text-[#0E1C33] px-3 py-1.5 flex justify-between items-center text-[11px] font-bold border-t border-slate-300">
-                                <span>Equivalente en Bolívares (Tasa Bs. {Number(invoiceForm.bcv_exchange_rate || 0).toFixed(2)}):</span>
-                                <span className="font-mono font-black">
-                                    TOTAL VES: Bs. {Number(totalVes || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                </span>
-                            </div>
+                                {/* Fila Total DDP en Navy Blue */}
+                                <div className="bg-[#0E1C33] text-white px-3 py-2.5 flex justify-between items-center font-black text-xs uppercase tracking-wide">
+                                    <span>TOTAL DDP — Puesto en destino, Venezuela</span>
+                                    <span className="font-mono text-base text-white">
+                                        USD {totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                                {invoiceForm.show_bs_conversion !== false && (
+                                    <div className="bg-slate-100 text-[#0E1C33] px-3 py-1.5 flex justify-between items-center text-[11px] font-bold border-t border-slate-300">
+                                        <span>Equivalente en Bolívares (Tasa Bs. {Number(invoiceForm.bcv_exchange_rate || 0).toFixed(2)}):</span>
+                                        <span className="font-mono font-black">
+                                            TOTAL VES: Bs. {Number(totalVes || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
@@ -293,24 +307,32 @@ export default function PdfTemplateModern({
                                 {invoiceForm.payment_reference ? ` (Ref: ${invoiceForm.payment_reference})` : ''}
                             </span>
                         </div>
-                        <div className="grid grid-cols-12 px-3 py-2.5 border-b border-slate-200 bg-white items-center">
-                            <div className="col-span-2 font-black text-sm text-[#0E1C33]">{invoiceForm.payment_milestone_1_pct || 70}%</div>
-                            <div className="col-span-10 text-slate-800">
-                                <span className="font-mono font-black text-black">
-                                    USD {(totalUsd * (Number(invoiceForm.payment_milestone_1_pct || 70) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </span>{' '}
-                                — {invoiceForm.payment_milestone_1_text || 'Al momento de firmar el contrato, para iniciar la verificación, compra del equipo y proceso de envío.'}
+                        {invoiceForm.show_totals !== false ? (
+                            <>
+                                <div className="grid grid-cols-12 px-3 py-2.5 border-b border-slate-200 bg-white items-center">
+                                    <div className="col-span-2 font-black text-sm text-[#0E1C33]">{invoiceForm.payment_milestone_1_pct || 70}%</div>
+                                    <div className="col-span-10 text-slate-800">
+                                        <span className="font-mono font-black text-black">
+                                            USD {(totalUsd * (Number(invoiceForm.payment_milestone_1_pct || 70) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </span>{' '}
+                                        — {invoiceForm.payment_milestone_1_text || 'Al momento de firmar el contrato, para iniciar la verificación, compra del equipo y proceso de envío.'}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-12 px-3 py-2.5 bg-[#F4F5F7] items-center">
+                                    <div className="col-span-2 font-black text-sm text-[#0E1C33]">{invoiceForm.payment_milestone_2_pct || 30}%</div>
+                                    <div className="col-span-10 text-slate-800">
+                                        <span className="font-mono font-black text-black">
+                                            USD {(totalUsd * (Number(invoiceForm.payment_milestone_2_pct || 30) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </span>{' '}
+                                        — {invoiceForm.payment_milestone_2_text || '15 días antes de la llegada del equipo al puerto de destino en Venezuela.'}
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="p-2.5 bg-slate-50 text-[11px] text-slate-600">
+                                Precios unitarios y sugeridos individuales por equipo sin porcentaje de anticipo calculado sobre un total global.
                             </div>
-                        </div>
-                        <div className="grid grid-cols-12 px-3 py-2.5 bg-[#F4F5F7] items-center">
-                            <div className="col-span-2 font-black text-sm text-[#0E1C33]">{invoiceForm.payment_milestone_2_pct || 30}%</div>
-                            <div className="col-span-10 text-slate-800">
-                                <span className="font-mono font-black text-black">
-                                    USD {(totalUsd * (Number(invoiceForm.payment_milestone_2_pct || 30) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </span>{' '}
-                                — {invoiceForm.payment_milestone_2_text || '15 días antes de la llegada del equipo al puerto de destino en Venezuela.'}
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 

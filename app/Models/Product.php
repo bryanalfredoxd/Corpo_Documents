@@ -17,6 +17,7 @@ class Product extends Model
         'category',
         'unit',
         'unit_price',
+        'suggested_price',
         'is_tax_exempt',
         'image_url',
         'track_inventory',
@@ -28,6 +29,7 @@ class Product extends Model
 
     protected $casts = [
         'unit_price' => 'decimal:2',
+        'suggested_price' => 'decimal:2',
         'is_tax_exempt' => 'boolean',
         'track_inventory' => 'boolean',
         'stock' => 'decimal:2',

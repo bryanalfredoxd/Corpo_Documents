@@ -209,12 +209,21 @@ export default function ProductPickerModal({
 
                                     <div className="flex items-center gap-3 shrink-0">
                                         <div className="text-right">
-                                            <span className="font-mono font-black text-sm text-black block">
-                                                ${Number(prod.unit_price).toFixed(2)}
-                                            </span>
-                                            <span className="text-[10px] font-bold text-slate-500">
-                                                /{prod.unit}
-                                            </span>
+                                            <div className="flex items-baseline justify-end gap-1">
+                                                <span className="text-[10px] font-black uppercase text-slate-500">Base:</span>
+                                                <span className="font-mono font-black text-sm text-slate-900">
+                                                    ${Number(prod.unit_price).toFixed(2)}
+                                                </span>
+                                            </div>
+                                            {prod.suggested_price && Number(prod.suggested_price) > 0 ? (
+                                                <span className="text-[10px] font-mono font-black text-red-700 bg-red-50 border border-red-300 px-1.5 py-0.5 rounded block mt-0.5 whitespace-nowrap">
+                                                    PVP Sugerido: ${Number(prod.suggested_price).toFixed(2)}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] font-bold text-slate-500">
+                                                    /{prod.unit}
+                                                </span>
+                                            )}
                                         </div>
 
                                         <button

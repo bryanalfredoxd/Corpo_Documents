@@ -190,24 +190,35 @@ function IndexContent({
             let newTerms = prev.terms_conditions;
             let newTaxPercentage = prev.tax_percentage;
             let newSaleCondition = prev.sale_condition;
+            let newShowTotals = prev.show_totals;
+            let newShowSuggested = prev.show_suggested_price;
 
             if (newType === 'proforma') {
                 newValidity = 8;
                 newTaxPercentage = 0; // Boss: precio neto en China sin impuestos
                 newTerms = 'Oferta proforma con validez máxima de ocho (8) días continuos a partir de su emisión. Transcurrido este plazo, los precios, fletes y disponibilidad de los equipos o mercancía quedan sujetos a reconfirmación.';
+                newShowTotals = true;
+                newShowSuggested = false;
             } else if (newType === 'cotizacion') {
                 newValidity = 8;
                 newTaxPercentage = 0;
                 newTerms = 'Cotización comercial con validez de ocho (8) días continuos a partir de la fecha de emisión.';
+                newShowTotals = true;
+                newShowSuggested = false;
             } else if (newType === 'nota_entrega') {
                 newTaxPercentage = 0;
                 if (!newSaleCondition || newSaleCondition === 'Venta de Contado') {
                     newSaleCondition = 'Consignación';
                 }
                 newTerms = 'Nota de entrega de mercancía / equipos recibidos conforme y a entera satisfacción. Control y despacho sin efecto de facturación fiscal.';
+                newShowTotals = false; // Modo consignación: sin sumatoria obligatoria
+                newShowSuggested = true; // Modo consignación: muestra PVP sugerido al cliente
             } else if (newType === 'factura') {
                 newTaxPercentage = 16.00;
+                newSaleCondition = 'Venta de Contado';
                 newTerms = activeCompany?.default_terms || 'Comprobante fiscal oficial generado por el sistema. Para devoluciones o reclamos conserve este documento. Plazo máximo de reclamación: 3 días hábiles desde la fecha de emisión.';
+                newShowTotals = true; // Factura fiscal: sumatoria y liquidación fiscal obligatoria
+                newShowSuggested = false; // Factura fiscal: NO muestra precio sugerido al cliente
             }
 
             return {
@@ -217,6 +228,8 @@ function IndexContent({
                 terms_conditions: newTerms,
                 tax_percentage: newTaxPercentage,
                 sale_condition: newSaleCondition,
+                show_totals: newShowTotals,
+                show_suggested_price: newShowSuggested,
             };
         });
     };
@@ -268,7 +281,7 @@ function IndexContent({
     const handleAddItem = () => {
         setInvoiceForm(prev => ({
             ...prev,
-            items: [...prev.items, { product_id: null, description: '', details: '', quantity: 1, unit: 'unid', unit_price: 0, is_tax_exempt: false, image_url: null, show_image: true }]
+            items: [...prev.items, { product_id: null, description: '', details: '', quantity: 1, unit: 'unid', unit_price: '', suggested_price: '', is_tax_exempt: false, image_url: null, show_image: true }]
         }));
     };
 
@@ -384,6 +397,8 @@ function IndexContent({
             parsedSpecs = defaultTechnicalSpecs.map(s => ({ ...s }));
         }
 
+        const isConsignmentInv = (inv.document_type === 'nota_entrega' || (inv.sale_condition || '').toLowerCase().includes('consign'));
+
         setInvoiceForm({
             id: inv.id,
             correlative_number: inv.correlative_number,
@@ -402,6 +417,8 @@ function IndexContent({
             sales_channel: inv.sales_channel || 'Oficina',
             bcv_exchange_rate: Number(inv.bcv_exchange_rate || 876.80),
             show_bs_conversion: inv.show_bs_conversion !== undefined ? Boolean(inv.show_bs_conversion) : (inv.technical_specs?.show_bs_conversion !== undefined ? Boolean(inv.technical_specs.show_bs_conversion) : true),
+            show_totals: inv.technical_specs?.show_totals !== undefined ? Boolean(inv.technical_specs.show_totals) : !isConsignmentInv,
+            show_suggested_price: inv.technical_specs?.show_suggested_price !== undefined ? Boolean(inv.technical_specs.show_suggested_price) : isConsignmentInv,
             show_item_images: inv.technical_specs?.show_item_images !== undefined ? Boolean(inv.technical_specs.show_item_images) : true,
             signature_stamp: inv.signature_stamp || inv.technical_specs?.signature_stamp || 'auto',
             currency: inv.currency || 'USD',
@@ -433,6 +450,7 @@ function IndexContent({
                         quantity: Number(it.quantity),
                         unit: it.unit,
                         unit_price: Number(it.unit_price),
+                        suggested_price: it.suggested_price !== undefined && it.suggested_price !== null ? it.suggested_price : '',
                         is_tax_exempt: !!it.is_tax_exempt,
                         image_url: it.image_url || null,
                         show_image: !hiddenOrders.includes(orderNum)
@@ -698,7 +716,7 @@ function IndexContent({
     const [editingProduct, setEditingProduct] = useState(null);
     const [productForm, setProductForm] = useState({
         code: '', name: '', details: '', category: 'General',
-        unit: 'unid', unit_price: '', is_tax_exempt: false,
+        unit: 'unid', unit_price: '', suggested_price: '', is_tax_exempt: false,
         track_inventory: false, stock: 0, min_stock: 0, technical_specs: null,
         image_url: null, imageFile: null, imagePreview: null, remove_image: false
     });
@@ -708,7 +726,7 @@ function IndexContent({
         setEditingProduct(null);
         setProductForm({
             code: '', name: '', details: '', category: 'General',
-            unit: 'unid', unit_price: '', is_tax_exempt: false,
+            unit: 'unid', unit_price: '', suggested_price: '', is_tax_exempt: false,
             track_inventory: false, stock: 0, min_stock: 0, technical_specs: null,
             image_url: null, imageFile: null, imagePreview: null, remove_image: false
         });
@@ -724,6 +742,7 @@ function IndexContent({
             category: prod.category || 'General',
             unit: prod.unit || 'unid',
             unit_price: prod.unit_price !== undefined ? prod.unit_price : '',
+            suggested_price: prod.suggested_price !== undefined && prod.suggested_price !== null ? prod.suggested_price : '',
             is_tax_exempt: !!prod.is_tax_exempt,
             track_inventory: !!prod.track_inventory,
             stock: prod.stock !== undefined && prod.stock !== null ? Number(prod.stock) : 0,
@@ -755,6 +774,7 @@ function IndexContent({
             category: productForm.category || 'General',
             unit: productForm.unit || 'unid',
             unit_price: Number(productForm.unit_price || 0),
+            suggested_price: productForm.suggested_price !== '' && productForm.suggested_price !== null && productForm.suggested_price !== undefined ? Number(productForm.suggested_price) : null,
             is_tax_exempt: productForm.is_tax_exempt ? 1 : 0,
             track_inventory: productForm.track_inventory ? 1 : 0,
             stock: Number(productForm.stock || 0),
@@ -806,6 +826,7 @@ function IndexContent({
             quantity: 1,
             unit: product.unit || 'unid',
             unit_price: Number(product.unit_price || 0),
+            suggested_price: product.suggested_price !== undefined && product.suggested_price !== null ? Number(product.suggested_price) : null,
             is_tax_exempt: !!product.is_tax_exempt,
             image_url: product.image_url || null,
             show_image: true
@@ -852,6 +873,7 @@ function IndexContent({
             category: 'General',
             unit: item.unit || 'unid',
             unit_price: Number(item.unit_price || 0),
+            suggested_price: item.suggested_price !== undefined && item.suggested_price !== null && item.suggested_price !== '' ? Number(item.suggested_price) : null,
             is_tax_exempt: item.is_tax_exempt ? 1 : 0,
             image_url: item.image_url || null,
         };

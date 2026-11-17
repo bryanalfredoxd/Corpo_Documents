@@ -60,6 +60,8 @@ class InvoiceController extends Controller
             'company_social_handle' => ['nullable', 'string', 'max:150'],
             'pdf_format' => ['nullable', 'in:formato-1,formato-2'],
             'show_item_images' => ['nullable', 'boolean'],
+            'show_totals' => ['nullable', 'boolean'],
+            'show_suggested_price' => ['nullable', 'boolean'],
             'status' => ['nullable', 'in:emitida,borrador,anulada,pagada'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable', 'integer'],
@@ -68,6 +70,7 @@ class InvoiceController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
             'items.*.unit' => ['required', 'string', 'max:50'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.suggested_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.image_url' => ['nullable', 'string'],
             'items.*.is_tax_exempt' => ['nullable', 'boolean'],
             'items.*.show_image' => ['nullable', 'boolean'],
@@ -110,10 +113,16 @@ class InvoiceController extends Controller
             }
         }
 
+        $isConsignment = ($validated['document_type'] === 'nota_entrega' || ($validated['sale_condition'] ?? '') === 'Consignación');
+        $defaultShowTotals = ! $isConsignment;
+        $defaultShowSuggested = $isConsignment;
+
         $technicalSpecs = [
             'specs' => $specsList,
             'pdf_format' => $validated['pdf_format'] ?? 'formato-1',
             'show_bs_conversion' => $request->boolean('show_bs_conversion', true),
+            'show_totals' => $request->has('show_totals') ? $request->boolean('show_totals') : $defaultShowTotals,
+            'show_suggested_price' => $request->has('show_suggested_price') ? $request->boolean('show_suggested_price') : $defaultShowSuggested,
             'show_item_images' => $request->boolean('show_item_images', true),
             'hidden_image_orders' => $hiddenImageOrders,
             'signature_stamp' => $validated['signature_stamp'] ?? 'auto',
@@ -190,6 +199,10 @@ class InvoiceController extends Controller
                 'total' => $itemTotal,
                 'is_tax_exempt' => ! empty($itemData['is_tax_exempt']),
             ];
+
+            if (Schema::hasColumn('invoice_items', 'suggested_price')) {
+                $itemDataToCreate['suggested_price'] = isset($itemData['suggested_price']) && $itemData['suggested_price'] !== '' && $itemData['suggested_price'] !== null ? (float) $itemData['suggested_price'] : null;
+            }
 
             if (Schema::hasColumn('invoice_items', 'product_id')) {
                 $itemDataToCreate['product_id'] = ! empty($itemData['product_id']) ? (int) $itemData['product_id'] : null;
@@ -427,6 +440,9 @@ class InvoiceController extends Controller
             $specs = is_array($invoice->technical_specs) ? $invoice->technical_specs : [];
             $specs['converted_from_id'] = $invoice->id;
             $specs['converted_from_correlative'] = $invoice->correlative_number;
+            // Al convertir a Factura Fiscal oficial, se asegura sumatoria activa y sin PVP sugerido en PDF
+            $specs['show_totals'] = true;
+            $specs['show_suggested_price'] = false;
 
             $nowCaracas = now('America/Caracas');
 
@@ -482,6 +498,7 @@ class InvoiceController extends Controller
                     'quantity' => $origItem->quantity,
                     'unit' => $origItem->unit,
                     'unit_price' => $origItem->unit_price,
+                    'suggested_price' => $origItem->suggested_price,
                     'total' => $origItem->total,
                     'is_tax_exempt' => $origItem->is_tax_exempt,
                 ];
@@ -756,6 +773,16 @@ class InvoiceController extends Controller
             ? (bool) $invoice->show_bs_conversion
             : (bool) ($specsMeta['show_bs_conversion'] ?? true);
 
+        $isConsignment = ($invoice->document_type === 'nota_entrega' || $invoice->sale_condition === 'Consignación');
+
+        $showTotals = isset($specsMeta['show_totals'])
+            ? (bool) $specsMeta['show_totals']
+            : ! $isConsignment;
+
+        $showSuggestedPrice = isset($specsMeta['show_suggested_price'])
+            ? (bool) $specsMeta['show_suggested_price']
+            : $isConsignment;
+
         $showItemImages = (bool) ($specsMeta['show_item_images'] ?? true);
         $hiddenOrders = array_map('intval', is_array($specsMeta['hidden_image_orders'] ?? null) ? $specsMeta['hidden_image_orders'] : []);
 
@@ -779,6 +806,7 @@ class InvoiceController extends Controller
                 'quantity' => (float) $it->quantity,
                 'unit' => $it->unit,
                 'unit_price' => (float) $it->unit_price,
+                'suggested_price' => $it->suggested_price !== null ? (float) $it->suggested_price : null,
                 'total' => (float) $it->total,
                 'is_tax_exempt' => (bool) $it->is_tax_exempt,
                 'show_image' => $canShowImg,
@@ -835,6 +863,8 @@ class InvoiceController extends Controller
             'issueDate' => $issueDate,
             'dueDate' => $dueDate,
             'showBsConversion' => $showBsConversion,
+            'showTotals' => $showTotals,
+            'showSuggestedPrice' => $showSuggestedPrice,
             'companyLogoUri' => $this->resolvePdfImageDataUri('images/corpoasia-square.png'),
             'stampUri' => $stampPath ? $this->resolvePdfImageDataUri($stampPath) : null,
             'items' => $items,

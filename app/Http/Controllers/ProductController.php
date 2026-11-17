@@ -60,6 +60,7 @@ class ProductController extends Controller
             'category' => ['nullable', 'string', 'max:100'],
             'unit' => ['required', 'string', 'max:50'],
             'unit_price' => ['required', 'numeric', 'min:0'],
+            'suggested_price' => ['nullable', 'numeric', 'min:0'],
             'is_tax_exempt' => ['nullable', 'boolean'],
             'image' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp,gif', 'max:5120'],
             'image_url' => ['nullable', 'string'],
@@ -79,6 +80,7 @@ class ProductController extends Controller
             'category' => ! empty($validated['category']) ? trim($validated['category']) : 'General',
             'unit' => trim($validated['unit']),
             'unit_price' => (float) $validated['unit_price'],
+            'suggested_price' => isset($validated['suggested_price']) && $validated['suggested_price'] !== '' && $validated['suggested_price'] !== null ? (float) $validated['suggested_price'] : null,
             'is_tax_exempt' => $request->boolean('is_tax_exempt', false),
             'image_url' => $imageUrl,
         ];

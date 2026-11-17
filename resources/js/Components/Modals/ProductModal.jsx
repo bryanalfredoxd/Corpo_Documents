@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, X, Save, Camera, CheckCircle2, Layers, Plus, Trash2, Sparkles, Boxes } from 'lucide-react';
+import { Package, X, Save, Camera, CheckCircle2, Layers, Plus, Trash2, Sparkles, Boxes, DollarSign, Tag } from 'lucide-react';
 import { defaultTechnicalSpecs } from '../../Utils/invoiceConstants';
 import { compressImageToDataUrl } from '../../Utils/imageCompression';
 
@@ -178,55 +178,98 @@ export default function ProductModal({
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                        <div>
-                            <label className="text-xs font-black text-black block mb-1">
-                                Precio Unitario ($) *
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-700">$</span>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    required
-                                    placeholder="0.00"
-                                    value={productForm.unit_price}
-                                    onChange={(e) => setProductForm(prev => ({ ...prev, unit_price: e.target.value }))}
-                                    className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg pl-7 pr-3 text-xs font-black text-black font-mono focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                                />
+                    {/* Precios: Base y Sugerido de Venta */}
+                    <div className="bg-slate-50 border-2 border-slate-300 rounded-xl p-3.5 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-black uppercase flex items-center gap-1.5">
+                                <DollarSign className="w-4 h-4 text-emerald-700" />
+                                <span>Estructura de Precios</span>
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-500">
+                                Precios expresados en Dólares (USD)
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            {/* 1. Precio Base */}
+                            <div className="bg-white p-2.5 rounded-lg border-2 border-slate-300">
+                                <label className="text-xs font-black text-slate-900 block mb-1">
+                                    Precio Base / Costo ($) *
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-700">$</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        placeholder="Ej: 900.00"
+                                        value={productForm.unit_price}
+                                        onChange={(e) => setProductForm(prev => ({ ...prev, unit_price: e.target.value }))}
+                                        className="h-9 w-full bg-slate-50 border-2 border-slate-400 rounded-lg pl-7 pr-3 text-xs font-black text-black font-mono focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white"
+                                    />
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-500 block mt-1">
+                                    Precio de referencia base del producto.
+                                </span>
+                            </div>
+
+                            {/* 2. Precio Sugerido de Venta (Resaltado en Rojo según requerimiento del jefe) */}
+                            <div className="bg-red-50/60 p-2.5 rounded-lg border-2 border-red-300">
+                                <label className="text-xs font-black text-red-700 block mb-1 flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+                                    <span>Precio Sugerido de Venta ($)</span>
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-red-700">$</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="Ej: 1100.00 (Opcional)"
+                                        value={productForm.suggested_price || ''}
+                                        onChange={(e) => setProductForm(prev => ({ ...prev, suggested_price: e.target.value }))}
+                                        className="h-9 w-full bg-white border-2 border-red-400 rounded-lg pl-7 pr-3 text-xs font-black text-red-700 font-mono focus:outline-none focus:ring-2 focus:ring-red-600 placeholder:text-red-300"
+                                    />
+                                </div>
+                                <span className="text-[10px] font-bold text-red-600 block mt-1">
+                                    PVP o precio de venta sugerido al público.
+                                </span>
                             </div>
                         </div>
 
-                        <div>
-                            <label className="text-xs font-black text-black block mb-1">
-                                Unidad *
-                            </label>
-                            <select
-                                value={productForm.unit}
-                                onChange={(e) => setProductForm(prev => ({ ...prev, unit: e.target.value }))}
-                                className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-2.5 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                            >
-                                <option value="unid">unid (Unidad)</option>
-                                <option value="pza">pza (Pieza)</option>
-                                <option value="caja">caja (Caja)</option>
-                                <option value="kg">kg (Kilos)</option>
-                                <option value="lt">lt (Litros)</option>
-                                <option value="serv">serv (Servicio)</option>
-                                <option value="m²">m² (Metro cuad.)</option>
-                            </select>
-                        </div>
+                        {/* Unidad y Exento IVA */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-200">
+                            <div>
+                                <label className="text-[11px] font-black text-black block mb-1">
+                                    Unidad de Medida *
+                                </label>
+                                <select
+                                    value={productForm.unit}
+                                    onChange={(e) => setProductForm(prev => ({ ...prev, unit: e.target.value }))}
+                                    className="h-9 w-full bg-white border-2 border-slate-400 rounded-lg px-2.5 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                                >
+                                    <option value="unid">unid (Unidad)</option>
+                                    <option value="pza">pza (Pieza)</option>
+                                    <option value="caja">caja (Caja)</option>
+                                    <option value="kg">kg (Kilos)</option>
+                                    <option value="lt">lt (Litros)</option>
+                                    <option value="serv">serv (Servicio)</option>
+                                    <option value="m²">m² (Metro cuad.)</option>
+                                </select>
+                            </div>
 
-                        <div className="h-9 flex items-center">
-                            <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-black text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg border-2 border-slate-300 w-full select-none">
-                                <input
-                                    type="checkbox"
-                                    checked={!!productForm.is_tax_exempt}
-                                    onChange={(e) => setProductForm(prev => ({ ...prev, is_tax_exempt: e.target.checked }))}
-                                    className="rounded border-slate-400 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
-                                />
-                                <span>Exento IVA</span>
-                            </label>
+                            <div className="flex items-end">
+                                <label className="h-9 inline-flex items-center gap-2 cursor-pointer text-xs font-black text-slate-900 bg-white hover:bg-slate-100 px-3 py-2 rounded-lg border-2 border-slate-300 w-full select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={!!productForm.is_tax_exempt}
+                                        onChange={(e) => setProductForm(prev => ({ ...prev, is_tax_exempt: e.target.checked }))}
+                                        className="rounded border-slate-400 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                    />
+                                    <span>Exento de IVA (Tasa 0% / Exento)</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 

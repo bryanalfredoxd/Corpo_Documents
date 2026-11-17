@@ -1912,5 +1912,134 @@ class FiscalSystemFunctionalityTest extends TestCase
         $this->assertArrayHasKey('clientCategories', $props);
         $this->assertNotEmpty($props['clientCategories']);
     }
+
+    public function test_product_can_be_created_and_updated_with_suggested_price(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/products', [
+            'name' => 'Peletizadora Agrícola 150Kg',
+            'code' => 'PEL-150',
+            'unit' => 'unid',
+            'unit_price' => 900.00,
+            'suggested_price' => 1100.00,
+            'category' => 'Maquinaria',
+            'details' => 'Peletizadora para alimento concentrado de animales',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $product = Product::where('name', 'Peletizadora Agrícola 150Kg')->first();
+        $this->assertNotNull($product);
+        $this->assertEquals(900.00, (float) $product->unit_price);
+        $this->assertEquals(1100.00, (float) $product->suggested_price);
+
+        // Actualizar el precio sugerido
+        $updateResponse = $this->actingAs($user)->put("/products/{$product->id}", [
+            'name' => 'Peletizadora Agrícola 150Kg',
+            'code' => 'PEL-150',
+            'unit' => 'unid',
+            'unit_price' => 900.00,
+            'suggested_price' => 1150.00,
+            'category' => 'Maquinaria',
+        ]);
+
+        $updateResponse->assertSessionHasNoErrors();
+        $product->refresh();
+        $this->assertEquals(1150.00, (float) $product->suggested_price);
+    }
+
+    public function test_invoice_can_be_created_with_suggested_prices_and_hidden_totals_for_consignment(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $user = User::where('email', 'admin@corpoasia.com')->first();
+        $company = Company::first();
+        $client = Client::first();
+
+        $response = $this->actingAs($user)->post('/invoices', [
+            'company_id' => $company->id,
+            'client_id' => $client->id,
+            'document_type' => 'nota_entrega',
+            'sale_condition' => 'Consignación',
+            'sales_channel' => 'Oficina',
+            'issue_date' => now()->format('Y-m-d'),
+            'bcv_exchange_rate' => 876.80,
+            'currency' => 'USD',
+            'tax_percentage' => 0.00,
+            'show_totals' => false,
+            'show_suggested_price' => true,
+            'items' => [
+                [
+                    'description' => 'Peletizadora Agrícola 150Kg (En Consignación)',
+                    'quantity' => 3,
+                    'unit' => 'máquinas',
+                    'unit_price' => 900.00,
+                    'suggested_price' => 1100.00,
+                    'is_tax_exempt' => true,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $invoice = Invoice::where('client_id', $client->id)->latest('id')->first();
+        $this->assertNotNull($invoice);
+        $this->assertFalse((bool) ($invoice->technical_specs['show_totals'] ?? true));
+
+        $item = $invoice->items()->first();
+        $this->assertNotNull($item);
+        $this->assertEquals(900.00, (float) $item->unit_price);
+        $this->assertEquals(1100.00, (float) $item->suggested_price);
+
+        // Descarga de PDF en modo consignación sin sumatoria
+        $pdfResponse = $this->actingAs($user)->get("/invoices/{$invoice->id}/pdf");
+        $pdfResponse->assertStatus(200);
+        $this->assertEquals('application/pdf', $pdfResponse->headers->get('content-type'));
+    }
+
+    public function test_standard_factura_omits_suggested_price_by_default_and_calculates_totals(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $user = User::where('email', 'admin@corpoasia.com')->first();
+        $company = Company::first();
+        $client = Client::first();
+
+        $response = $this->actingAs($user)->post('/invoices', [
+            'company_id' => $company->id,
+            'client_id' => $client->id,
+            'document_type' => 'factura',
+            'sale_condition' => 'Venta de Contado',
+            'sales_channel' => 'Oficina',
+            'issue_date' => now()->format('Y-m-d'),
+            'bcv_exchange_rate' => 876.80,
+            'currency' => 'USD',
+            'tax_percentage' => 16.00,
+            'items' => [
+                [
+                    'description' => 'Bicicleta Rin 29 Montañera',
+                    'quantity' => 1,
+                    'unit' => 'unid',
+                    'unit_price' => 250.00,
+                    'suggested_price' => 320.00,
+                    'is_tax_exempt' => false,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $invoice = Invoice::where('client_id', $client->id)->latest('id')->first();
+        $this->assertNotNull($invoice);
+        // En Factura Fiscal estándar, show_totals es true y show_suggested_price es false
+        $this->assertTrue((bool) ($invoice->technical_specs['show_totals'] ?? true));
+        $this->assertFalse((bool) ($invoice->technical_specs['show_suggested_price'] ?? false));
+
+        // Descarga de PDF oficial en modo Factura Fiscal estándar
+        $pdfResponse = $this->actingAs($user)->get("/invoices/{$invoice->id}/pdf");
+        $pdfResponse->assertStatus(200);
+        $this->assertEquals('application/pdf', $pdfResponse->headers->get('content-type'));
+    }
 }
 

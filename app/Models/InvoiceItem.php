@@ -20,6 +20,7 @@ class InvoiceItem extends Model
         'quantity',
         'unit',
         'unit_price',
+        'suggested_price',
         'total',
         'is_tax_exempt',
     ];
@@ -29,6 +30,7 @@ class InvoiceItem extends Model
         'item_order' => 'integer',
         'quantity' => 'decimal:2',
         'unit_price' => 'decimal:2',
+        'suggested_price' => 'decimal:2',
         'total' => 'decimal:2',
         'is_tax_exempt' => 'boolean',
     ];

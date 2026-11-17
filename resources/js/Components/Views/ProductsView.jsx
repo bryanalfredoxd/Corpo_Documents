@@ -212,28 +212,56 @@ export default function ProductsView({
                                     </div>
                                 )}
 
-                                {/* Precio y Unidad */}
-                                <div className="flex items-baseline justify-between pt-1 border-t border-slate-200">
-                                    <div>
-                                        <span className="text-[10px] font-black uppercase text-slate-500 block">
-                                            Precio Unitario
-                                        </span>
-                                        <span className="text-lg font-mono font-black text-emerald-700">
-                                            ${Number(prod.unit_price).toFixed(2)}
-                                        </span>
-                                        <span className="text-xs font-bold text-slate-600 ml-1">
-                                            / {prod.unit}
-                                        </span>
+                                {/* Precios: Base y Sugerido */}
+                                <div className="pt-2 border-t border-slate-200 space-y-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div>
+                                            <span className="text-[10px] font-black uppercase text-slate-500 block">
+                                                Precio Base
+                                            </span>
+                                            <div className="flex items-baseline">
+                                                <span className="text-base font-mono font-black text-slate-900">
+                                                    ${Number(prod.unit_price).toFixed(2)}
+                                                </span>
+                                                <span className="text-[11px] font-bold text-slate-500 ml-1">
+                                                    / {prod.unit}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {prod.suggested_price && Number(prod.suggested_price) > 0 ? (
+                                            <div className="text-right bg-red-50 border-2 border-red-300 rounded-lg px-2.5 py-1 shadow-2xs">
+                                                <span className="text-[9px] font-black uppercase text-red-700 tracking-wide block">
+                                                    PVP Sugerido
+                                                </span>
+                                                <span className="text-sm font-mono font-black text-red-600">
+                                                    ${Number(prod.suggested_price).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="text-right">
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase block">
+                                                    PVP Sugerido
+                                                </span>
+                                                <span className="text-xs font-mono text-slate-400 italic">
+                                                    No asignado
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
-                                    {prod.is_tax_exempt ? (
-                                        <span className="text-[10px] font-black bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded border border-emerald-300">
-                                            Exento IVA (E)
-                                        </span>
-                                    ) : (
-                                        <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
-                                            Gravable IVA
-                                        </span>
-                                    )}
+
+                                    <div className="flex items-center justify-between text-[10px] pt-1 border-t border-dashed border-slate-200">
+                                        <span className="text-slate-500 font-bold">Régimen Fiscal:</span>
+                                        {prod.is_tax_exempt ? (
+                                            <span className="font-black bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded border border-emerald-300">
+                                                Exento IVA (E)
+                                            </span>
+                                        ) : (
+                                            <span className="font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                                                Gravable IVA
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
