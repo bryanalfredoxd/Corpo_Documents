@@ -354,27 +354,24 @@ export default function ConsignmentsView({
                         <button
                             type="button"
                             onClick={() => setStatusFilter('activas')}
-                            className={`flex-1 py-1 px-1.5 rounded text-[11px] font-black cursor-pointer text-center transition-colors ${
-                                statusFilter === 'activas' ? 'bg-purple-700 text-white shadow-2xs' : 'text-slate-700 hover:text-black'
-                            }`}
+                            className={`flex-1 py-1 px-1.5 rounded text-[11px] font-black cursor-pointer text-center transition-colors ${statusFilter === 'activas' ? 'bg-purple-700 text-white shadow-2xs' : 'text-slate-700 hover:text-black'
+                                }`}
                         >
                             Activas
                         </button>
                         <button
                             type="button"
                             onClick={() => setStatusFilter('todas')}
-                            className={`flex-1 py-1 px-1.5 rounded text-[11px] font-black cursor-pointer text-center transition-colors ${
-                                statusFilter === 'todas' ? 'bg-slate-800 text-white shadow-2xs' : 'text-slate-700 hover:text-black'
-                            }`}
+                            className={`flex-1 py-1 px-1.5 rounded text-[11px] font-black cursor-pointer text-center transition-colors ${statusFilter === 'todas' ? 'bg-slate-800 text-white shadow-2xs' : 'text-slate-700 hover:text-black'
+                                }`}
                         >
                             Todas
                         </button>
                         <button
                             type="button"
                             onClick={() => setStatusFilter('liquidadas')}
-                            className={`flex-1 py-1 px-1.5 rounded text-[11px] font-black cursor-pointer text-center transition-colors ${
-                                statusFilter === 'liquidadas' ? 'bg-emerald-700 text-white shadow-2xs' : 'text-slate-700 hover:text-black'
-                            }`}
+                            className={`flex-1 py-1 px-1.5 rounded text-[11px] font-black cursor-pointer text-center transition-colors ${statusFilter === 'liquidadas' ? 'bg-emerald-700 text-white shadow-2xs' : 'text-slate-700 hover:text-black'
+                                }`}
                         >
                             Vendidas
                         </button>
@@ -470,9 +467,8 @@ export default function ConsignmentsView({
                                     return (
                                         <div
                                             key={consignment.id}
-                                            className={`p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 transition-colors ${
-                                                isLiquidated ? 'bg-slate-50/60 opacity-80' : 'hover:bg-purple-50/20'
-                                            }`}
+                                            className={`p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 transition-colors ${isLiquidated ? 'bg-slate-50/60 opacity-80' : 'hover:bg-purple-50/20'
+                                                }`}
                                         >
                                             {/* Info del Producto */}
                                             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -495,11 +491,10 @@ export default function ConsignmentsView({
                                                         <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
                                                             {consignment.description}
                                                         </h4>
-                                                        <span className={`text-[10px] font-black px-1.5 py-0.2 rounded border ${
-                                                            qty > 0
-                                                                ? 'bg-purple-100 text-purple-900 border-purple-300'
-                                                                : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                                                        }`}>
+                                                        <span className={`text-[10px] font-black px-1.5 py-0.2 rounded border ${qty > 0
+                                                            ? 'bg-purple-100 text-purple-900 border-purple-300'
+                                                            : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                                            }`}>
                                                             {qty > 0 ? `En Custodia: ${qty} ${consignment.unit}` : 'Liquidada / Vendida'}
                                                         </span>
                                                         {consignment.initialDeliveryInvoice && (
@@ -1038,16 +1033,15 @@ export default function ConsignmentsView({
                                         >
                                             <div className="space-y-1 min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                                                        isSale ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${isSale ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
                                                         isRestock ? 'bg-blue-100 text-blue-900 border border-blue-300' :
-                                                        isReturn ? 'bg-amber-100 text-amber-900 border border-amber-300' :
-                                                        'bg-purple-100 text-purple-900 border border-purple-300'
-                                                    }`}>
+                                                            isReturn ? 'bg-amber-100 text-amber-900 border border-amber-300' :
+                                                                'bg-purple-100 text-purple-900 border border-purple-300'
+                                                        }`}>
                                                         {isSale ? '🛒 Venta Facturada' :
-                                                         isRestock ? '🚚 Reposición' :
-                                                         isReturn ? '↩️ Devolución' :
-                                                         '📦 Entrega Inicial'}
+                                                            isRestock ? '🚚 Reposición' :
+                                                                isReturn ? '↩️ Devolución' :
+                                                                    '📦 Entrega Inicial'}
                                                     </span>
                                                     <span className="text-[10px] text-slate-500 font-mono">
                                                         {mov.created_at ? new Date(mov.created_at).toLocaleString('es-VE') : ''}
