@@ -45,5 +45,13 @@ class Product extends Model
     {
         return $this->hasMany(InvoiceItem::class);
     }
+
+    /**
+     * Registros de consignación en los que este producto está en poder de clientes.
+     */
+    public function consignments(): HasMany
+    {
+        return $this->hasMany(Consignment::class);
+    }
 }
 

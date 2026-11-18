@@ -1,5 +1,5 @@
 import React from 'react';
-import { Receipt, Users2, Package, FileText, Search, History } from 'lucide-react';
+import { Receipt, Users2, Package, FileText, Search, History, Boxes } from 'lucide-react';
 import { getDocumentTypeInfo } from '../../Utils/invoiceConstants';
 
 export default function SecondaryNav({
@@ -9,6 +9,7 @@ export default function SecondaryNav({
     companiesCount = 0,
     clientsCount = 0,
     productsCount = 0,
+    consignmentsCount = 0,
     searchQuery,
     setSearchQuery,
     invoiceForm,
@@ -78,15 +79,31 @@ export default function SecondaryNav({
                 </button>
 
                 <button
+                    onClick={() => setCurrentView('consignaciones')}
+                    className={`h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg text-xs font-black flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${currentView === 'consignaciones'
+                        ? 'bg-black text-white shadow-xs ring-2 ring-purple-600'
+                        : 'text-black hover:bg-slate-200 border-2 border-slate-300'
+                        }`}
+                >
+                    <Boxes className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600 shrink-0" />
+                    <span className="hidden md:inline">5. CONSIGNACIONES</span>
+                    <span className="md:hidden">5. Consignaciones</span>
+                    <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded font-mono font-bold ${currentView === 'consignaciones' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-black'
+                        }`}>
+                        {consignmentsCount}
+                    </span>
+                </button>
+
+                <button
                     onClick={() => setCurrentView('auditoria')}
                     className={`h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg text-xs font-black flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${currentView === 'auditoria'
                         ? 'bg-black text-white shadow-xs ring-2 ring-blue-600'
                         : 'text-black hover:bg-slate-200 border-2 border-slate-300'
                         }`}
                 >
-                    <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
-                    <span className="hidden md:inline">5. AUDITORÍA & ACTIVIDAD</span>
-                    <span className="md:hidden">5. Auditoría</span>
+                    <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 shrink-0" />
+                    <span className="hidden md:inline">6. AUDITORÍA & ACTIVIDAD</span>
+                    <span className="md:hidden">6. Auditoría</span>
                 </button>
             </div>
 
@@ -99,9 +116,11 @@ export default function SecondaryNav({
                         placeholder={
                             currentView === 'catalogo'
                                 ? 'Buscar producto, código o categoría...'
-                                : currentView === 'libro-fiscal'
-                                    ? 'Buscar factura, control, cliente o RIF...'
-                                    : 'Buscar RIF, Cédula o Nombre...'
+                                : currentView === 'consignaciones'
+                                    ? 'Buscar cliente, máquina o consignación...'
+                                    : currentView === 'libro-fiscal'
+                                        ? 'Buscar factura, control, cliente o RIF...'
+                                        : 'Buscar RIF, Cédula o Nombre...'
                         }
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}

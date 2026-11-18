@@ -38,6 +38,14 @@ class Client extends Model
     }
 
     /**
+     * Mercancías y equipos entregados a consignación a este cliente.
+     */
+    public function consignments(): HasMany
+    {
+        return $this->hasMany(Consignment::class);
+    }
+
+    /**
      * Filtrar solo empresas / jurídicos.
      */
     public function scopeEmpresas(Builder $query): Builder

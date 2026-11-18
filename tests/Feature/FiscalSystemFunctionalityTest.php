@@ -6,6 +6,8 @@ use App\Models\Client;
 use App\Models\ClientCategory;
 use App\Models\Company;
 use App\Models\CompanyBankAccount;
+use App\Models\Consignment;
+use App\Models\ConsignmentMovement;
 use App\Models\Invoice;
 use App\Models\InvoiceAuditLog;
 use App\Models\InvoicePayment;
@@ -2040,6 +2042,208 @@ class FiscalSystemFunctionalityTest extends TestCase
         $pdfResponse = $this->actingAs($user)->get("/invoices/{$invoice->id}/pdf");
         $pdfResponse->assertStatus(200);
         $this->assertEquals('application/pdf', $pdfResponse->headers->get('content-type'));
+    }
+
+    public function test_consignment_delivery_note_creates_custody_and_movement(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $user = User::where('email', 'admin@corpoasia.com')->first();
+        $company = Company::first();
+        $client = Client::first();
+        $product = Product::create([
+            'code' => 'PEL-900',
+            'name' => 'Peletizadora Industrial 900',
+            'unit_price' => 900.00,
+            'suggested_price' => 1100.00,
+            'stock' => 10,
+            'unit' => 'unid',
+            'track_inventory' => true,
+            'is_active' => true,
+        ]);
+        $initialStock = (float) $product->stock;
+
+        $response = $this->actingAs($user)->post('/invoices', [
+            'company_id' => $company->id,
+            'client_id' => $client->id,
+            'document_type' => 'nota_entrega',
+            'sale_condition' => 'Consignación',
+            'payment_method' => 'Crédito',
+            'issue_date' => now()->format('Y-m-d'),
+            'bcv_exchange_rate' => 876.80,
+            'currency' => 'USD',
+            'tax_percentage' => 16.00,
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'description' => $product->name,
+                    'quantity' => 3,
+                    'unit' => 'unid',
+                    'unit_price' => 900.00,
+                    'suggested_price' => 1100.00,
+                    'is_tax_exempt' => false,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        // Stock central descontado por la nota de entrega
+        $product->refresh();
+        $this->assertEquals($initialStock - 3, (float) $product->stock);
+
+        // Registro de custodia en consignments
+        $consignment = Consignment::where('client_id', $client->id)
+            ->where('product_id', $product->id)
+            ->first();
+        $this->assertNotNull($consignment);
+        $this->assertEquals(3, (float) $consignment->current_quantity);
+        $this->assertEquals(900.00, (float) $consignment->unit_price);
+        $this->assertEquals(1100.00, (float) $consignment->suggested_price);
+
+        // Movimiento inicial registrado
+        $movement = ConsignmentMovement::where('consignment_id', $consignment->id)->first();
+        $this->assertNotNull($movement);
+        $this->assertEquals('entrega_inicial', $movement->movement_type);
+        $this->assertEquals(3, (float) $movement->quantity);
+        $this->assertEquals(3, (float) $movement->resulting_balance);
+    }
+
+    public function test_consignment_full_lifecycle_sale_restock_and_return(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $user = User::where('email', 'admin@corpoasia.com')->first();
+        $company = Company::first();
+        $client = Client::first();
+        $product = Product::create([
+            'code' => 'PEL-900',
+            'name' => 'Peletizadora Industrial 900',
+            'unit_price' => 900.00,
+            'suggested_price' => 1100.00,
+            'stock' => 10,
+            'unit' => 'unid',
+            'track_inventory' => true,
+            'is_active' => true,
+        ]);
+
+        // 1. Entrega inicial a consignación: 3 unidades
+        $consignment = Consignment::create([
+            'company_id' => $company->id,
+            'client_id' => $client->id,
+            'product_id' => $product->id,
+            'description' => $product->name,
+            'initial_quantity' => 3,
+            'current_quantity' => 3,
+            'unit_price' => 900.00,
+            'suggested_price' => 1100.00,
+            'status' => 'activa',
+        ]);
+
+        $initialCentralStock = (float) $product->stock;
+
+        // 2. VENTA DE 1 UNIDAD: El cliente vende una máquina
+        $sellResponse = $this->actingAs($user)->post("/consignments/{$consignment->id}/sell", [
+            'quantity' => 1,
+            'unit_price' => 900.00,
+            'issue_invoice' => true,
+            'payment_method' => 'TRANSFERENCIA BANCARIA',
+            'payment_reference' => 'REF-998877',
+            'notes' => 'Venta de 1 peletizadora en consignación',
+        ]);
+        $sellResponse->assertSessionHasNoErrors();
+
+        $consignment->refresh();
+        $product->refresh();
+
+        // La custodia baja a 2
+        $this->assertEquals(2, (float) $consignment->current_quantity);
+        $this->assertEquals('liquidada_parcial', $consignment->status);
+
+        // EL INVENTARIO CENTRAL NO SE DESCUENTA OTRA VEZ (Evita doble descuento contable)
+        $this->assertEquals($initialCentralStock, (float) $product->stock);
+
+        // Se generó la Factura Fiscal con el flag is_consignment_sale
+        $invoice = Invoice::where('client_id', $client->id)
+            ->where('document_type', 'factura')
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($invoice);
+        $this->assertTrue((bool) ($invoice->technical_specs['is_consignment_sale'] ?? false));
+
+        // 3. REPOSICIÓN: Se le entrega 1 nueva máquina para reponer la vendida
+        $restockResponse = $this->actingAs($user)->post("/consignments/{$consignment->id}/restock", [
+            'quantity' => 1,
+            'create_delivery_note' => true,
+            'notes' => 'Reposición de 1 peletizadora',
+        ]);
+        $restockResponse->assertSessionHasNoErrors();
+
+        $consignment->refresh();
+        $product->refresh();
+
+        // La custodia vuelve exactamente a 3 (NO se acumulan a 4 o 5)
+        $this->assertEquals(3, (float) $consignment->current_quantity);
+
+        // El almacén central descuenta 1 unidad por la máquina de reposición que salió
+        $this->assertEquals($initialCentralStock - 1, (float) $product->stock);
+
+        // 4. DEVOLUCIÓN: El cliente devuelve 1 máquina que no logró vender
+        $returnResponse = $this->actingAs($user)->post("/consignments/{$consignment->id}/return", [
+            'quantity' => 1,
+            'notes' => 'Devolución de 1 unidad por cambio de modelo',
+        ]);
+        $returnResponse->assertSessionHasNoErrors();
+
+        $consignment->refresh();
+        $product->refresh();
+
+        // La custodia baja a 2
+        $this->assertEquals(2, (float) $consignment->current_quantity);
+
+        // El almacén central recibe la máquina de vuelta (+1)
+        $this->assertEquals($initialCentralStock, (float) $product->stock);
+    }
+
+    public function test_commercial_discount_reduces_taxable_base_before_vat_calculation(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $user = User::where('email', 'admin@corpoasia.com')->first();
+        $company = Company::first();
+        $client = Client::first();
+
+        // Subtotal $100.00, Descuento $20.00 => Base imponible neta = $80.00. IVA 16% = $12.80. Total = $92.80
+        $response = $this->actingAs($user)->post('/invoices', [
+            'company_id' => $company->id,
+            'client_id' => $client->id,
+            'document_type' => 'factura',
+            'sale_condition' => 'Contado',
+            'issue_date' => now()->format('Y-m-d'),
+            'bcv_exchange_rate' => 876.80,
+            'currency' => 'USD',
+            'tax_percentage' => 16.00,
+            'discount' => 20.00,
+            'items' => [
+                [
+                    'description' => 'Servicio de Mantenimiento Preventivo',
+                    'quantity' => 1,
+                    'unit' => 'serv',
+                    'unit_price' => 100.00,
+                    'is_tax_exempt' => false,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $invoice = Invoice::where('client_id', $client->id)->latest('id')->first();
+        $this->assertNotNull($invoice);
+        $this->assertEquals(100.00, (float) $invoice->subtotal);
+        $this->assertEquals(20.00, (float) $invoice->discount);
+        // Base gravada neta = 100 - 20 = 80 => IVA 16% = 12.80
+        $this->assertEquals(12.80, (float) $invoice->tax_amount);
+        $this->assertEquals(92.80, (float) $invoice->total_usd);
     }
 }
 

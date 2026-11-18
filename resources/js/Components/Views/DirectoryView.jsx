@@ -15,7 +15,8 @@ import {
     User,
     Archive,
     Tag,
-    Settings2
+    Settings2,
+    Boxes
 } from 'lucide-react';
 import { sprintfCorrelative, sprintfControl, getEmptyInvoice, CLIENT_CATEGORIES, getClientCategoryBadge } from '../../Utils/invoiceConstants';
 import { useFeedback } from '../../Contexts/FeedbackContext';
@@ -601,20 +602,42 @@ export default function DirectoryView({
                                                 {client.notes || 'Cliente Registrado'}
                                             </span>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setInvoiceForm({
-                                                    ...getEmptyInvoice(activeCompany, companies),
-                                                    client_id: client.id,
-                                                });
-                                                setCurrentView('generador-pdf');
-                                            }}
-                                            className="h-8 px-3.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black text-xs flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-2xs shrink-0"
-                                        >
-                                            <Receipt className="w-4 h-4 text-sky-200" />
-                                            <span>Facturar</span>
-                                        </button>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setInvoiceForm({
+                                                        ...getEmptyInvoice(activeCompany, companies),
+                                                        client_id: client.id,
+                                                        document_type: 'nota_entrega',
+                                                        payment_terms: 'Consignación',
+                                                        show_suggested_price: true,
+                                                        show_totals: false,
+                                                        payment_method: 'Crédito'
+                                                    });
+                                                    setCurrentView('generador-pdf');
+                                                }}
+                                                className="h-8 px-2.5 rounded-lg border border-purple-300 hover:bg-purple-50 text-purple-800 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                                                title="Generar Nota de Entrega a Consignación para este cliente"
+                                            >
+                                                <Boxes className="w-3.5 h-3.5 text-purple-600" />
+                                                <span className="hidden sm:inline">Consignar</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setInvoiceForm({
+                                                        ...getEmptyInvoice(activeCompany, companies),
+                                                        client_id: client.id,
+                                                    });
+                                                    setCurrentView('generador-pdf');
+                                                }}
+                                                className="h-8 px-3 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black text-xs flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-2xs"
+                                            >
+                                                <Receipt className="w-4 h-4 text-sky-200" />
+                                                <span>Facturar</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             );

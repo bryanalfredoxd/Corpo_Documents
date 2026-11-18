@@ -4,6 +4,7 @@ use App\Http\Controllers\ClientCategoryController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CompanyBankAccountController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\ConsignmentController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoicePaymentController;
 use App\Http\Controllers\ProductController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\ReportController;
 use App\Models\Client;
 use App\Models\ClientCategory;
 use App\Models\Company;
+use App\Models\Consignment;
 use App\Models\Invoice;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -207,12 +209,41 @@ Route::middleware(['auth'])->group(function () {
             'top_products' => $topProducts,
         ];
 
+        $consignments = collect();
+        $consignmentStats = [
+            'total_items_in_custody' => 0,
+            'active_consignments_count' => 0,
+            'active_clients_count' => 0,
+            'total_base_value' => 0,
+            'total_suggested_value' => 0,
+        ];
+        if (Schema::hasTable('consignments')) {
+            $consignments = Consignment::with([
+                'client:id,name,tax_id,category,phone,email,address',
+                'product:id,code,name,image_url,stock,unit',
+                'company:id,name,tax_id',
+                'initialDeliveryInvoice:id,correlative_number,issue_date',
+                'movements.invoice:id,correlative_number,document_type',
+                'movements.user:id,name',
+            ])->latest('id')->get();
+
+            $consignmentStats = [
+                'total_items_in_custody' => (float) Consignment::where('status', '!=', 'devuelta')->where('status', '!=', 'liquidada_total')->sum('current_quantity'),
+                'active_consignments_count' => Consignment::where('status', '!=', 'devuelta')->where('status', '!=', 'liquidada_total')->where('current_quantity', '>', 0)->count(),
+                'active_clients_count' => Consignment::where('status', '!=', 'devuelta')->where('status', '!=', 'liquidada_total')->where('current_quantity', '>', 0)->distinct('client_id')->count('client_id'),
+                'total_base_value' => (float) (Consignment::where('status', '!=', 'devuelta')->where('status', '!=', 'liquidada_total')->selectRaw('SUM(current_quantity * unit_price) as total')->value('total') ?? 0),
+                'total_suggested_value' => (float) (Consignment::where('status', '!=', 'devuelta')->where('status', '!=', 'liquidada_total')->selectRaw('SUM(current_quantity * COALESCE(suggested_price, unit_price)) as total')->value('total') ?? 0),
+            ];
+        }
+
         return Inertia::render('Index', [
             'companies' => $companies,
             'clients' => $clients,
             'clientCategories' => $clientCategories,
             'invoices' => $paginatedResult['invoices'],
             'products' => $products,
+            'consignments' => $consignments,
+            'consignmentStats' => $consignmentStats,
             'stats' => $stats,
             'chartData' => $chartData,
             'statusCounts' => $paginatedResult['statusCounts'],
@@ -261,6 +292,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store'])->name('invoice-payments.store');
     Route::delete('/invoice-payments/{payment}', [InvoicePaymentController::class, 'destroy'])->name('invoice-payments.destroy');
     Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
+
+    // Control de Mercancía en Consignación y Custodia de Clientes
+    Route::get('/consignments', [ConsignmentController::class, 'index'])->name('consignments.index');
+    Route::post('/consignments/{consignment}/sell', [ConsignmentController::class, 'sell'])->name('consignments.sell');
+    Route::post('/consignments/{consignment}/restock', [ConsignmentController::class, 'restock'])->name('consignments.restock');
+    Route::post('/consignments/{consignment}/return', [ConsignmentController::class, 'returnStock'])->name('consignments.return');
 
     // Reportes Contables y Libro de Ventas
     Route::get('/reports/sales-book', [ReportController::class, 'salesBook'])->name('reports.sales-book');

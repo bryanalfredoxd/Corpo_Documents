@@ -23,6 +23,7 @@ import DocumentsView from '../Components/Views/DocumentsView';
 import DirectoryView from '../Components/Views/DirectoryView';
 import ProductsView from '../Components/Views/ProductsView';
 import GeneratorView from '../Components/Views/GeneratorView';
+import ConsignmentsView from '../Components/Views/ConsignmentsView';
 import AuditView from '../Components/Views/AuditView';
 import { FeedbackProvider, useFeedback } from '../Contexts/FeedbackContext';
 
@@ -42,6 +43,8 @@ function IndexContent({
     clientCategories = [],
     invoices = [],
     products = [],
+    consignments = [],
+    consignmentStats = {},
     stats = {},
     chartData = {},
     statusCounts = {},
@@ -933,6 +936,7 @@ function IndexContent({
                 companiesCount={companies.length}
                 clientsCount={clients.length}
                 productsCount={products.length}
+                consignmentsCount={consignmentStats?.active_consignments_count ?? (Array.isArray(consignments) ? consignments.filter(c => c.status !== 'devuelta' && c.status !== 'liquidada_total' && Number(c.current_quantity) > 0).length : 0)}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 invoiceForm={invoiceForm}
@@ -946,7 +950,7 @@ function IndexContent({
             <main className="flex-1 p-3 sm:p-4 md:p-6 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full print:space-y-0 print:bg-white">
 
                 {/* MÉTRICAS CONTABLES */}
-                {currentView !== 'generador-pdf' && currentView !== 'auditoria' && (
+                {currentView !== 'generador-pdf' && currentView !== 'auditoria' && currentView !== 'consignaciones' && (
                     <MetricCards
                         stats={stats}
                         invoicesCount={totalInvoicesCount}
@@ -1057,7 +1061,28 @@ function IndexContent({
                     />
                 )}
 
-                {/* VISTA 5: BITÁCORA DE AUDITORÍA Y ACTIVIDAD */}
+                {/* VISTA 5: CONTROL DE CONSIGNACIONES & CUSTODIA */}
+                {currentView === 'consignaciones' && (
+                    <ConsignmentsView
+                        consignments={consignments}
+                        consignmentStats={consignmentStats}
+                        clients={clients}
+                        searchQuery={searchQuery}
+                        onNewConsignmentDelivery={() => {
+                            handleDocumentTypeChange('nota_entrega');
+                            setInvoiceForm(prev => ({
+                                ...prev,
+                                payment_terms: 'Consignación',
+                                show_suggested_price: true,
+                                show_totals: false,
+                                payment_method: 'Crédito'
+                            }));
+                            setCurrentView('generador-pdf');
+                        }}
+                    />
+                )}
+
+                {/* VISTA 6: BITÁCORA DE AUDITORÍA Y ACTIVIDAD */}
                 {currentView === 'auditoria' && (
                     <AuditView
                         initialLogs={auditLogs}

@@ -133,6 +133,14 @@ class Invoice extends Model
     }
 
     /**
+     * Movimientos de consignación vinculados a este documento (entregas, ventas, reposiciones).
+     */
+    public function consignmentMovements(): HasMany
+    {
+        return $this->hasMany(ConsignmentMovement::class);
+    }
+
+    /**
      * Total abonado en USD hasta la fecha.
      */
     public function getPaidAmountUsdAttribute(): float
