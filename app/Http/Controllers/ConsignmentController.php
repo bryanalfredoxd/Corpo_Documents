@@ -10,11 +10,13 @@ use App\Models\Invoice;
 use App\Models\InvoiceAuditLog;
 use App\Models\InvoiceItem;
 use App\Models\Product;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HttpFoundation\Response;
 
 class ConsignmentController extends Controller
 {
@@ -393,5 +395,52 @@ class ConsignmentController extends Controller
         });
 
         return redirect()->back()->with('success', "¡Devolución de {$qtyToReturn} {$consignment->unit} registrada y reintegrada al almacén central!");
+    }
+
+    /**
+     * Generar Acta de Arqueo y Estado de Cuenta de Mercancía en Consignación en PDF.
+     */
+    public function clientStatementPdf(Request $request, Client $client): Response
+    {
+        $companyId = $request->input('company_id');
+        $company = $companyId ? Company::find($companyId) : Company::first();
+
+        $consignments = Consignment::where('client_id', $client->id)
+            ->with(['product', 'initialDeliveryInvoice', 'movements.invoice', 'movements.user'])
+            ->get();
+
+        $companyLogoUri = null;
+        if ($company && $company->logo_path) {
+            $path = public_path('storage/' . $company->logo_path);
+            if (! file_exists($path)) {
+                $path = public_path($company->logo_path);
+            }
+            if (file_exists($path)) {
+                $ext = pathinfo($path, PATHINFO_EXTENSION);
+                $companyLogoUri = 'data:image/' . ($ext === 'svg' ? 'svg+xml' : $ext) . ';base64,' . base64_encode(file_get_contents($path));
+            }
+        }
+
+        $nowCaracas = now('America/Caracas');
+
+        $fontDir = storage_path('fonts');
+        if (! is_dir($fontDir)) {
+            @mkdir($fontDir, 0755, true);
+        }
+
+        $pdf = Pdf::loadView('pdf.consignment_statement', [
+            'client' => $client,
+            'company' => $company,
+            'companyLogoUri' => $companyLogoUri,
+            'consignments' => $consignments,
+            'generatedAt' => $nowCaracas,
+        ]);
+
+        $pdf->setPaper('letter', 'portrait');
+
+        $cleanClient = preg_replace('/[^A-Za-z0-9_-]/', '_', $client->name);
+        $filename = "Acta_Consignacion_{$cleanClient}_{$nowCaracas->format('Ymd')}.pdf";
+
+        return $pdf->stream($filename);
     }
 }

@@ -441,7 +441,7 @@ class InvoiceController extends Controller
             $oldStatus = $invoice->status;
             $company = Company::lockForUpdate()->findOrFail($validated['company_id']);
 
-            if ($this->shouldAffectInventory($invoice->document_type, $invoice->status, (array) ($invoice->technical_specs ?? []))) {
+            if ($this->shouldAffectInventory($invoice->document_type, $invoice->status)) {
                 $this->adjustInventoryForItems($invoice->items, +1);
             }
 
@@ -458,7 +458,7 @@ class InvoiceController extends Controller
             $invoice->items()->delete();
             $this->persistItems($invoice, $validated['items']);
 
-            if ($this->shouldAffectInventory($validated['document_type'], $newStatus, (array) ($invoiceData['technical_specs'] ?? []))) {
+            if ($this->shouldAffectInventory($validated['document_type'], $newStatus)) {
                 $this->adjustInventoryForItems($validated['items'], -1);
             }
 
@@ -490,8 +490,8 @@ class InvoiceController extends Controller
         DB::transaction(function () use ($request, $invoice, $newStatus, $user) {
             $invoice->load('items');
             $oldStatus = $invoice->status;
-            $wasDeducted = $this->shouldAffectInventory($invoice->document_type, $invoice->status, (array) ($invoice->technical_specs ?? []));
-            $willDeduct = $this->shouldAffectInventory($invoice->document_type, $newStatus, (array) ($invoice->technical_specs ?? []));
+            $wasDeducted = $this->shouldAffectInventory($invoice->document_type, $invoice->status);
+            $willDeduct = $this->shouldAffectInventory($invoice->document_type, $newStatus);
 
             if (! $wasDeducted && $willDeduct) {
                 $this->adjustInventoryForItems($invoice->items, -1);
@@ -549,13 +549,6 @@ class InvoiceController extends Controller
             // Al convertir a Factura Fiscal oficial, se asegura sumatoria activa y sin PVP sugerido en PDF
             $specs['show_totals'] = true;
             $specs['show_suggested_price'] = false;
-
-            $isConsignmentDelivery = $invoice->document_type === 'nota_entrega'
-                && ($invoice->sale_condition === 'Consignación' || stripos($invoice->payment_terms_notes ?? '', 'consignac') !== false);
-
-            if ($isConsignmentDelivery) {
-                $specs['is_consignment_sale'] = true;
-            }
 
             $nowCaracas = now('America/Caracas');
 
@@ -624,33 +617,8 @@ class InvoiceController extends Controller
             }
 
             // Si provenía de cotización/proforma (no había descontado stock aún), descontar existencias ahora
-            // Si era nota de entrega normal, ya descontó stock; si era consignación, tampoco se descuenta doble
-            if (! $this->shouldAffectInventory($invoice->document_type, $invoice->status, (array) ($invoice->technical_specs ?? [])) && ! $isConsignmentDelivery) {
+            if (! $this->shouldAffectInventory($invoice->document_type, $invoice->status)) {
                 $this->adjustInventoryForItems($invoice->items, -1);
-            }
-
-            // Si era una nota de entrega a consignación, liquidar la custodia en consignments
-            if ($isConsignmentDelivery && Schema::hasTable('consignments')) {
-                $linkedConsignments = Consignment::where('initial_delivery_invoice_id', $invoice->id)->get();
-                foreach ($linkedConsignments as $lc) {
-                    $liquidatedQty = (float) $lc->current_quantity;
-                    if ($liquidatedQty > 0) {
-                        $lc->current_quantity = 0;
-                        $lc->status = 'liquidada_total';
-                        $lc->save();
-
-                        ConsignmentMovement::create([
-                            'consignment_id' => $lc->id,
-                            'movement_type' => 'venta_facturada',
-                            'quantity' => $liquidatedQty,
-                            'previous_quantity' => $liquidatedQty,
-                            'new_quantity' => 0,
-                            'invoice_id' => $created->id,
-                            'user_id' => $request->user()?->id ?? $invoice->user_id,
-                            'notes' => "Conversión directa de Nota de Entrega #{$invoice->correlative_number} a Factura Fiscal #{$created->correlative_number}",
-                        ]);
-                    }
-                }
             }
 
             InvoiceAuditLog::record(
@@ -675,7 +643,7 @@ class InvoiceController extends Controller
     {
         DB::transaction(function () use ($request, $invoice) {
             $invoice->load('items');
-            if ($this->shouldAffectInventory($invoice->document_type, $invoice->status, (array) ($invoice->technical_specs ?? []))) {
+            if ($this->shouldAffectInventory($invoice->document_type, $invoice->status)) {
                 $this->adjustInventoryForItems($invoice->items, +1);
             }
 

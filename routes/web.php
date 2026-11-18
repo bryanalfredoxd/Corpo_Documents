@@ -295,6 +295,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Control de Mercancía en Consignación y Custodia de Clientes
     Route::get('/consignments', [ConsignmentController::class, 'index'])->name('consignments.index');
+    Route::get('/consignments/clients/{client}/statement-pdf', [ConsignmentController::class, 'clientStatementPdf'])->name('consignments.client-statement-pdf');
     Route::post('/consignments/{consignment}/sell', [ConsignmentController::class, 'sell'])->name('consignments.sell');
     Route::post('/consignments/{consignment}/restock', [ConsignmentController::class, 'restock'])->name('consignments.restock');
     Route::post('/consignments/{consignment}/return', [ConsignmentController::class, 'returnStock'])->name('consignments.return');

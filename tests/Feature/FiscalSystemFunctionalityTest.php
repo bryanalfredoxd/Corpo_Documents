@@ -2106,7 +2106,7 @@ class FiscalSystemFunctionalityTest extends TestCase
         $this->assertNotNull($movement);
         $this->assertEquals('entrega_inicial', $movement->movement_type);
         $this->assertEquals(3, (float) $movement->quantity);
-        $this->assertEquals(3, (float) $movement->resulting_balance);
+        $this->assertEquals(3, (float) $movement->new_quantity);
     }
 
     public function test_consignment_full_lifecycle_sale_restock_and_return(): void
@@ -2244,6 +2244,53 @@ class FiscalSystemFunctionalityTest extends TestCase
         // Base gravada neta = 100 - 20 = 80 => IVA 16% = 12.80
         $this->assertEquals(12.80, (float) $invoice->tax_amount);
         $this->assertEquals(92.80, (float) $invoice->total_usd);
+    }
+
+    public function test_client_consignment_statement_pdf_generation(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $user = User::where('email', 'admin@corpoasia.com')->first();
+        $company = Company::first();
+        $client = Client::first();
+        $product = Product::create([
+            'code' => 'ZAP-01',
+            'name' => 'Par de Zapatos de Seguridad',
+            'unit_price' => 50.00,
+            'suggested_price' => 70.00,
+            'stock' => 20,
+            'unit' => 'par',
+            'track_inventory' => true,
+            'is_active' => true,
+        ]);
+
+        $consignment = Consignment::create([
+            'company_id' => $company->id,
+            'client_id' => $client->id,
+            'product_id' => $product->id,
+            'description' => $product->name,
+            'initial_quantity' => 10,
+            'current_quantity' => 10,
+            'unit_price' => 50.00,
+            'suggested_price' => 70.00,
+            'status' => 'activa',
+        ]);
+
+        ConsignmentMovement::create([
+            'consignment_id' => $consignment->id,
+            'movement_type' => 'entrega_inicial',
+            'quantity' => 10,
+            'previous_quantity' => 0,
+            'new_quantity' => 10,
+            'unit_price' => 50.00,
+            'suggested_price' => 70.00,
+            'user_id' => $user->id,
+            'notes' => 'Entrega inicial de 10 pares',
+        ]);
+
+        $pdfResponse = $this->actingAs($user)->get("/consignments/clients/{$client->id}/statement-pdf");
+        $pdfResponse->assertStatus(200);
+        $this->assertEquals('application/pdf', $pdfResponse->headers->get('content-type'));
     }
 }
 

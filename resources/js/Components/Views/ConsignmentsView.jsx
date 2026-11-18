@@ -27,7 +27,6 @@ export default function ConsignmentsView({
     consignments = [],
     consignmentStats = {},
     clients = [],
-    searchQuery: externalSearchQuery = '',
     onNewConsignmentDelivery
 }) {
     const { notify, confirm } = useFeedback();
@@ -188,14 +187,14 @@ export default function ConsignmentsView({
             return false;
         }
 
-        // Búsqueda por texto (local o desde SecondaryNav)
-        const effectiveQuery = (searchQuery || externalSearchQuery || '').trim().toLowerCase();
-        if (effectiveQuery !== '') {
+        // Búsqueda por texto
+        if (searchQuery.trim() !== '') {
+            const q = searchQuery.toLowerCase();
             const desc = (c.description || '').toLowerCase();
             const clientName = (c.client?.name || '').toLowerCase();
             const clientRif = (c.client?.tax_id || '').toLowerCase();
             const clientCat = (c.client?.category || '').toLowerCase();
-            return desc.includes(effectiveQuery) || clientName.includes(effectiveQuery) || clientRif.includes(effectiveQuery) || clientCat.includes(effectiveQuery);
+            return desc.includes(q) || clientName.includes(q) || clientRif.includes(q) || clientCat.includes(q);
         }
 
         return true;
@@ -447,6 +446,18 @@ export default function ConsignmentsView({
                                             {totalUnits} unidades (${totalBaseValue.toLocaleString('en-US', { minimumFractionDigits: 2 })})
                                         </span>
                                     </div>
+                                    {client?.id && (
+                                        <a
+                                            href={`/consignments/clients/${client.id}/statement-pdf`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="h-8.5 px-3 rounded-lg border-2 border-purple-200 hover:border-purple-400 bg-white hover:bg-purple-50 text-purple-900 text-xs font-black flex items-center gap-1.5 transition-colors shadow-2xs"
+                                            title="Descargar Acta de Arqueo y Conciliación de Consignación en PDF"
+                                        >
+                                            <FileText className="w-3.5 h-3.5 text-purple-700" />
+                                            <span>Acta PDF</span>
+                                        </a>
+                                    )}
                                 </div>
                             </div>
 
@@ -1089,3 +1100,4 @@ export default function ConsignmentsView({
         </div>
     );
 }
+

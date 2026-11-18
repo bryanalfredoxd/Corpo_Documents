@@ -46,8 +46,9 @@ class ConsignmentMovement extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function getResultingBalanceAttribute()
+    public function getResultingBalanceAttribute(): float
     {
-        return $this->new_quantity;
+        return (float) ($this->new_quantity ?? 0);
     }
 }
+
