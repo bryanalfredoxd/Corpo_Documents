@@ -40,6 +40,17 @@ Route::middleware(['auth'])->group(function () {
         if (Schema::hasTable('products')) {
             $products = Product::where('is_active', true)->orderBy('name')->get();
             if (Schema::hasColumn('invoice_items', 'product_id')) {
+                // Condición SQL que identifica documentos bajo modalidad de Consignación
+                // (incluso si fueron creados dejando el selector en 'factura' pero marcados con condición Consignación o PVP Sugerido)
+                $consignSql = "(
+                    LOWER(COALESCE(invoices.sale_condition, '')) LIKE '%consign%'
+                    OR LOWER(COALESCE(invoices.payment_terms_notes, '')) LIKE '%consignac%'
+                    OR (
+                        COALESCE(invoices.technical_specs, '') LIKE '%show_suggested_price%true%'
+                        AND COALESCE(invoices.technical_specs, '') LIKE '%show_totals%false%'
+                    )
+                )";
+
                 // Métricas de uso segmentadas por tipo de documento / modalidad PDF
                 $usageStats = DB::table('invoice_items')
                     ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
@@ -47,15 +58,15 @@ Route::middleware(['auth'])->group(function () {
                     ->whereNotIn('invoices.status', ['anulada'])
                     ->select(
                         'invoice_items.product_id',
-                        // Facturas fiscales / comerciales (Ventas formales emitidas o pagadas)
-                        DB::raw("SUM(CASE WHEN invoices.document_type = 'factura' AND invoices.status IN ('emitida', 'pagada') THEN invoice_items.quantity ELSE 0 END) as invoiced_units"),
-                        DB::raw("SUM(CASE WHEN invoices.document_type = 'factura' AND invoices.status IN ('emitida', 'pagada') THEN invoice_items.total ELSE 0 END) as invoiced_revenue"),
+                        // Facturas fiscales / comerciales (Ventas formales reales, excluyendo consignaciones)
+                        DB::raw("SUM(CASE WHEN invoices.document_type = 'factura' AND NOT $consignSql AND invoices.status IN ('emitida', 'pagada') THEN invoice_items.quantity ELSE 0 END) as invoiced_units"),
+                        DB::raw("SUM(CASE WHEN invoices.document_type = 'factura' AND NOT $consignSql AND invoices.status IN ('emitida', 'pagada') THEN invoice_items.total ELSE 0 END) as invoiced_revenue"),
                         
-                        // Notas de Entrega a Consignación (despachadas bajo modalidad consignación)
-                        DB::raw("SUM(CASE WHEN invoices.document_type = 'nota_entrega' AND (invoices.sale_condition = 'Consignación' OR LOWER(COALESCE(invoices.payment_terms_notes, '')) LIKE '%consignac%') AND invoices.status IN ('emitida', 'pagada', 'borrador') THEN invoice_items.quantity ELSE 0 END) as consigned_delivery_units"),
+                        // Mercancía en Consignación (sea nota de entrega o factura ajustada a consignación)
+                        DB::raw("SUM(CASE WHEN $consignSql AND invoices.status IN ('emitida', 'pagada', 'borrador') THEN invoice_items.quantity ELSE 0 END) as consigned_delivery_units"),
                         
-                        // Notas de Entrega ordinarias (despacho / entrega simple)
-                        DB::raw("SUM(CASE WHEN invoices.document_type = 'nota_entrega' AND invoices.sale_condition != 'Consignación' AND LOWER(COALESCE(invoices.payment_terms_notes, '')) NOT LIKE '%consignac%' AND invoices.status IN ('emitida', 'pagada') THEN invoice_items.quantity ELSE 0 END) as delivered_units"),
+                        // Notas de Entrega ordinarias (despacho / entrega simple, no consignación)
+                        DB::raw("SUM(CASE WHEN invoices.document_type = 'nota_entrega' AND NOT $consignSql AND invoices.status IN ('emitida', 'pagada') THEN invoice_items.quantity ELSE 0 END) as delivered_units"),
                         
                         // Cotizaciones
                         DB::raw("SUM(CASE WHEN invoices.document_type = 'cotizacion' AND invoices.status != 'borrador' THEN invoice_items.quantity ELSE 0 END) as quoted_units"),
@@ -108,6 +119,16 @@ Route::middleware(['auth'])->group(function () {
         }
 
         // Métricas contables globales calculadas directamente en MySQL con SUM() / COUNT()
+        // Las consignaciones (incluso si se crearon bajo la modalidad 'factura') representan mercancía en custodia, no ventas exigibles
+        $fiscalConsignFilter = "NOT (
+            LOWER(COALESCE(invoices.sale_condition, '')) LIKE '%consign%'
+            OR LOWER(COALESCE(invoices.payment_terms_notes, '')) LIKE '%consignac%'
+            OR (
+                COALESCE(invoices.technical_specs, '') LIKE '%show_suggested_price%true%'
+                AND COALESCE(invoices.technical_specs, '') LIKE '%show_totals%false%'
+            )
+        )";
+
         if (Schema::hasTable('invoice_payments')) {
             $paymentsSub = DB::table('invoice_payments')
                 ->select('invoice_id', DB::raw('SUM(amount_usd) as paid_sum'))
@@ -116,6 +137,7 @@ Route::middleware(['auth'])->group(function () {
             $fiscalAgg = Invoice::query()
                 ->leftJoinSub($paymentsSub, 'ip', 'invoices.id', '=', 'ip.invoice_id')
                 ->where('invoices.document_type', 'factura')
+                ->whereRaw($fiscalConsignFilter)
                 ->whereNotIn('invoices.status', ['anulada', 'borrador'])
                 ->selectRaw('
                     COUNT(*) as fiscal_count,
@@ -144,6 +166,7 @@ Route::middleware(['auth'])->group(function () {
             $fiscalCount = (int) ($fiscalAgg->fiscal_count ?? 0);
         } else {
             $fiscalAgg = Invoice::where('document_type', 'factura')
+                ->whereRaw($fiscalConsignFilter)
                 ->whereNotIn('status', ['anulada', 'borrador'])
                 ->selectRaw('
                     COUNT(*) as fiscal_count,

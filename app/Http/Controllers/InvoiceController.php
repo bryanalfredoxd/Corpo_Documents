@@ -117,7 +117,12 @@ class InvoiceController extends Controller
             }
         }
 
-        $isConsignment = ($validated['document_type'] === 'nota_entrega' || ($validated['sale_condition'] ?? '') === 'Consignación');
+        $isConsignment = (
+            $validated['document_type'] === 'nota_entrega'
+            || strcasecmp((string) ($validated['sale_condition'] ?? ''), 'Consignación') === 0
+            || str_contains(strtolower((string) ($validated['sale_condition'] ?? '')), 'consign')
+            || str_contains(strtolower((string) ($validated['payment_terms_notes'] ?? '')), 'consign')
+        );
         $defaultShowTotals = ! $isConsignment;
         $defaultShowSuggested = $isConsignment;
 
@@ -265,8 +270,17 @@ class InvoiceController extends Controller
             return;
         }
 
-        $isConsignment = $invoice->document_type === 'nota_entrega'
-            && (strcasecmp((string) $invoice->sale_condition, 'Consignación') === 0 || str_contains(strtolower((string) $invoice->sale_condition), 'consign'));
+        $specs = is_array($invoice->technical_specs) ? $invoice->technical_specs : json_decode($invoice->technical_specs ?? '[]', true);
+        $showSuggested = ! empty($specs['show_suggested_price']);
+        $hideTotals = isset($specs['show_totals']) && ! $specs['show_totals'];
+
+        $isConsignment = (
+            strcasecmp((string) $invoice->sale_condition, 'Consignación') === 0
+            || str_contains(strtolower((string) $invoice->sale_condition), 'consign')
+            || str_contains(strtolower((string) ($invoice->payment_terms_notes ?? '')), 'consign')
+            || ($showSuggested && $hideTotals)
+            || ($invoice->document_type === 'nota_entrega' && $showSuggested)
+        );
 
         if (! $isConsignment) {
             return;

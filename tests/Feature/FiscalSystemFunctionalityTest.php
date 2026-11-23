@@ -2328,5 +2328,80 @@ class FiscalSystemFunctionalityTest extends TestCase
         $this->assertTrue((bool) ($second['cached'] ?? false));
         $this->assertEquals($first['rate'], $second['rate']);
     }
+
+    public function test_consignment_created_as_factura_modality_is_classified_as_consignment_not_sold(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::create([
+            'name' => 'Corpo Asia Maquinaria CA',
+            'tax_id' => 'J-50999999-9',
+            'phone' => '+58 212 9999999',
+            'address' => 'Caracas',
+            'is_active' => true,
+        ]);
+        $client = Client::create([
+            'type' => 'empresa',
+            'name' => 'Agropecuaria El Carmen CA',
+            'tax_id' => 'J-12345678-0',
+            'phone' => '+58 212 1111111',
+            'address' => 'Caracas',
+            'is_active' => true,
+        ]);
+        $product = Product::create([
+            'name' => 'Peletizadora KL-160 Test',
+            'code' => 'TEST-KL160',
+            'unit' => 'unid',
+            'unit_price' => 900,
+            'suggested_price' => 1100,
+            'track_inventory' => true,
+            'stock' => 10,
+            'is_active' => true,
+        ]);
+
+        // El usuario emite un documento dejando document_type = 'factura' pero ajustando a Consignación
+        $this->actingAs($user)->post('/invoices', [
+            'company_id' => $company->id,
+            'client_id' => $client->id,
+            'document_type' => 'factura', // El usuario no cambió el selector de arriba
+            'status' => 'emitida',
+            'issue_date' => '2026-11-23',
+            'sale_condition' => 'Consignación', // Marcó la condición Consignación
+            'show_suggested_price' => true,     // Activó Mostrar PVP (Consignación)
+            'show_totals' => false,            // Ocultó totales
+            'bcv_exchange_rate' => 900,
+            'currency' => 'USD',
+            'tax_percentage' => 0,
+            'items' => [[
+                'product_id' => $product->id,
+                'description' => $product->name,
+                'quantity' => 2,
+                'unit' => 'unid',
+                'unit_price' => 900,
+                'suggested_price' => 1100,
+                'is_tax_exempt' => true,
+            ]],
+        ])->assertRedirect();
+
+        // 1. Verificar catálogo en '/'
+        $props = $this->actingAs($user)->get('/')->viewData('page')['props'];
+        $loadedProduct = collect($props['products'])->firstWhere('id', $product->id);
+
+        $this->assertNotNull($loadedProduct);
+        // Debe registrarse como En Consignación: 2
+        $this->assertEquals(2.0, (float) $loadedProduct['consigned_units']);
+        // NO debe registrarse como Facturado / Vendido
+        $this->assertEquals(0.0, (float) $loadedProduct['invoiced_units']);
+        $this->assertEquals(0.0, (float) $loadedProduct['sold_units']);
+
+        // 2. No debe inflar el total fiscal facturado de ventas comerciales
+        $this->assertEquals(0.0, (float) $props['stats']['total_usd']);
+
+        // 3. Debe haberse sincronizado a la tabla de consignaciones para control y reposición
+        $consignment = \App\Models\Consignment::where('product_id', $product->id)
+            ->where('client_id', $client->id)
+            ->first();
+        $this->assertNotNull($consignment);
+        $this->assertEquals(2.0, (float) $consignment->current_quantity);
+    }
 }
 

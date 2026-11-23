@@ -30,7 +30,8 @@ import {
     Tag,
     Settings2,
     Calculator,
-    RefreshCw
+    RefreshCw,
+    PackageCheck
 } from 'lucide-react';
 import { getDocumentTypeInfo, CLIENT_CATEGORIES, getClientCategoryBadge } from '../../Utils/invoiceConstants';
 import { compressImageToDataUrl } from '../../Utils/imageCompression';
@@ -541,7 +542,12 @@ export default function InvoiceForm({
                     <div className="grid grid-cols-2 gap-2">
                         <button
                             type="button"
-                            onClick={() => setInvoiceForm(prev => ({ ...prev, show_suggested_price: false }))}
+                            onClick={() => setInvoiceForm(prev => ({
+                                ...prev,
+                                show_suggested_price: false,
+                                show_totals: true,
+                                sale_condition: prev.sale_condition === 'Consignación' ? 'Venta de Contado' : prev.sale_condition,
+                            }))}
                             className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${!invoiceForm.show_suggested_price
                                 ? 'bg-slate-800 text-white border-slate-900 shadow-2xs'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
@@ -551,7 +557,15 @@ export default function InvoiceForm({
                         </button>
                         <button
                             type="button"
-                            onClick={() => setInvoiceForm(prev => ({ ...prev, show_suggested_price: true }))}
+                            onClick={() => setInvoiceForm(prev => {
+                                const isConsign = prev.sale_condition === 'Consignación' || prev.sale_condition?.toLowerCase().includes('consign');
+                                return {
+                                    ...prev,
+                                    show_suggested_price: true,
+                                    show_totals: false,
+                                    sale_condition: isConsign ? prev.sale_condition : 'Consignación',
+                                };
+                            })}
                             className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${invoiceForm.show_suggested_price
                                 ? 'bg-red-700 text-white border-red-800 shadow-2xs'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
@@ -560,6 +574,15 @@ export default function InvoiceForm({
                             <span>🏷️ Mostrar PVP (Consignación)</span>
                         </button>
                     </div>
+                    {invoiceForm.show_suggested_price && (
+                        <div className="p-2 bg-purple-50 border border-purple-200 rounded-lg text-[11px] font-bold text-purple-900 flex items-start gap-1.5">
+                            <PackageCheck className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" />
+                            <div>
+                                <span className="font-black text-purple-950">Modalidad Consignación Activa:</span>{' '}
+                                Este documento se registra como entrega en custodia a consignación. En el catálogo los productos se clasificarán como <strong>En Consignación</strong> (no como venta facturada) y estarán en el módulo de Consignaciones para su control y reposición.
+                            </div>
+                        </div>
+                    )}
                     <p className="text-[10px] text-slate-500 font-medium">
                         {invoiceForm.show_suggested_price
                             ? '✓ El cliente verá el Precio Sugerido en el PDF (ideal para entregas a consignación o listas de distribuidores).'
