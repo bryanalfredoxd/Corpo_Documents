@@ -21,6 +21,7 @@ export default function GeneratorView({
     taxAmount,
     totalUsd,
     totalVes,
+    bcvData = {},
     projectedCorrelative,
     projectedControlNumber,
     handleAddItem,
@@ -92,6 +93,7 @@ export default function GeneratorView({
                     taxAmount={taxAmount}
                     totalUsd={totalUsd}
                     totalVes={totalVes}
+                    bcvData={bcvData}
                     handleAddItem={handleAddItem}
                     handleRemoveItem={handleRemoveItem}
                     handleItemChange={handleItemChange}

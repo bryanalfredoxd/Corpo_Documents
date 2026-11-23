@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, Search, X, Plus, CheckCircle2, Image as ImageIcon } from 'lucide-react';
+import { Package, Search, X, Plus, CheckCircle2, Image as ImageIcon, ShoppingCart, PackageCheck, Truck, FileText } from 'lucide-react';
 
 export default function ProductPickerModal({
     isOpen,
@@ -193,6 +193,30 @@ export default function ProductPickerModal({
                                                 {prod.technical_specs?.specs?.length > 0 && (
                                                     <span className="text-[10px] font-black bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
                                                         Ficha Técnica
+                                                    </span>
+                                                )}
+                                                {prod.invoiced_units > 0 && (
+                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-900 border border-emerald-300 inline-flex items-center gap-1" title="Unidades facturadas formalmente">
+                                                        <ShoppingCart className="w-2.5 h-2.5 text-emerald-700" />
+                                                        Facturados: {Number(prod.invoiced_units)}
+                                                    </span>
+                                                )}
+                                                {prod.consigned_units > 0 && (
+                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-purple-50 text-purple-900 border border-purple-300 inline-flex items-center gap-1" title="Unidades en custodia o nota de consignación">
+                                                        <PackageCheck className="w-2.5 h-2.5 text-purple-700" />
+                                                        En Consignación: {Number(prod.consigned_units)}
+                                                    </span>
+                                                )}
+                                                {prod.delivered_units > 0 && (
+                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-300 inline-flex items-center gap-1" title="Unidades entregadas mediante nota de entrega">
+                                                        <Truck className="w-2.5 h-2.5 text-blue-700" />
+                                                        Entregados: {Number(prod.delivered_units)}
+                                                    </span>
+                                                )}
+                                                {prod.quoted_units > 0 && (
+                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300 inline-flex items-center gap-1" title="Unidades en cotizaciones">
+                                                        <FileText className="w-2.5 h-2.5 text-amber-700" />
+                                                        Cotizados: {Number(prod.quoted_units)}
                                                     </span>
                                                 )}
                                             </div>

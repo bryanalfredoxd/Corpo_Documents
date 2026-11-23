@@ -150,7 +150,7 @@ export function getCompanyBankAccountsForPdf(activeCompany, invoiceForm) {
 /**
  * Genera la estructura inicial de una factura vacía lista para llenar
  */
-export const getEmptyInvoice = (company, companies = []) => ({
+export const getEmptyInvoice = (company, companies = [], defaultBcvRate = null) => ({
     id: null,
     correlative_number: null,
     control_number: null,
@@ -169,7 +169,7 @@ export const getEmptyInvoice = (company, companies = []) => ({
     delivery_address: '',
     sale_condition: 'Venta de Contado',
     sales_channel: 'Oficina / Presencial',
-    bcv_exchange_rate: 876.80,
+    bcv_exchange_rate: defaultBcvRate ? Number(defaultBcvRate) : 918.77,
     show_bs_conversion: true,
     show_totals: true,
     show_suggested_price: false,

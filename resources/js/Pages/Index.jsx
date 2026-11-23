@@ -45,6 +45,7 @@ function IndexContent({
     products = [],
     consignments = [],
     consignmentStats = {},
+    bcvData = {},
     stats = {},
     chartData = {},
     statusCounts = {},
@@ -183,8 +184,21 @@ function IndexContent({
         default_terms: 'Comprobante fiscal válido. Conserve este documento para efectos legales y de garantía.'
     };
 
-    // Estado del formulario de factura (Sincronizado en tiempo real con la hoja A4)
-    const [invoiceForm, setInvoiceForm] = useState(getEmptyInvoice(activeCompany, companies));
+    // Estado del formulario de factura (Sincronizado en tiempo real con la hoja A4 y vinculado a Tasa BCV Oficial)
+    const initialBcvRate = bcvData?.rate ? Number(bcvData.rate) : 918.77;
+    const [invoiceForm, setInvoiceForm] = useState(getEmptyInvoice(activeCompany, companies, initialBcvRate));
+
+    // Sincronizar tasa BCV oficial si llega por props y el formulario está nuevo
+    useEffect(() => {
+        if (bcvData?.rate && !invoiceForm.id) {
+            setInvoiceForm(prev => {
+                if (prev.bcv_exchange_rate === 876.80 || !prev.bcv_exchange_rate) {
+                    return { ...prev, bcv_exchange_rate: Number(bcvData.rate) };
+                }
+                return prev;
+            });
+        }
+    }, [bcvData]);
 
     // Cambio inteligente de tipo de documento (Factura, Proforma, Cotización, Nota Entrega)
     const handleDocumentTypeChange = (newType) => {
@@ -237,9 +251,9 @@ function IndexContent({
         });
     };
 
-    // Iniciar una nueva factura limpia
+    // Iniciar una nueva factura limpia con la tasa BCV oficial
     const handleNewInvoice = () => {
-        setInvoiceForm(getEmptyInvoice(activeCompany, companies));
+        setInvoiceForm(getEmptyInvoice(activeCompany, companies, bcvData?.rate));
         setCurrentView('generador-pdf');
     };
 
@@ -1039,6 +1053,7 @@ function IndexContent({
                         taxAmount={taxAmount}
                         totalUsd={totalUsd}
                         totalVes={totalVes}
+                        bcvData={bcvData}
                         projectedCorrelative={projectedCorrelative}
                         projectedControlNumber={projectedControlNumber}
                         handleAddItem={handleAddItem}

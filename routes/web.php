@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BcvController;
 use App\Http\Controllers\ClientCategoryController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CompanyBankAccountController;
@@ -16,6 +17,7 @@ use App\Models\Company;
 use App\Models\Consignment;
 use App\Models\Invoice;
 use App\Models\Product;
+use App\Services\BcvExchangeRateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -38,30 +40,69 @@ Route::middleware(['auth'])->group(function () {
         if (Schema::hasTable('products')) {
             $products = Product::where('is_active', true)->orderBy('name')->get();
             if (Schema::hasColumn('invoice_items', 'product_id')) {
-                $soldStats = DB::table('invoice_items')
+                // Métricas de uso segmentadas por tipo de documento / modalidad PDF
+                $usageStats = DB::table('invoice_items')
                     ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
                     ->whereNotNull('invoice_items.product_id')
-                    ->whereIn('invoices.document_type', ['factura', 'nota_entrega'])
-                    ->whereIn('invoices.status', ['emitida', 'pagada'])
-                    ->select('invoice_items.product_id', DB::raw('SUM(invoice_items.quantity) as sold_units'), DB::raw('SUM(invoice_items.total) as sold_revenue'))
+                    ->whereNotIn('invoices.status', ['anulada'])
+                    ->select(
+                        'invoice_items.product_id',
+                        // Facturas fiscales / comerciales (Ventas formales emitidas o pagadas)
+                        DB::raw("SUM(CASE WHEN invoices.document_type = 'factura' AND invoices.status IN ('emitida', 'pagada') THEN invoice_items.quantity ELSE 0 END) as invoiced_units"),
+                        DB::raw("SUM(CASE WHEN invoices.document_type = 'factura' AND invoices.status IN ('emitida', 'pagada') THEN invoice_items.total ELSE 0 END) as invoiced_revenue"),
+                        
+                        // Notas de Entrega a Consignación (despachadas bajo modalidad consignación)
+                        DB::raw("SUM(CASE WHEN invoices.document_type = 'nota_entrega' AND (invoices.sale_condition = 'Consignación' OR LOWER(COALESCE(invoices.payment_terms_notes, '')) LIKE '%consignac%') AND invoices.status IN ('emitida', 'pagada', 'borrador') THEN invoice_items.quantity ELSE 0 END) as consigned_delivery_units"),
+                        
+                        // Notas de Entrega ordinarias (despacho / entrega simple)
+                        DB::raw("SUM(CASE WHEN invoices.document_type = 'nota_entrega' AND invoices.sale_condition != 'Consignación' AND LOWER(COALESCE(invoices.payment_terms_notes, '')) NOT LIKE '%consignac%' AND invoices.status IN ('emitida', 'pagada') THEN invoice_items.quantity ELSE 0 END) as delivered_units"),
+                        
+                        // Cotizaciones
+                        DB::raw("SUM(CASE WHEN invoices.document_type = 'cotizacion' AND invoices.status != 'borrador' THEN invoice_items.quantity ELSE 0 END) as quoted_units"),
+                        
+                        // Proformas
+                        DB::raw("SUM(CASE WHEN invoices.document_type = 'proforma' AND invoices.status != 'borrador' THEN invoice_items.quantity ELSE 0 END) as proforma_units")
+                    )
                     ->groupBy('invoice_items.product_id')
                     ->get()
                     ->keyBy('product_id');
 
-                $quotedStats = DB::table('invoice_items')
-                    ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
-                    ->whereNotNull('invoice_items.product_id')
-                    ->whereIn('invoices.document_type', ['proforma', 'cotizacion'])
-                    ->whereNotIn('invoices.status', ['anulada', 'borrador'])
-                    ->select('invoice_items.product_id', DB::raw('SUM(invoice_items.quantity) as quoted_units'))
-                    ->groupBy('invoice_items.product_id')
-                    ->get()
-                    ->keyBy('product_id');
+                $custodyStats = collect();
+                if (Schema::hasTable('consignments')) {
+                    $custodyStats = DB::table('consignments')
+                        ->whereNotNull('product_id')
+                        ->whereNotIn('status', ['devuelta', 'liquidada_total'])
+                        ->select('product_id', DB::raw('SUM(current_quantity) as active_custody_units'))
+                        ->groupBy('product_id')
+                        ->get()
+                        ->keyBy('product_id');
+                }
 
-                $products->each(function ($prod) use ($soldStats, $quotedStats) {
-                    $prod->sold_units = (float) ($soldStats->get($prod->id)->sold_units ?? 0);
-                    $prod->sold_revenue = (float) ($soldStats->get($prod->id)->sold_revenue ?? 0);
-                    $prod->quoted_units = (float) ($quotedStats->get($prod->id)->quoted_units ?? 0);
+                $products->each(function ($prod) use ($usageStats, $custodyStats) {
+                    $stats = $usageStats->get($prod->id);
+                    $custody = $custodyStats->get($prod->id);
+
+                    $invoicedUnits = (float) ($stats->invoiced_units ?? 0);
+                    $invoicedRevenue = (float) ($stats->invoiced_revenue ?? 0);
+                    $activeCustody = (float) ($custody->active_custody_units ?? 0);
+                    $consignedDelivery = (float) ($stats->consigned_delivery_units ?? 0);
+                    $consignedUnits = $activeCustody > 0 ? $activeCustody : $consignedDelivery;
+                    $deliveredUnits = (float) ($stats->delivered_units ?? 0);
+                    $quotedUnits = (float) ($stats->quoted_units ?? 0);
+                    $proformaUnits = (float) ($stats->proforma_units ?? 0);
+
+                    $prod->invoiced_units = $invoicedUnits;
+                    $prod->invoiced_revenue = $invoicedRevenue;
+                    $prod->consigned_units = $consignedUnits;
+                    $prod->consigned_active_units = $activeCustody;
+                    $prod->consigned_delivery_units = $consignedDelivery;
+                    $prod->delivered_units = $deliveredUnits;
+                    $prod->quoted_units = $quotedUnits;
+                    $prod->proforma_units = $proformaUnits;
+
+                    // Compatibilidad con código previo y pruebas
+                    $prod->sold_units = $invoicedUnits;
+                    $prod->sold_revenue = $invoicedRevenue;
                 });
             }
         }
@@ -236,6 +277,8 @@ Route::middleware(['auth'])->group(function () {
             ];
         }
 
+        $bcvData = BcvExchangeRateService::getLiveRate();
+
         return Inertia::render('Index', [
             'companies' => $companies,
             'clients' => $clients,
@@ -244,6 +287,7 @@ Route::middleware(['auth'])->group(function () {
             'products' => $products,
             'consignments' => $consignments,
             'consignmentStats' => $consignmentStats,
+            'bcvData' => $bcvData,
             'stats' => $stats,
             'chartData' => $chartData,
             'statusCounts' => $paginatedResult['statusCounts'],
@@ -302,6 +346,10 @@ Route::middleware(['auth'])->group(function () {
 
     // Reportes Contables y Libro de Ventas
     Route::get('/reports/sales-book', [ReportController::class, 'salesBook'])->name('reports.sales-book');
+
+    // Consulta en vivo de Tasa Oficial Dólar BCV (DolarApi / PyDolar)
+    Route::get('/bcv/rate', [BcvController::class, 'getRate'])->name('bcv.rate');
+    Route::get('/api/bcv-rate', [BcvController::class, 'getRate'])->name('api.bcv.rate');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

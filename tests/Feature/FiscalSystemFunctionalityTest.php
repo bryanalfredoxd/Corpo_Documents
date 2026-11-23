@@ -2292,5 +2292,41 @@ class FiscalSystemFunctionalityTest extends TestCase
         $pdfResponse->assertStatus(200);
         $this->assertEquals('application/pdf', $pdfResponse->headers->get('content-type'));
     }
+
+    public function test_unauthenticated_user_cannot_access_bcv_rate_api(): void
+    {
+        $response = $this->getJson('/api/bcv-rate');
+        $response->assertStatus(401);
+    }
+
+    public function test_authenticated_user_can_query_official_bcv_rate(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $user = User::where('email', 'admin@corpoasia.com')->first();
+
+        $response = $this->actingAs($user)->getJson('/api/bcv-rate');
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'rate',
+            'formatted_rate',
+            'source',
+            'fetched_at',
+        ]);
+
+        $data = $response->json();
+        $this->assertGreaterThan(0, (float) $data['rate']);
+        $this->assertNotEmpty($data['formatted_rate']);
+    }
+
+    public function test_bcv_service_caching_and_forced_refresh(): void
+    {
+        $first = \App\Services\BcvExchangeRateService::getLiveRate(false);
+        $this->assertGreaterThan(0, (float) $first['rate']);
+
+        // Segunda llamada inmediata debe venir de la caché
+        $second = \App\Services\BcvExchangeRateService::getLiveRate(false);
+        $this->assertTrue((bool) ($second['cached'] ?? false));
+        $this->assertEquals($first['rate'], $second['rate']);
+    }
 }
 

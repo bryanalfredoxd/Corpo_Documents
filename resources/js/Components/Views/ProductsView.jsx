@@ -11,7 +11,12 @@ import {
     Boxes,
     AlertTriangle,
     Layers,
-    TrendingUp
+    TrendingUp,
+    ShoppingCart,
+    PackageCheck,
+    Truck,
+    FileText,
+    FileSpreadsheet
 } from 'lucide-react';
 import { useFeedback } from '../../Contexts/FeedbackContext';
 
@@ -181,8 +186,14 @@ export default function ProductsView({
                                     </p>
                                 )}
 
-                                {/* Stock, Ficha Técnica y Métricas */}
-                                {(prod.track_inventory || prod.technical_specs?.specs?.length > 0 || prod.sold_units > 0 || prod.quoted_units > 0) && (
+                                {/* Stock, Ficha Técnica y Métricas de Uso por Modalidad de Documento */}
+                                {(prod.track_inventory ||
+                                  prod.technical_specs?.specs?.length > 0 ||
+                                  prod.invoiced_units > 0 ||
+                                  prod.consigned_units > 0 ||
+                                  prod.delivered_units > 0 ||
+                                  prod.quoted_units > 0 ||
+                                  prod.proforma_units > 0) && (
                                     <div className="flex flex-wrap gap-1.5 text-[10px] font-black">
                                         {prod.track_inventory && (
                                             Number(prod.stock) <= Number(prod.min_stock) ? (
@@ -203,10 +214,51 @@ export default function ProductsView({
                                                 Ficha Técnica ({prod.technical_specs.specs.length})
                                             </span>
                                         )}
-                                        {(prod.sold_units > 0 || prod.quoted_units > 0) && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-200">
-                                                <TrendingUp className="w-3 h-3 text-blue-700" />
-                                                {prod.sold_units > 0 ? `Vendidos: ${prod.sold_units}` : `Cotiz: ${prod.quoted_units}`}
+
+                                        {/* Modality Badges: Según el tipo de PDF donde se integró el producto */}
+                                        {prod.invoiced_units > 0 && (
+                                            <span
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs"
+                                                title="Unidades vendidas mediante Factura Fiscal o Comercial formal"
+                                            >
+                                                <ShoppingCart className="w-3 h-3 text-emerald-700 shrink-0" />
+                                                <span>Facturados: {Number(prod.invoiced_units)}</span>
+                                            </span>
+                                        )}
+                                        {prod.consigned_units > 0 && (
+                                            <span
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 text-purple-900 border border-purple-300 shadow-2xs"
+                                                title="Unidades entregadas en custodia de clientes bajo Nota de Entrega a Consignación"
+                                            >
+                                                <PackageCheck className="w-3 h-3 text-purple-700 shrink-0" />
+                                                <span>En Consignación: {Number(prod.consigned_units)}</span>
+                                            </span>
+                                        )}
+                                        {prod.delivered_units > 0 && (
+                                            <span
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-300 shadow-2xs"
+                                                title="Unidades despachadas mediante Nota de Entrega directa (no consignación)"
+                                            >
+                                                <Truck className="w-3 h-3 text-blue-700 shrink-0" />
+                                                <span>Entregados: {Number(prod.delivered_units)}</span>
+                                            </span>
+                                        )}
+                                        {prod.quoted_units > 0 && (
+                                            <span
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs"
+                                                title="Unidades presupuestadas en Cotizaciones"
+                                            >
+                                                <FileText className="w-3 h-3 text-amber-700 shrink-0" />
+                                                <span>Cotizados: {Number(prod.quoted_units)}</span>
+                                            </span>
+                                        )}
+                                        {prod.proforma_units > 0 && (
+                                            <span
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-50 text-cyan-900 border border-cyan-300 shadow-2xs"
+                                                title="Unidades incluidas en ofertas Proforma"
+                                            >
+                                                <FileSpreadsheet className="w-3 h-3 text-cyan-700 shrink-0" />
+                                                <span>Proformas: {Number(prod.proforma_units)}</span>
                                             </span>
                                         )}
                                     </div>

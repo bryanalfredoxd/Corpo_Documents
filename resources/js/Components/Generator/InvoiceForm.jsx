@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Combobox,
     ComboboxInput,
@@ -28,7 +29,8 @@ import {
     User,
     Tag,
     Settings2,
-    Calculator
+    Calculator,
+    RefreshCw
 } from 'lucide-react';
 import { getDocumentTypeInfo, CLIENT_CATEGORIES, getClientCategoryBadge } from '../../Utils/invoiceConstants';
 import { compressImageToDataUrl } from '../../Utils/imageCompression';
@@ -51,6 +53,7 @@ export default function InvoiceForm({
     taxAmount,
     totalUsd,
     totalVes,
+    bcvData = {},
     handleAddItem,
     handleRemoveItem,
     handleItemChange,
@@ -71,6 +74,40 @@ export default function InvoiceForm({
     const { confirm, notify } = useFeedback();
     const [clientQuery, setClientQuery] = useState('');
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+
+    // Estado de consulta y vinculación en tiempo real con la tasa oficial BCV
+    const [isFetchingBcv, setIsFetchingBcv] = useState(false);
+    const [currentBcvInfo, setCurrentBcvInfo] = useState(bcvData || null);
+
+    useEffect(() => {
+        if (bcvData && bcvData.rate) {
+            setCurrentBcvInfo(bcvData);
+        }
+    }, [bcvData]);
+
+    const handleFetchLiveBcvRate = async (isManual = true) => {
+        setIsFetchingBcv(true);
+        try {
+            const response = await axios.get('/api/bcv-rate', { params: { force: isManual ? 1 : 0 } });
+            if (response.data && response.data.rate) {
+                const numericRate = Number(response.data.rate);
+                setCurrentBcvInfo(response.data);
+                setInvoiceForm(prev => ({
+                    ...prev,
+                    bcv_exchange_rate: numericRate
+                }));
+                if (isManual) {
+                    notify.success(`Tasa BCV oficial actualizada: Bs. ${response.data.formatted_rate || numericRate.toFixed(2)}`);
+                }
+            } else {
+                if (isManual) notify.warning('No se pudo obtener la tasa BCV en vivo. Se conserva la tasa actual.');
+            }
+        } catch (err) {
+            if (isManual) notify.error('Error al conectar con la API oficial del BCV.');
+        } finally {
+            setIsFetchingBcv(false);
+        }
+    };
 
     const selectedClientOption = clients.find((cl) => String(cl.id) === String(invoiceForm.client_id)) || null;
     const filteredClients = clients.filter((cl) => {
@@ -99,9 +136,8 @@ export default function InvoiceForm({
     return (
         <form
             onSubmit={(e) => handleSubmitInvoice(e)}
-            className={`lg:col-span-5 bg-white rounded-xl border-2 border-slate-300 shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5 no-print ${
-                mobileEditorTab === 'formulario' ? 'block' : 'hidden lg:block'
-            }`}
+            className={`lg:col-span-5 bg-white rounded-xl border-2 border-slate-300 shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5 no-print ${mobileEditorTab === 'formulario' ? 'block' : 'hidden lg:block'
+                }`}
         >
             {/* Banner si se está editando un documento guardado */}
             {invoiceForm.id && (
@@ -193,11 +229,10 @@ export default function InvoiceForm({
                             key={t.id}
                             type="button"
                             onClick={() => handleDocumentTypeChange(t.id)}
-                            className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer font-black text-xs ${
-                                invoiceForm.document_type === t.id
-                                    ? 'bg-blue-700 text-white shadow-xs'
-                                    : 'text-slate-800 hover:text-black hover:bg-slate-200'
-                            }`}
+                            className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer font-black text-xs ${invoiceForm.document_type === t.id
+                                ? 'bg-blue-700 text-white shadow-xs'
+                                : 'text-slate-800 hover:text-black hover:bg-slate-200'
+                                }`}
                         >
                             {t.label}
                         </button>
@@ -265,11 +300,10 @@ export default function InvoiceForm({
                                     key={cat.id || catName}
                                     type="button"
                                     onClick={() => setSelectedCategoryFilter(cat.id === 'all' ? 'all' : catName)}
-                                    className={`px-2 py-0.5 rounded-lg border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 text-[11px] font-black ${
-                                        isSelected
-                                            ? 'bg-blue-700 text-white border-blue-900 shadow-2xs'
-                                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                                    }`}
+                                    className={`px-2 py-0.5 rounded-lg border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 text-[11px] font-black ${isSelected
+                                        ? 'bg-blue-700 text-white border-blue-900 shadow-2xs'
+                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                        }`}
                                 >
                                     <span>{cat.icon || badgeInfo.icon}</span>
                                     <span>{cat.shortLabel || catName}</span>
@@ -341,10 +375,9 @@ export default function InvoiceForm({
                                                 key={cl.id}
                                                 value={cl}
                                                 className={({ focus, selected }) =>
-                                                    `px-3 py-2 cursor-pointer flex items-center justify-between gap-2 border-b border-slate-100 last:border-0 ${
-                                                        focus
-                                                            ? 'bg-blue-700 text-white'
-                                                            : selected
+                                                    `px-3 py-2 cursor-pointer flex items-center justify-between gap-2 border-b border-slate-100 last:border-0 ${focus
+                                                        ? 'bg-blue-700 text-white'
+                                                        : selected
                                                             ? 'bg-blue-50 text-blue-950 font-black'
                                                             : 'text-slate-900 font-bold'
                                                     }`
@@ -426,22 +459,20 @@ export default function InvoiceForm({
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, show_bs_conversion: true }))}
-                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                                invoiceForm.show_bs_conversion !== false
-                                    ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${invoiceForm.show_bs_conversion !== false
+                                ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
                         >
                             <span>💵 Dólares + Bolívares (USD + BS)</span>
                         </button>
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, show_bs_conversion: false }))}
-                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                                invoiceForm.show_bs_conversion === false
-                                    ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${invoiceForm.show_bs_conversion === false
+                                ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
                         >
                             <span>💲 Solo Dólares (USD)</span>
                         </button>
@@ -468,22 +499,20 @@ export default function InvoiceForm({
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, show_totals: true }))}
-                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                                invoiceForm.show_totals !== false
-                                    ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${invoiceForm.show_totals !== false
+                                ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
                         >
                             <span>✓ Con Sumatoria Total</span>
                         </button>
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, show_totals: false }))}
-                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                                invoiceForm.show_totals === false
-                                    ? 'bg-amber-700 text-white border-amber-800 shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${invoiceForm.show_totals === false
+                                ? 'bg-amber-700 text-white border-amber-800 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
                         >
                             <span>🚫 Sin Sumatoria (Consignación)</span>
                         </button>
@@ -502,11 +531,10 @@ export default function InvoiceForm({
                             <Tag className="w-3.5 h-3.5 text-red-600" />
                             <span>Precio Sugerido (PVP) en el Documento (PDF):</span>
                         </label>
-                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                            invoiceForm.show_suggested_price
-                                ? 'bg-red-100 text-red-800 border border-red-300'
-                                : 'bg-slate-100 text-slate-600 border border-slate-300'
-                        }`}>
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${invoiceForm.show_suggested_price
+                            ? 'bg-red-100 text-red-800 border border-red-300'
+                            : 'bg-slate-100 text-slate-600 border border-slate-300'
+                            }`}>
                             {invoiceForm.show_suggested_price ? 'Visible al Cliente' : 'Oculto al Cliente'}
                         </span>
                     </div>
@@ -514,22 +542,20 @@ export default function InvoiceForm({
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, show_suggested_price: false }))}
-                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                                !invoiceForm.show_suggested_price
-                                    ? 'bg-slate-800 text-white border-slate-900 shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${!invoiceForm.show_suggested_price
+                                ? 'bg-slate-800 text-white border-slate-900 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
                         >
                             <span>🔒 Ocultar (Factura Fiscal)</span>
                         </button>
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, show_suggested_price: true }))}
-                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                                invoiceForm.show_suggested_price
-                                    ? 'bg-red-700 text-white border-red-800 shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${invoiceForm.show_suggested_price
+                                ? 'bg-red-700 text-white border-red-800 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
                         >
                             <span>🏷️ Mostrar PVP (Consignación)</span>
                         </button>
@@ -542,47 +568,95 @@ export default function InvoiceForm({
                     </p>
                 </div>
 
-                {/* Fecha y Tasa BS */}
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="min-w-0">
-                        <label className="text-xs font-black text-black block mb-1 truncate">
-                            Fecha de Emisión
-                        </label>
-                        <input
-                            type="date"
-                            value={invoiceForm.issue_date}
-                            onChange={(e) => setInvoiceForm(prev => ({ ...prev, issue_date: e.target.value }))}
-                            className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        />
+                {/* Fecha y Tasa BS vinculada al Banco Central de Venezuela (BCV) */}
+                <div className="bg-white p-3 rounded-lg border border-slate-300 shadow-2xs space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="min-w-0">
+                            <label className="text-xs font-black text-black block mb-1 truncate">
+                                Fecha de Emisión
+                            </label>
+                            <input
+                                type="date"
+                                value={invoiceForm.issue_date}
+                                onChange={(e) => setInvoiceForm(prev => ({ ...prev, issue_date: e.target.value }))}
+                                className="h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg px-2.5 text-xs font-black text-black focus:outline-none focus:ring-2 focus:ring-blue-600"
+                            />
+                        </div>
+
+                        <div className="min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="text-xs font-black text-black flex items-center gap-1.5 truncate">
+                                    <span>Tasa de Cambio</span>
+                                </label>
+                                {invoiceForm.show_bs_conversion === false ? (
+                                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded">
+                                        Oculta en PDF
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                                        BCV Oficial
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="relative flex-1 min-w-0">
+                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-700 select-none">
+                                        Bs.
+                                    </span>
+                                    <input
+                                        type="number"
+                                        step="0.0001"
+                                        placeholder="0.00"
+                                        disabled={invoiceForm.show_bs_conversion === false}
+                                        value={invoiceForm.bcv_exchange_rate}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, bcv_exchange_rate: e.target.value === '' ? '' : Number(e.target.value) }))}
+                                        className={`h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg pl-8 pr-3 text-xs font-black text-black font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 ${invoiceForm.show_bs_conversion === false ? 'opacity-60 bg-slate-100 cursor-not-allowed' : ''
+                                            }`}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleFetchLiveBcvRate(true)}
+                                    disabled={isFetchingBcv || invoiceForm.show_bs_conversion === false}
+                                    className="h-9 px-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Consultar y sincronizar la tasa oficial del Banco Central de Venezuela en vivo"
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 text-blue-700 ${isFetchingBcv ? 'animate-spin' : ''}`} />
+                                    <span className="hidden sm:inline">BCV</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                            <label className="text-xs font-black text-black block truncate">
-                                Tasa BS {invoiceForm.show_bs_conversion !== false && '*'}
-                            </label>
-                            {invoiceForm.show_bs_conversion === false && (
-                                <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">
-                                    Oculta en PDF
+                    {/* Barra de estado y vinculación oficial con el BCV */}
+                    <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 text-[11px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-slate-600">Tasa Oficial Vigente:</span>
+                            <span className="font-mono font-black text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                1 USD = Bs. {currentBcvInfo?.formatted_rate || (currentBcvInfo?.rate ? Number(currentBcvInfo.rate).toFixed(2) : Number(invoiceForm.bcv_exchange_rate || 0).toFixed(2))}
+                            </span>
+                            {currentBcvInfo?.last_updated && (
+                                <span className="text-slate-400 text-[10px]">
+                                    (Actualizado: {currentBcvInfo.last_updated})
                                 </span>
                             )}
                         </div>
-                        <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-700 select-none">
-                                Bs.
-                            </span>
-                            <input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                disabled={invoiceForm.show_bs_conversion === false}
-                                value={invoiceForm.bcv_exchange_rate}
-                                onChange={(e) => setInvoiceForm(prev => ({ ...prev, bcv_exchange_rate: e.target.value === '' ? '' : Number(e.target.value) }))}
-                                className={`h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg pl-8 pr-3 text-xs font-black text-black font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 ${
-                                    invoiceForm.show_bs_conversion === false ? 'opacity-60 bg-slate-100 cursor-not-allowed' : ''
-                                }`}
-                            />
-                        </div>
+
+                        {/* Comparador si el usuario editó la tasa a mano */}
+                        {currentBcvInfo?.rate && Math.abs(Number(invoiceForm.bcv_exchange_rate || 0) - Number(currentBcvInfo.rate)) > 0.05 && invoiceForm.show_bs_conversion !== false && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setInvoiceForm(prev => ({ ...prev, bcv_exchange_rate: Number(currentBcvInfo.rate) }));
+                                    notify.success(`Restaurada tasa oficial BCV: Bs. ${currentBcvInfo.formatted_rate || Number(currentBcvInfo.rate).toFixed(2)}`);
+                                }}
+                                className="text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 cursor-pointer transition-colors self-start sm:self-auto"
+                                title="Volver a poner la tasa oficial del BCV"
+                            >
+                                <span>⚠️ Usar tasa oficial BCV ({Number(currentBcvInfo.rate).toFixed(2)})</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -637,11 +711,10 @@ export default function InvoiceForm({
                                             )
                                         }));
                                     }}
-                                    className={`text-[10px] font-black px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
-                                        invoiceForm.sale_condition === pill.val
-                                            ? 'bg-blue-700 text-white border-blue-700 shadow-2xs'
-                                            : 'bg-white hover:bg-slate-200 text-slate-800 border-slate-300'
-                                    }`}
+                                    className={`text-[10px] font-black px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${invoiceForm.sale_condition === pill.val
+                                        ? 'bg-blue-700 text-white border-blue-700 shadow-2xs'
+                                        : 'bg-white hover:bg-slate-200 text-slate-800 border-slate-300'
+                                        }`}
                                 >
                                     {pill.label}
                                 </button>
@@ -731,11 +804,10 @@ export default function InvoiceForm({
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, signature_stamp: 'auto' }))}
-                            className={`py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer border ${
-                                (!invoiceForm.signature_stamp || invoiceForm.signature_stamp === 'auto')
-                                    ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
+                            className={`py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer border ${(!invoiceForm.signature_stamp || invoiceForm.signature_stamp === 'auto')
+                                ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
                             title="Selecciona automáticamente el sello de China para Proformas/Cotizaciones, y CorpoAsia para Facturas"
                         >
                             ⚡ Automático
@@ -743,11 +815,10 @@ export default function InvoiceForm({
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, signature_stamp: 'china' }))}
-                            className={`py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer border ${
-                                invoiceForm.signature_stamp === 'china'
-                                    ? 'bg-purple-700 text-white border-purple-800 shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
+                            className={`py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer border ${invoiceForm.signature_stamp === 'china'
+                                ? 'bg-purple-700 text-white border-purple-800 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
                             title="Sello Hongkong Maoyi para proformas y cotizaciones de importación China"
                         >
                             🇨🇳 Sello China
@@ -755,11 +826,10 @@ export default function InvoiceForm({
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, signature_stamp: 'corpoasia' }))}
-                            className={`py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer border ${
-                                invoiceForm.signature_stamp === 'corpoasia'
-                                    ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
+                            className={`py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer border ${invoiceForm.signature_stamp === 'corpoasia'
+                                ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
                             title="Sello Inv. CorpoAsia C.A. para facturas y ventas nacionales"
                         >
                             🏢 Sello CorpoAsia
@@ -773,10 +843,10 @@ export default function InvoiceForm({
                                     ? 'Aplicando sello Hongkong Maoyi (China) para cotizaciones.'
                                     : 'Aplicando sello Inv. CorpoAsia C.A. para ventas y facturación.')
                                 : invoiceForm.signature_stamp === 'china'
-                                ? 'Forzado: Sello Hongkong Maoyi (China).'
-                                : invoiceForm.signature_stamp === 'corpoasia'
-                                ? 'Forzado: Sello Inv. CorpoAsia C.A.'
-                                : 'Sin sello estampado.'}
+                                    ? 'Forzado: Sello Hongkong Maoyi (China).'
+                                    : invoiceForm.signature_stamp === 'corpoasia'
+                                        ? 'Forzado: Sello Inv. CorpoAsia C.A.'
+                                        : 'Sin sello estampado.'}
                         </span>
                         <button
                             type="button"
@@ -874,11 +944,10 @@ export default function InvoiceForm({
                     <button
                         type="button"
                         onClick={() => setInvoiceForm(prev => ({ ...prev, show_item_images: prev.show_item_images === false }))}
-                        className={`h-7 px-3 rounded-lg text-[11px] font-black transition-all cursor-pointer border shrink-0 ${
-                            invoiceForm.show_item_images !== false
-                                ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-800 shadow-2xs'
-                                : 'bg-white hover:bg-slate-200 text-slate-700 border-slate-300'
-                        }`}
+                        className={`h-7 px-3 rounded-lg text-[11px] font-black transition-all cursor-pointer border shrink-0 ${invoiceForm.show_item_images !== false
+                            ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-800 shadow-2xs'
+                            : 'bg-white hover:bg-slate-200 text-slate-700 border-slate-300'
+                            }`}
                     >
                         {invoiceForm.show_item_images !== false ? '✓ Mostrar imágenes' : '✕ Ocultas en PDF'}
                     </button>
@@ -890,267 +959,267 @@ export default function InvoiceForm({
                             p => p.name.trim().toLowerCase() === (it.description || '').trim().toLowerCase()
                         );
                         return (
-                        <div key={idx} className="p-3.5 bg-slate-50 rounded-xl border border-slate-300 text-xs space-y-2.5 shadow-2xs hover:border-slate-400 transition-colors">
-                            <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                                <span className="font-black text-black text-xs flex items-center gap-1.5">
-                                    <span className="h-5 w-5 rounded-full bg-slate-900 text-white flex items-center justify-center font-mono text-[11px]">
-                                        {idx + 1}
-                                    </span>
-                                    <span>Renglón #{idx + 1}</span>
-                                    {it.product_id && (
-                                        <span
-                                            className="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 border border-indigo-300 rounded text-[10px] font-black"
-                                            title="Vinculado al catálogo para control de inventario y estadísticas"
-                                        >
-                                            📦 Catálogo
+                            <div key={idx} className="p-3.5 bg-slate-50 rounded-xl border border-slate-300 text-xs space-y-2.5 shadow-2xs hover:border-slate-400 transition-colors">
+                                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                                    <span className="font-black text-black text-xs flex items-center gap-1.5">
+                                        <span className="h-5 w-5 rounded-full bg-slate-900 text-white flex items-center justify-center font-mono text-[11px]">
+                                            {idx + 1}
                                         </span>
-                                    )}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    {!it.product_id && !alreadyInCatalog && it.description && it.unit_price !== '' && (
-                                        <button
-                                            type="button"
-                                            onClick={() => onQuickSaveToCatalog(it)}
-                                            className="h-6 px-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 text-indigo-800 rounded text-[10px] font-black flex items-center gap-1 cursor-pointer transition-colors"
-                                            title="Guardar este producto en el catálogo para futuras facturas"
-                                        >
-                                            <BookmarkPlus className="w-3 h-3" />
-                                            <span>Guardar en Catálogo</span>
-                                        </button>
-                                    )}
-                                    <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] font-bold text-slate-700 select-none">
-                                        <input
-                                            type="checkbox"
-                                            checked={!!it.is_tax_exempt}
-                                            onChange={(e) => handleItemChange(idx, 'is_tax_exempt', e.target.checked)}
-                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
-                                        />
-                                        <span>Exento IVA</span>
-                                    </label>
-                                    {invoiceForm.items.length > 1 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveItem(idx)}
-                                            className="h-6 px-2 bg-red-50 hover:bg-red-100 border border-red-300 text-red-800 rounded text-[11px] font-black flex items-center gap-1 cursor-pointer transition-colors"
-                                            title="Eliminar este renglón"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                            <span>Quitar</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div>
-                                <input
-                                    type="text"
-                                    placeholder="Descripción del producto o servicio *"
-                                    required
-                                    value={it.description}
-                                    onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
-                                    className="h-8 w-full bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black placeholder:text-slate-500"
-                                />
-                            </div>
-
-                            <div>
-                                <input
-                                    type="text"
-                                    placeholder="Detalles técnicos / especificaciones (opcional)..."
-                                    value={it.details || ''}
-                                    onChange={(e) => handleItemChange(idx, 'details', e.target.value)}
-                                    className="h-7 w-full bg-white border border-slate-200 rounded-md px-2.5 text-[11px] font-bold text-slate-800 placeholder:text-slate-400"
-                                />
-                            </div>
-
-                            {/* Foto / Imagen Opcional del Producto */}
-                            <div className="pt-0.5">
-                                {it.image_url ? (
-                                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200">
-                                        <div className="w-12 h-12 rounded-md border border-slate-300 bg-slate-50 p-0.5 flex items-center justify-center shrink-0">
-                                            <img
-                                                src={it.image_url}
-                                                alt="Foto del producto"
-                                                className="max-h-full max-w-full object-contain rounded"
-                                            />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1.5 text-[11px] font-black text-emerald-800">
-                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                                <span>Foto disponible</span>
-                                            </div>
-                                            {invoiceForm.show_item_images === false ? (
-                                                <p className="text-[10px] font-bold text-amber-700 mt-0.5">
-                                                    Oculta por configuración general de este documento.
-                                                </p>
-                                            ) : (
-                                                <label className="inline-flex items-center gap-1.5 mt-1 cursor-pointer text-[11px] font-bold text-slate-700 select-none">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={it.show_image !== false}
-                                                        onChange={(e) => handleItemChange(idx, 'show_image', e.target.checked)}
-                                                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
-                                                    />
-                                                    <span>Mostrar esta foto en el PDF</span>
-                                                </label>
-                                            )}
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleItemChange(idx, 'image_url', null)}
-                                            className="text-[11px] font-black text-red-600 hover:text-red-800 px-2 py-1 bg-red-50 hover:bg-red-100 rounded border border-red-200 cursor-pointer shrink-0 transition-colors"
-                                            title="Eliminar foto de este producto"
-                                        >
-                                            Quitar
-                                        </button>
-                                    </div>
-                                ) : (
+                                        <span>Renglón #{idx + 1}</span>
+                                        {it.product_id && (
+                                            <span
+                                                className="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 border border-indigo-300 rounded text-[10px] font-black"
+                                                title="Vinculado al catálogo para control de inventario y estadísticas"
+                                            >
+                                                📦 Catálogo
+                                            </span>
+                                        )}
+                                    </span>
                                     <div className="flex items-center gap-2">
-                                        <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 rounded-lg text-[11px] font-bold text-slate-700 cursor-pointer transition-colors shadow-2xs">
-                                            <Camera className="w-3.5 h-3.5 text-blue-700" />
-                                            <span>Añadir foto del producto (Opcional)</span>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                className="hidden"
-                                                onChange={async (e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (!file) return;
-                                                    const { dataUrl } = await compressImageToDataUrl(file);
-                                                    handleItemChange(idx, 'image_url', dataUrl);
-                                                }}
-                                            />
-                                        </label>
-                                        <span className="text-[10px] text-slate-500 italic hidden sm:inline">
-                                            Ej: bicicleta, generador, ventilador, maquinaria...
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Fila A: Cantidad, Unidad y Total del Renglón */}
-                            <div className="grid grid-cols-12 gap-2 text-xs font-black items-end">
-                                <div className="col-span-5 sm:col-span-4">
-                                    <span className="text-slate-800 block mb-1 text-[11px] font-bold">Cantidad</span>
-                                    <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden h-8.5 shadow-2xs">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleItemChange(idx, 'quantity', Math.max(1, Number(it.quantity || 1) - 1))}
-                                            className="px-2.5 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
-                                        >
-                                            -
-                                        </button>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            required
-                                            value={it.quantity}
-                                            onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                                            className="w-full text-center font-mono font-black text-xs py-1 text-black border-0 focus:ring-0 p-0"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => handleItemChange(idx, 'quantity', Number(it.quantity || 0) + 1)}
-                                            className="px-2.5 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
-                                        >
-                                            +
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="col-span-3 sm:col-span-3">
-                                    <span className="text-slate-800 block mb-1 text-[11px] font-bold">Unidad</span>
-                                    <input
-                                        type="text"
-                                        value={it.unit}
-                                        placeholder="unid"
-                                        onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
-                                        className="h-8.5 w-full bg-white border border-slate-300 rounded-lg px-2 text-center font-mono font-bold text-xs shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                    />
-                                </div>
-
-                                <div className="col-span-4 sm:col-span-5">
-                                    <span className="text-slate-800 block mb-1 text-[11px] font-bold truncate">
-                                        {invoiceForm.show_totals !== false ? 'Total Renglón ($)' : 'Modalidad'}
-                                    </span>
-                                    {invoiceForm.show_totals !== false ? (
-                                        <div className="h-8.5 flex items-center justify-end px-3 bg-blue-50 border border-blue-200 rounded-lg font-mono font-black text-blue-900 text-xs shadow-2xs">
-                                            ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
-                                        </div>
-                                    ) : (
-                                        <div className="h-8.5 flex items-center justify-center px-2 bg-amber-50 border border-amber-300 rounded-lg font-sans font-bold text-amber-900 text-xs text-center shadow-2xs" title="Modo consignación activo: sin sumatoria acumulada en el pie">
-                                            Consignación
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Fila B: Estructura de Precios (Precio Base y PVP Sugerido) */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
-                                {/* 1. Precio Base / Unitario */}
-                                <div className="p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs space-y-1.5">
-                                    <div className="flex items-center justify-between gap-1">
-                                        <span className="text-[11px] font-black text-slate-800 whitespace-nowrap">
-                                            Precio Base ($) *
-                                        </span>
-                                        {it.suggested_price && Number(it.suggested_price) > 0 && (
+                                        {!it.product_id && !alreadyInCatalog && it.description && it.unit_price !== '' && (
                                             <button
                                                 type="button"
-                                                onClick={() => handleItemChange(idx, 'unit_price', Number(it.suggested_price))}
-                                                className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors whitespace-nowrap"
-                                                title="Copiar el Precio Sugerido como Precio Unitario"
+                                                onClick={() => onQuickSaveToCatalog(it)}
+                                                className="h-6 px-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 text-indigo-800 rounded text-[10px] font-black flex items-center gap-1 cursor-pointer transition-colors"
+                                                title="Guardar este producto en el catálogo para futuras facturas"
                                             >
-                                                ← Copiar Sugerido
+                                                <BookmarkPlus className="w-3 h-3" />
+                                                <span>Guardar en Catálogo</span>
+                                            </button>
+                                        )}
+                                        <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] font-bold text-slate-700 select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={!!it.is_tax_exempt}
+                                                onChange={(e) => handleItemChange(idx, 'is_tax_exempt', e.target.checked)}
+                                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                                            />
+                                            <span>Exento IVA</span>
+                                        </label>
+                                        {invoiceForm.items.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveItem(idx)}
+                                                className="h-6 px-2 bg-red-50 hover:bg-red-100 border border-red-300 text-red-800 rounded text-[11px] font-black flex items-center gap-1 cursor-pointer transition-colors"
+                                                title="Eliminar este renglón"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                                <span>Quitar</span>
                                             </button>
                                         )}
                                     </div>
-                                    <div className="relative">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">$</span>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            required
-                                            placeholder="0.00"
-                                            value={it.unit_price}
-                                            onChange={(e) => handleItemChange(idx, 'unit_price', e.target.value)}
-                                            className="h-8.5 w-full bg-slate-50/50 border border-slate-300 rounded-md pl-6 pr-2.5 text-right font-mono font-black text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                        />
-                                    </div>
-                                    <span className="text-[10px] font-medium text-slate-500 block">
-                                        Precio unitario de venta/costo.
-                                    </span>
                                 </div>
 
-                                {/* 2. Precio Sugerido de Venta al Público (PVP) */}
-                                <div className="p-2.5 bg-red-50/50 rounded-lg border border-red-200 shadow-2xs space-y-1.5">
-                                    <div className="flex items-center justify-between gap-1">
-                                        <span className="text-[11px] font-black text-red-700 flex items-center gap-1 whitespace-nowrap">
-                                            <Tag className="w-3 h-3 text-red-600 shrink-0" />
-                                            <span>PVP Sugerido ($)</span>
-                                        </span>
-                                        <span className="text-[9px] font-bold text-red-700 bg-red-100/80 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
-                                            Venta Público
-                                        </span>
+                                <div>
+                                    <input
+                                        type="text"
+                                        placeholder="Descripción del producto o servicio *"
+                                        required
+                                        value={it.description}
+                                        onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
+                                        className="h-8 w-full bg-white border border-slate-300 rounded-lg px-3 text-xs font-black text-black placeholder:text-slate-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <input
+                                        type="text"
+                                        placeholder="Detalles técnicos / especificaciones (opcional)..."
+                                        value={it.details || ''}
+                                        onChange={(e) => handleItemChange(idx, 'details', e.target.value)}
+                                        className="h-7 w-full bg-white border border-slate-200 rounded-md px-2.5 text-[11px] font-bold text-slate-800 placeholder:text-slate-400"
+                                    />
+                                </div>
+
+                                {/* Foto / Imagen Opcional del Producto */}
+                                <div className="pt-0.5">
+                                    {it.image_url ? (
+                                        <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200">
+                                            <div className="w-12 h-12 rounded-md border border-slate-300 bg-slate-50 p-0.5 flex items-center justify-center shrink-0">
+                                                <img
+                                                    src={it.image_url}
+                                                    alt="Foto del producto"
+                                                    className="max-h-full max-w-full object-contain rounded"
+                                                />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5 text-[11px] font-black text-emerald-800">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                                    <span>Foto disponible</span>
+                                                </div>
+                                                {invoiceForm.show_item_images === false ? (
+                                                    <p className="text-[10px] font-bold text-amber-700 mt-0.5">
+                                                        Oculta por configuración general de este documento.
+                                                    </p>
+                                                ) : (
+                                                    <label className="inline-flex items-center gap-1.5 mt-1 cursor-pointer text-[11px] font-bold text-slate-700 select-none">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={it.show_image !== false}
+                                                            onChange={(e) => handleItemChange(idx, 'show_image', e.target.checked)}
+                                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                                                        />
+                                                        <span>Mostrar esta foto en el PDF</span>
+                                                    </label>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleItemChange(idx, 'image_url', null)}
+                                                className="text-[11px] font-black text-red-600 hover:text-red-800 px-2 py-1 bg-red-50 hover:bg-red-100 rounded border border-red-200 cursor-pointer shrink-0 transition-colors"
+                                                title="Eliminar foto de este producto"
+                                            >
+                                                Quitar
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 rounded-lg text-[11px] font-bold text-slate-700 cursor-pointer transition-colors shadow-2xs">
+                                                <Camera className="w-3.5 h-3.5 text-blue-700" />
+                                                <span>Añadir foto del producto (Opcional)</span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+                                                        const { dataUrl } = await compressImageToDataUrl(file);
+                                                        handleItemChange(idx, 'image_url', dataUrl);
+                                                    }}
+                                                />
+                                            </label>
+                                            <span className="text-[10px] text-slate-500 italic hidden sm:inline">
+                                                Ej: bicicleta, generador, ventilador, maquinaria...
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Fila A: Cantidad, Unidad y Total del Renglón */}
+                                <div className="grid grid-cols-12 gap-2 text-xs font-black items-end">
+                                    <div className="col-span-5 sm:col-span-4">
+                                        <span className="text-slate-800 block mb-1 text-[11px] font-bold">Cantidad</span>
+                                        <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden h-8.5 shadow-2xs">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleItemChange(idx, 'quantity', Math.max(1, Number(it.quantity || 1) - 1))}
+                                                className="px-2.5 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
+                                            >
+                                                -
+                                            </button>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                required
+                                                value={it.quantity}
+                                                onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                                                className="w-full text-center font-mono font-black text-xs py-1 text-black border-0 focus:ring-0 p-0"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleItemChange(idx, 'quantity', Number(it.quantity || 0) + 1)}
+                                                className="px-2.5 h-full text-slate-700 hover:bg-slate-200 text-xs font-black cursor-pointer select-none"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="relative">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-red-600">$</span>
+
+                                    <div className="col-span-3 sm:col-span-3">
+                                        <span className="text-slate-800 block mb-1 text-[11px] font-bold">Unidad</span>
                                         <input
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="Opcional (Ej: 1100.00)"
-                                            value={it.suggested_price || ''}
-                                            onChange={(e) => handleItemChange(idx, 'suggested_price', e.target.value)}
-                                            className="h-8.5 w-full bg-white border border-red-300 rounded-md pl-6 pr-2.5 text-right font-mono font-black text-xs text-red-700 placeholder:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                            title="Precio de venta sugerido al público / cliente final"
+                                            type="text"
+                                            value={it.unit}
+                                            placeholder="unid"
+                                            onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
+                                            className="h-8.5 w-full bg-white border border-slate-300 rounded-lg px-2 text-center font-mono font-bold text-xs shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-600"
                                         />
                                     </div>
-                                    <span className="text-[10px] font-medium text-red-700 block">
-                                        {invoiceForm.show_suggested_price
-                                            ? '✓ Se reflejará en el PDF al cliente'
-                                            : 'Oculto en PDF (activo solo en consignación)'}
-                                    </span>
+
+                                    <div className="col-span-4 sm:col-span-5">
+                                        <span className="text-slate-800 block mb-1 text-[11px] font-bold truncate">
+                                            {invoiceForm.show_totals !== false ? 'Total Renglón ($)' : 'Modalidad'}
+                                        </span>
+                                        {invoiceForm.show_totals !== false ? (
+                                            <div className="h-8.5 flex items-center justify-end px-3 bg-blue-50 border border-blue-200 rounded-lg font-mono font-black text-blue-900 text-xs shadow-2xs">
+                                                ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
+                                            </div>
+                                        ) : (
+                                            <div className="h-8.5 flex items-center justify-center px-2 bg-amber-50 border border-amber-300 rounded-lg font-sans font-bold text-amber-900 text-xs text-center shadow-2xs" title="Modo consignación activo: sin sumatoria acumulada en el pie">
+                                                Consignación
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Fila B: Estructura de Precios (Precio Base y PVP Sugerido) */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                                    {/* 1. Precio Base / Unitario */}
+                                    <div className="p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs space-y-1.5">
+                                        <div className="flex items-center justify-between gap-1">
+                                            <span className="text-[11px] font-black text-slate-800 whitespace-nowrap">
+                                                Precio Base ($) *
+                                            </span>
+                                            {it.suggested_price && Number(it.suggested_price) > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleItemChange(idx, 'unit_price', Number(it.suggested_price))}
+                                                    className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors whitespace-nowrap"
+                                                    title="Copiar el Precio Sugerido como Precio Unitario"
+                                                >
+                                                    ← Copiar Sugerido
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="relative">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">$</span>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                required
+                                                placeholder="0.00"
+                                                value={it.unit_price}
+                                                onChange={(e) => handleItemChange(idx, 'unit_price', e.target.value)}
+                                                className="h-8.5 w-full bg-slate-50/50 border border-slate-300 rounded-md pl-6 pr-2.5 text-right font-mono font-black text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                            />
+                                        </div>
+                                        <span className="text-[10px] font-medium text-slate-500 block">
+                                            Precio unitario de venta/costo.
+                                        </span>
+                                    </div>
+
+                                    {/* 2. Precio Sugerido de Venta al Público (PVP) */}
+                                    <div className="p-2.5 bg-red-50/50 rounded-lg border border-red-200 shadow-2xs space-y-1.5">
+                                        <div className="flex items-center justify-between gap-1">
+                                            <span className="text-[11px] font-black text-red-700 flex items-center gap-1 whitespace-nowrap">
+                                                <Tag className="w-3 h-3 text-red-600 shrink-0" />
+                                                <span>PVP Sugerido ($)</span>
+                                            </span>
+                                            <span className="text-[9px] font-bold text-red-700 bg-red-100/80 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                                                Venta Público
+                                            </span>
+                                        </div>
+                                        <div className="relative">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-red-600">$</span>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="Opcional (Ej: 1100.00)"
+                                                value={it.suggested_price || ''}
+                                                onChange={(e) => handleItemChange(idx, 'suggested_price', e.target.value)}
+                                                className="h-8.5 w-full bg-white border border-red-300 rounded-md pl-6 pr-2.5 text-right font-mono font-black text-xs text-red-700 placeholder:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                                title="Precio de venta sugerido al público / cliente final"
+                                            />
+                                        </div>
+                                        <span className="text-[10px] font-medium text-red-700 block">
+                                            {invoiceForm.show_suggested_price
+                                                ? '✓ Se reflejará en el PDF al cliente'
+                                                : 'Oculto en PDF (activo solo en consignación)'}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
                         );
                     })}
                 </div>
@@ -1470,22 +1539,20 @@ export default function InvoiceForm({
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, tax_percentage: 0 }))}
-                            className={`py-1 px-2 rounded-lg text-center text-[11px] font-black transition-all cursor-pointer border ${
-                                Number(invoiceForm.tax_percentage) === 0
-                                    ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
-                                    : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
-                            }`}
+                            className={`py-1 px-2 rounded-lg text-center text-[11px] font-black transition-all cursor-pointer border ${Number(invoiceForm.tax_percentage) === 0
+                                ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
+                                : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+                                }`}
                         >
                             0% Neto (Sin IVA)
                         </button>
                         <button
                             type="button"
                             onClick={() => setInvoiceForm(prev => ({ ...prev, tax_percentage: 16.00 }))}
-                            className={`py-1 px-2 rounded-lg text-center text-[11px] font-black transition-all cursor-pointer border ${
-                                Number(invoiceForm.tax_percentage) === 16
-                                    ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
-                                    : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
-                            }`}
+                            className={`py-1 px-2 rounded-lg text-center text-[11px] font-black transition-all cursor-pointer border ${Number(invoiceForm.tax_percentage) === 16
+                                ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
+                                : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+                                }`}
                         >
                             16% IVA Fiscal
                         </button>
@@ -1493,11 +1560,10 @@ export default function InvoiceForm({
                 </div>
 
                 {/* Banner de Gran Total */}
-                <div className={`p-4 rounded-xl space-y-1.5 shadow-sm ${
-                    invoiceForm.show_totals !== false
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-amber-950 text-amber-100 border-2 border-amber-600'
-                }`}>
+                <div className={`p-4 rounded-xl space-y-1.5 shadow-sm ${invoiceForm.show_totals !== false
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-amber-950 text-amber-100 border-2 border-amber-600'
+                    }`}>
                     <div className="flex justify-between items-baseline">
                         <span className="text-xs font-black uppercase tracking-wider text-slate-300">
                             {invoiceForm.show_totals !== false ? 'TOTAL FACTURA (USD)' : 'MODO SIN SUMATORIA (CONSIGNACIÓN)'}
@@ -1573,8 +1639,8 @@ export default function InvoiceForm({
                         {isSubmittingInvoice
                             ? 'Guardando...'
                             : invoiceForm.id
-                            ? (invoiceForm.status === 'borrador' ? 'EMITIR Y ASIGNAR CORRELATIVO OFICIAL' : 'ACTUALIZAR DOCUMENTO EXISTENTE')
-                            : 'GUARDAR DOCUMENTO'}
+                                ? (invoiceForm.status === 'borrador' ? 'EMITIR Y ASIGNAR CORRELATIVO OFICIAL' : 'ACTUALIZAR DOCUMENTO EXISTENTE')
+                                : 'GUARDAR DOCUMENTO'}
                     </span>
                 </button>
 
