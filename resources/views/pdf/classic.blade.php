@@ -2,12 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>{{ $docInfo['title'] }} {{ $correlative }}</title>
     <style>
-        @page {
-            size: A4 portrait;
-            margin: 12mm 14mm 14mm 14mm;
-        }
         * {
             box-sizing: border-box;
         }
@@ -191,7 +186,7 @@
     </style>
 </head>
 <body>
-    @if($invoice->status === 'anulada' || $invoice->status === 'borrador')
+    @if(empty($useMpdfEngine) && ($invoice->status === 'anulada' || $invoice->status === 'borrador'))
         <div class="watermark">{{ $invoice->status === 'anulada' ? 'ANULADA' : 'BORRADOR' }}</div>
     @endif
 
@@ -324,20 +319,20 @@
                     <td>
                         <table>
                             <tr>
-                                @if($item['show_image'] && $item['image_uri'])
+                                @if(!empty($item['show_image']) && !empty($item['image_uri']))
                                     <td style="width: 52px; vertical-align: top; padding-right: 8px; border-bottom: none; padding-top: 0;">
                                         <img src="{{ $item['image_uri'] }}" alt="" class="item-thumb">
                                     </td>
                                 @endif
                                 <td style="vertical-align: top; border-bottom: none; padding: 0;">
-                                    <div style="font-weight: bold; color: #020617;">{{ $item['description'] }}</div>
+                                    <span style="font-weight: bold; color: #020617;">{{ $item['description'] }}</span>
                                     @if(!empty($item['details']))
-                                        <div style="font-size: 7.8pt; color: #475569; margin-top: 2px;">{!! nl2br(e($item['details'])) !!}</div>
+                                        <br><span style="font-size: 7.8pt; color: #475569;">{!! nl2br(e($item['details'])) !!}</span>
                                     @endif
                                     @if($showTotals && !empty($showSuggestedPrice) && !empty($item['suggested_price']) && (float) $item['suggested_price'] > 0)
-                                        <div style="font-size: 7.8pt; color: #dc2626; font-weight: bold; margin-top: 2px;">
+                                        <br><span style="font-size: 7.8pt; color: #dc2626; font-weight: bold;">
                                             PVP Sugerido: ${{ number_format((float) $item['suggested_price'], 2, '.', '') }}
-                                        </div>
+                                        </span>
                                     @endif
                                 </td>
                             </tr>
@@ -389,9 +384,13 @@
                     </p>
                 @endif
                 @if($showBsConversion)
-                    <div class="bs-note">
-                        Monto en Bolívares (VES) calculado según la Tasa BS indicada a la fecha de la transacción.
-                    </div>
+                    <table style="margin-top: 8px; width: 100%;">
+                        <tr>
+                            <td style="border-left: 2px solid #94a3b8; padding: 2px 0 2px 8px; font-size: 7.5pt; color: #475569; font-style: italic;">
+                                Monto en Bolívares (VES) calculado según la Tasa BS indicada a la fecha de la transacción.
+                            </td>
+                        </tr>
+                    </table>
                 @endif
             </td>
             <td style="width: 50%; vertical-align: top; padding-left: 16px;">
@@ -431,10 +430,14 @@
                         @endif
                     </table>
                 @else
-                    <div style="border: 1px dashed #cbd5e1; border-radius: 4px; padding: 10px 12px; background-color: #f8fafc; font-size: 8pt; color: #475569;">
-                        <strong style="color: #0f172a; text-transform: uppercase; display: block; margin-bottom: 3px;">Documento sin sumatoria final</strong>
-                        Control de mercancía o equipos por renglón / consignación con precios referenciales individuales sin liquidación acumulada al pie.
-                    </div>
+                    <table style="width: 100%; border: 1px dashed #cbd5e1; background-color: #f8fafc;">
+                        <tr>
+                            <td style="padding: 9px 11px; font-size: 8pt; color: #475569; line-height: 1.35;">
+                                <span style="font-weight: bold; color: #0f172a; text-transform: uppercase;">Documento sin sumatoria final</span><br>
+                                Control de mercancía o equipos por renglón / consignación con precios referenciales individuales sin liquidación acumulada al pie.
+                            </td>
+                        </tr>
+                    </table>
                 @endif
             </td>
         </tr>
@@ -451,16 +454,28 @@
                     </p>
                 </td>
                 <td style="width: 26%; vertical-align: bottom; padding: 0 6px; text-align: center;">
-                    <div style="height: 68px; text-align: center; vertical-align: bottom;">
-                        @if($stampUri)
-                            <img src="{{ $stampUri }}" alt="Firma y Sello Emisor" style="max-height: 66px; max-width: 135px; object-fit: contain;">
-                        @endif
-                    </div>
-                    <div class="sig-line">FIRMA Y SELLO EMISOR</div>
+                    <table style="width: 100%;">
+                        <tr>
+                            <td style="height: 68px; text-align: center; vertical-align: bottom; padding-bottom: 2px;">
+                                @if($stampUri)
+                                    <img src="{{ $stampUri }}" alt="Firma y Sello Emisor" style="max-height: 66px; max-width: 135px;">
+                                @endif
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="sig-line">FIRMA Y SELLO EMISOR</td>
+                        </tr>
+                    </table>
                 </td>
                 <td style="width: 26%; vertical-align: bottom; padding-left: 6px; text-align: center;">
-                    <div style="height: 68px;"></div>
-                    <div class="sig-line">RECIBIDO CONFORME</div>
+                    <table style="width: 100%;">
+                        <tr>
+                            <td style="height: 68px;"></td>
+                        </tr>
+                        <tr>
+                            <td class="sig-line">RECIBIDO CONFORME</td>
+                        </tr>
+                    </table>
                 </td>
             </tr>
         </table>

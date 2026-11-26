@@ -2,12 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>{{ $docInfo['title'] }} {{ $correlative }}</title>
     <style>
-        @page {
-            size: A4 portrait;
-            margin: 11mm 13mm 13mm 13mm;
-        }
         * {
             box-sizing: border-box;
         }
@@ -114,7 +109,7 @@
     </style>
 </head>
 <body>
-    @if($invoice->status === 'anulada' || $invoice->status === 'borrador')
+    @if(empty($useMpdfEngine) && ($invoice->status === 'anulada' || $invoice->status === 'borrador'))
         <div class="watermark">{{ $invoice->status === 'anulada' ? 'ANULADA' : 'BORRADOR' }}</div>
     @endif
 
@@ -206,7 +201,7 @@
                             <span style="font-size: 8.2pt; color: #475569; margin-left: 6px;">— {{ $items[0]['details'] }}</span>
                         @endif
                     </td>
-                    @if(!empty($items[0]) && $items[0]['show_image'] && $items[0]['image_uri'])
+                    @if(!empty($items[0]) && !empty($items[0]['show_image']) && !empty($items[0]['image_uri']))
                         <td style="width: 56px; text-align: right; vertical-align: middle;">
                             <img src="{{ $items[0]['image_uri'] }}" alt="" style="width: 48px; height: 48px; object-fit: contain; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px;">
                         </td>
@@ -260,7 +255,7 @@
                     <td style="padding: 6px 9px; border-bottom: 1px solid #e2e8f0; vertical-align: middle;">
                         <table>
                             <tr>
-                                @if($it['show_image'] && $it['image_uri'])
+                                @if(!empty($it['show_image']) && !empty($it['image_uri']))
                                     <td style="width: 34px; padding-right: 8px; vertical-align: middle;">
                                         <img src="{{ $it['image_uri'] }}" alt="" style="width: 28px; height: 28px; object-fit: contain; border: 1px solid #cbd5e1; border-radius: 3px;">
                                     </td>
@@ -393,7 +388,7 @@
 
     @if(!empty($termsText))
         <div style="border: 1px solid #e2e8f0; padding: 6px 9px; background-color: #f8fafc; font-size: 7.8pt; color: #334155; margin-bottom: 12px;">
-            <strong style="color: #0E1C33; text-transform: uppercase; font-size: 7.5pt; display: block; margin-bottom: 2px;">Términos y Condiciones de Entrega:</strong>
+            <div style="font-weight: bold; color: #0E1C33; text-transform: uppercase; font-size: 7.5pt; margin-bottom: 2px;">Términos y Condiciones de Entrega:</div>
             {{ $termsText }}
         </div>
     @endif
@@ -402,21 +397,33 @@
     <table style="margin-top: 18px; page-break-inside: avoid;">
         <tr>
             <td style="width: 46%; text-align: center; vertical-align: bottom; padding-right: 16px;">
-                <div style="height: 68px; text-align: center;">
-                    @if($stampUri)
-                        <img src="{{ $stampUri }}" alt="Firma autorizada" style="max-height: 66px; max-width: 145px; object-fit: contain;">
-                    @endif
-                </div>
-                <div style="border-top: 1px solid #0f172a; padding-top: 4px; font-weight: bold; font-size: 8pt;">
-                    Firma autorizada — {{ $invoice->company->name }}
-                </div>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="height: 68px; text-align: center; vertical-align: bottom; padding-bottom: 2px;">
+                            @if($stampUri)
+                                <img src="{{ $stampUri }}" alt="Firma autorizada" style="max-height: 66px; max-width: 145px;">
+                            @endif
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="border-top: 1px solid #0f172a; padding-top: 4px; font-weight: bold; font-size: 8pt; text-align: center;">
+                            Firma autorizada — {{ $invoice->company->name }}
+                        </td>
+                    </tr>
+                </table>
             </td>
             <td style="width: 8%;"></td>
             <td style="width: 46%; text-align: center; vertical-align: bottom; padding-left: 16px;">
-                <div style="height: 68px;"></div>
-                <div style="border-top: 1px solid #0f172a; padding-top: 4px; font-weight: bold; font-size: 8pt;">
-                    Firma / aceptación del cliente
-                </div>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="height: 68px;"></td>
+                    </tr>
+                    <tr>
+                        <td style="border-top: 1px solid #0f172a; padding-top: 4px; font-weight: bold; font-size: 8pt; text-align: center;">
+                            Firma / aceptación del cliente
+                        </td>
+                    </tr>
+                </table>
             </td>
         </tr>
     </table>

@@ -1,8 +1,10 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useReactToPrint } from 'react-to-print';
-import { FileText, Layers, Printer, Download } from 'lucide-react';
+import { FileText, Layers, Printer, Download, Loader2 } from 'lucide-react';
 import PdfTemplateClassic from '../Templates/PdfTemplateClassic';
 import PdfTemplateModern from '../Templates/PdfTemplateModern';
+import { useFeedback } from '../../Contexts/FeedbackContext';
+import { downloadPdfRequest } from '../../Utils/pdfDownload';
 
 export default function PdfPreview({
     mobileEditorTab,
@@ -21,6 +23,8 @@ export default function PdfPreview({
     totalVes
 }) {
     const printSheetRef = useRef(null);
+    const { notify } = useFeedback();
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
     const handleReactPrint = useReactToPrint({
         contentRef: printSheetRef,
@@ -38,12 +42,40 @@ export default function PdfPreview({
         }, 80);
     };
 
-    const handleDownloadPdf = () => {
-        if (invoiceForm?.id) {
-            window.location.assign(`/invoices/${invoiceForm.id}/pdf?format=${encodeURIComponent(selectedPdfFormat || 'formato-1')}`);
-            return;
+    const handleDownloadPdf = async () => {
+        if (isDownloadingPdf) return;
+
+        setIsDownloadingPdf(true);
+        try {
+            const safeSlug = String(projectedCorrelative || invoiceForm?.correlative_number || 'documento')
+                .toLowerCase()
+                .replace(/[^a-z0-9-_]+/g, '-');
+
+            const previewUrl = typeof window.route === 'function'
+                ? window.route('invoices.preview-pdf', undefined, false)
+                : '/invoices/preview-pdf';
+
+            await downloadPdfRequest({
+                url: previewUrl,
+                method: 'post',
+                data: {
+                    ...invoiceForm,
+                    company_id: invoiceForm?.company_id || activeCompany?.id || null,
+                    client_id: invoiceForm?.client_id || currentSelectedClient?.id || null,
+                    invoice_id: invoiceForm?.id || null,
+                    correlative_number: projectedCorrelative || invoiceForm?.correlative_number,
+                    control_number: projectedControlNumber || invoiceForm?.control_number,
+                    format: selectedPdfFormat || 'formato-1',
+                    pdf_format: selectedPdfFormat || 'formato-1',
+                },
+                fallbackFilename: `${safeSlug}.pdf`,
+            });
+            notify.success('PDF descargado correctamente.');
+        } catch (err) {
+            notify.error(err?.message || 'No se pudo descargar el PDF directamente.');
+        } finally {
+            setIsDownloadingPdf(false);
         }
-        handlePrintAction();
     };
     return (
         <div className={`lg:col-span-7 space-y-4 print:space-y-0 print:!w-full print:!m-0 print:!p-0 print:!block ${
@@ -112,11 +144,16 @@ export default function PdfPreview({
                     <button
                         type="button"
                         onClick={handleDownloadPdf}
-                        title={invoiceForm?.id ? 'Descargar PDF directo generado por el servidor' : 'Guardar vista previa como PDF'}
-                        className="h-8 sm:h-9 px-3.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors flex-1 sm:flex-initial"
+                        disabled={isDownloadingPdf}
+                        title="Descargar PDF oficial generado directamente con mPDF"
+                        className="h-8 sm:h-9 px-3.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-wait text-white text-xs font-black rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors flex-1 sm:flex-initial"
                     >
-                        <Download className="w-4 h-4 text-white" />
-                        <span>{invoiceForm?.id ? 'Descargar PDF' : 'Guardar PDF'}</span>
+                        {isDownloadingPdf ? (
+                            <Loader2 className="w-4 h-4 text-white animate-spin" />
+                        ) : (
+                            <Download className="w-4 h-4 text-white" />
+                        )}
+                        <span>{isDownloadingPdf ? 'Generando PDF...' : 'Descargar PDF'}</span>
                     </button>
                 </div>
             </div>

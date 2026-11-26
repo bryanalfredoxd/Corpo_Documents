@@ -10,7 +10,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceAuditLog;
 use App\Models\InvoiceItem;
 use App\Models\Product;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\PdfGeneratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -398,9 +398,9 @@ class ConsignmentController extends Controller
     }
 
     /**
-     * Generar Acta de Arqueo y Estado de Cuenta de Mercancía en Consignación en PDF.
+     * Generar Acta de Arqueo y Estado de Cuenta de Mercancía en Consignación en PDF mediante mPDF.
      */
-    public function clientStatementPdf(Request $request, Client $client): Response
+    public function clientStatementPdf(Request $request, Client $client, PdfGeneratorService $pdfGenerator): Response
     {
         $companyId = $request->input('company_id');
         $company = $companyId ? Company::find($companyId) : Company::first();
@@ -422,25 +422,27 @@ class ConsignmentController extends Controller
         }
 
         $nowCaracas = now('America/Caracas');
-
-        $fontDir = storage_path('fonts');
-        if (! is_dir($fontDir)) {
-            @mkdir($fontDir, 0755, true);
-        }
-
-        $pdf = Pdf::loadView('pdf.consignment_statement', [
-            'client' => $client,
-            'company' => $company,
-            'companyLogoUri' => $companyLogoUri,
-            'consignments' => $consignments,
-            'generatedAt' => $nowCaracas,
-        ]);
-
-        $pdf->setPaper('letter', 'portrait');
-
         $cleanClient = preg_replace('/[^A-Za-z0-9_-]/', '_', $client->name);
         $filename = "Acta_Consignacion_{$cleanClient}_{$nowCaracas->format('Ymd')}.pdf";
+        $disposition = $request->boolean('download') ? 'attachment' : 'inline';
 
-        return $pdf->stream($filename);
+        return $pdfGenerator->makePdfResponse(
+            'pdf.consignment_statement',
+            [
+                'client' => $client,
+                'company' => $company,
+                'companyLogoUri' => $companyLogoUri,
+                'consignments' => $consignments,
+                'generatedAt' => $nowCaracas,
+            ],
+            $filename,
+            [
+                'paper' => 'Letter',
+                'margins' => ['top' => 12, 'right' => 14, 'bottom' => 14, 'left' => 14],
+                'title' => "Acta de Arqueo de Consignación - {$client->name}",
+                'default_font_size' => 9,
+            ],
+            $disposition
+        );
     }
 }

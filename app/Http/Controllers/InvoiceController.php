@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Models\Company;
 use App\Models\Consignment;
 use App\Models\ConsignmentMovement;
@@ -10,7 +11,7 @@ use App\Models\InvoiceAuditLog;
 use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Services\ImageOptimizerService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\PdfGeneratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -80,15 +81,24 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Construye el array de atributos financieros y metadatos técnicos para crear/actualizar.
+     * Calcula los totales fiscales y multimoneda de un conjunto de renglones.
+     *
+     * @return array{subtotal: float, tax_amount: float, total_usd: float, total_ves: float}
      */
-    private function buildInvoiceAttributes(Request $request, array $validated, Company $company): array
-    {
-        $subtotal = 0;
-        $taxableBase = 0;
+    private function calculateInvoiceTotals(
+        array $items,
+        float $taxRate,
+        float $shippingCost,
+        float $discount,
+        float $bcvRate
+    ): array {
+        $subtotal = 0.0;
+        $taxableBase = 0.0;
 
-        foreach ($validated['items'] as $itemData) {
-            $itemTotal = round((float) $itemData['quantity'] * (float) $itemData['unit_price'], 2);
+        foreach ($items as $itemData) {
+            $qty = (float) ($itemData['quantity'] ?? 0);
+            $price = (float) ($itemData['unit_price'] ?? 0);
+            $itemTotal = round($qty * $price, 2);
             $subtotal += $itemTotal;
 
             if (empty($itemData['is_tax_exempt'])) {
@@ -96,16 +106,36 @@ class InvoiceController extends Controller
             }
         }
 
-        $shippingCost = (float) ($validated['shipping_cost'] ?? 0);
-        $discount = (float) ($validated['discount'] ?? 0);
-        $taxRate = (float) $validated['tax_percentage'];
         // El descuento comercial rebaja la base gravada proporcionalmente antes de liquidar el IVA
         $netTaxableBase = max(0, round($taxableBase - ($taxableBase > 0 ? min($discount, $taxableBase) : 0), 2));
         $taxAmount = round(($netTaxableBase * $taxRate) / 100, 2);
 
         $totalUsd = max(0, round($subtotal + $shippingCost - $discount + $taxAmount, 2));
-        $bcvRate = (float) $validated['bcv_exchange_rate'];
         $totalVes = round($totalUsd * $bcvRate, 2);
+
+        return [
+            'subtotal' => round($subtotal, 2),
+            'tax_amount' => $taxAmount,
+            'total_usd' => $totalUsd,
+            'total_ves' => $totalVes,
+        ];
+    }
+
+    /**
+     * Construye el array de atributos financieros y metadatos técnicos para crear/actualizar.
+     */
+    private function buildInvoiceAttributes(Request $request, array $validated, Company $company): array
+    {
+        $shippingCost = (float) ($validated['shipping_cost'] ?? 0);
+        $discount = (float) ($validated['discount'] ?? 0);
+        $taxRate = (float) $validated['tax_percentage'];
+        $bcvRate = (float) $validated['bcv_exchange_rate'];
+
+        $totals = $this->calculateInvoiceTotals($validated['items'], $taxRate, $shippingCost, $discount, $bcvRate);
+        $subtotal = $totals['subtotal'];
+        $taxAmount = $totals['tax_amount'];
+        $totalUsd = $totals['total_usd'];
+        $totalVes = $totals['total_ves'];
 
         $rawSpecs = $validated['technical_specs'] ?? [];
         $specsList = array_is_list($rawSpecs) ? $rawSpecs : ($rawSpecs['specs'] ?? []);
@@ -866,14 +896,173 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Genera y descarga el documento oficial en PDF A4 desde el servidor (DomPDF).
+     * Genera y descarga un documento guardado oficial en PDF A4 desde el servidor mediante mPDF.
      */
-    public function downloadPdf(Request $request, Invoice $invoice): Response
+    public function downloadPdf(Request $request, Invoice $invoice, PdfGeneratorService $pdfGenerator): Response
     {
         $invoice->load(['company', 'client', 'items']);
         $specsMeta = is_array($invoice->technical_specs) ? $invoice->technical_specs : [];
 
-        $format = $request->input('format') ?: ($specsMeta['pdf_format'] ?? ($invoice->document_type === 'proforma' ? 'formato-2' : 'formato-1'));
+        return $this->renderInvoicePdfResponse(
+            $invoice,
+            $specsMeta,
+            $request->input('format'),
+            $pdfGenerator
+        );
+    }
+
+    /**
+     * Genera y descarga un PDF A4 directamente desde el taller de vista previa (borrador o edición en vivo).
+     */
+    public function previewPdf(Request $request, PdfGeneratorService $pdfGenerator): Response
+    {
+        $existingInvoice = $request->filled('invoice_id')
+            ? Invoice::with(['company', 'client'])->find((int) $request->input('invoice_id'))
+            : null;
+
+        $company = $request->filled('company_id')
+            ? Company::find((int) $request->input('company_id'))
+            : ($existingInvoice?->company ?: Company::where('is_active', true)->first() ?: Company::first());
+
+        if (! $company) {
+            $company = new Company([
+                'name' => 'Inversiones CorpoAsia C.A.',
+                'tax_id' => 'J-00000000-0',
+                'address' => '',
+                'phone' => '',
+            ]);
+        }
+
+        $client = $request->filled('client_id')
+            ? Client::find((int) $request->input('client_id'))
+            : $existingInvoice?->client;
+
+        if (! $client) {
+            $client = new Client([
+                'name' => 'Cliente General / Por Asignar',
+                'tax_id' => 'N/A',
+                'phone' => 'N/A',
+            ]);
+        }
+
+        $docType = (string) ($request->input('document_type') ?: ($existingInvoice?->document_type ?: 'factura'));
+        $saleCondition = (string) ($request->input('sale_condition') ?: ($existingInvoice?->sale_condition ?: 'Venta de Contado'));
+        $isConsignment = (
+            $docType === 'nota_entrega'
+            || strcasecmp($saleCondition, 'Consignación') === 0
+            || str_contains(strtolower($saleCondition), 'consign')
+        );
+
+        $rawItems = is_array($request->input('items')) ? $request->input('items') : [];
+        $hiddenImageOrders = [];
+        $preparedItems = collect();
+
+        foreach (array_values($rawItems) as $idx => $it) {
+            if (! is_array($it)) {
+                continue;
+            }
+            $qty = max(0, (float) ($it['quantity'] ?? 1));
+            $unitPrice = max(0, (float) ($it['unit_price'] ?? 0));
+            $lineTotal = round($qty * $unitPrice, 2);
+            $showImage = array_key_exists('show_image', $it) ? (bool) $it['show_image'] : true;
+            if (! $showImage) {
+                $hiddenImageOrders[] = $idx + 1;
+            }
+
+            $itemObj = new InvoiceItem([
+                'item_order' => $idx + 1,
+                'description' => trim((string) ($it['description'] ?? 'Producto / Servicio')) ?: 'Producto / Servicio',
+                'details' => $it['details'] ?? null,
+                'quantity' => $qty,
+                'unit' => trim((string) ($it['unit'] ?? 'unid')) ?: 'unid',
+                'unit_price' => $unitPrice,
+                'suggested_price' => isset($it['suggested_price']) && $it['suggested_price'] !== '' ? (float) $it['suggested_price'] : null,
+                'total' => $lineTotal,
+                'is_tax_exempt' => (bool) ($it['is_tax_exempt'] ?? false),
+                'image_url' => $it['image_url'] ?? null,
+            ]);
+            $preparedItems->push($itemObj);
+        }
+
+        $taxRate = (float) ($request->input('tax_percentage') ?? ($docType === 'factura' ? 16 : 0));
+        $shippingCost = (float) ($request->input('shipping_cost') ?? 0);
+        $discount = (float) ($request->input('discount') ?? 0);
+        $bcvRate = max(0.0001, (float) ($request->input('bcv_exchange_rate') ?? 1));
+
+        $totals = $this->calculateInvoiceTotals($rawItems, $taxRate, $shippingCost, $discount, $bcvRate);
+
+        $rawSpecs = $request->input('technical_specs', []);
+        $specsList = array_is_list($rawSpecs) ? $rawSpecs : ($rawSpecs['specs'] ?? []);
+
+        $specsMeta = [
+            'specs' => $specsList,
+            'pdf_format' => $request->input('format') ?: $request->input('pdf_format', 'formato-1'),
+            'show_bs_conversion' => $request->has('show_bs_conversion') ? $request->boolean('show_bs_conversion') : true,
+            'show_totals' => $request->has('show_totals') ? $request->boolean('show_totals') : ! $isConsignment,
+            'show_suggested_price' => $request->has('show_suggested_price') ? $request->boolean('show_suggested_price') : $isConsignment,
+            'show_item_images' => $request->has('show_item_images') ? $request->boolean('show_item_images') : true,
+            'hidden_image_orders' => $hiddenImageOrders,
+            'signature_stamp' => $request->input('signature_stamp', 'auto'),
+            'equipment_year' => $request->input('equipment_year'),
+            'equipment_vin' => $request->input('equipment_vin'),
+            'customs_text' => $request->input('customs_text'),
+            'payment_milestone_1_pct' => $request->input('payment_milestone_1_pct', 70),
+            'payment_milestone_1_text' => $request->input('payment_milestone_1_text'),
+            'payment_milestone_2_pct' => $request->input('payment_milestone_2_pct', 30),
+            'payment_milestone_2_text' => $request->input('payment_milestone_2_text'),
+            'company_social_handle' => $request->input('company_social_handle'),
+        ];
+
+        $virtualInvoice = new Invoice([
+            'document_type' => $docType,
+            'document_subtitle' => $request->input('document_subtitle'),
+            'correlative_number' => $request->input('correlative_number') ?: ($existingInvoice?->correlative_number ?: 'VISTA-PREVIA'),
+            'control_number' => $request->input('control_number') ?: ($existingInvoice?->control_number ?: 'BORRADOR'),
+            'status' => $request->input('status') ?: ($existingInvoice?->status ?: 'emitida'),
+            'issue_date' => $request->input('issue_date') ?: now('America/Caracas')->format('Y-m-d'),
+            'due_date' => $request->input('due_date'),
+            'offer_validity_days' => $request->input('offer_validity_days'),
+            'sale_condition' => $saleCondition,
+            'sales_channel' => $request->input('sales_channel', 'Oficina'),
+            'bcv_exchange_rate' => $bcvRate,
+            'show_bs_conversion' => $specsMeta['show_bs_conversion'],
+            'currency' => $request->input('currency', 'USD'),
+            'payment_method' => $request->input('payment_method', 'PAGO MOVIL'),
+            'payment_reference' => $request->input('payment_reference'),
+            'subtotal' => $totals['subtotal'],
+            'shipping_cost' => $shippingCost,
+            'discount' => $discount,
+            'tax_percentage' => $taxRate,
+            'tax_amount' => $totals['tax_amount'],
+            'total_usd' => $totals['total_usd'],
+            'total_ves' => $totals['total_ves'],
+            'delivery_address' => $request->input('delivery_address'),
+            'shipping_terms_notes' => $request->input('shipping_terms_notes'),
+            'terms_conditions' => $request->input('terms_conditions'),
+        ]);
+        $virtualInvoice->id = $existingInvoice?->id ?? 0;
+        $virtualInvoice->setRelation('company', $company);
+        $virtualInvoice->setRelation('client', $client);
+        $virtualInvoice->setRelation('items', $preparedItems);
+
+        return $this->renderInvoicePdfResponse(
+            $virtualInvoice,
+            $specsMeta,
+            $request->input('format') ?: $request->input('pdf_format'),
+            $pdfGenerator
+        );
+    }
+
+    /**
+     * Ensambla la plantilla clásica/moderna de documento fiscal y retorna la descarga PDF mediante mPDF.
+     */
+    private function renderInvoicePdfResponse(
+        Invoice $invoice,
+        array $specsMeta,
+        ?string $requestedFormat,
+        PdfGeneratorService $pdfGenerator
+    ): Response {
+        $format = $requestedFormat ?: ($specsMeta['pdf_format'] ?? ($invoice->document_type === 'proforma' ? 'formato-2' : 'formato-1'));
         if (! in_array($format, ['formato-1', 'formato-2'], true)) {
             $format = 'formato-1';
         }
@@ -893,7 +1082,11 @@ class InvoiceController extends Controller
             ? (bool) $invoice->show_bs_conversion
             : (bool) ($specsMeta['show_bs_conversion'] ?? true);
 
-        $isConsignment = ($invoice->document_type === 'nota_entrega' || $invoice->sale_condition === 'Consignación');
+        $isConsignment = (
+            $invoice->document_type === 'nota_entrega'
+            || strcasecmp((string) $invoice->sale_condition, 'Consignación') === 0
+            || str_contains(strtolower((string) $invoice->sale_condition), 'consign')
+        );
 
         $showTotals = isset($specsMeta['show_totals'])
             ? (bool) $specsMeta['show_totals']
@@ -963,50 +1156,65 @@ class InvoiceController extends Controller
 
         $correlative = $invoice->correlative_number ?: sprintf('DOC-%06d', $invoice->id);
         $controlNumber = $invoice->control_number ?: 'BORRADOR';
-        $issueDate = $invoice->issue_date ? $invoice->issue_date->format('Y-m-d') : '';
-        $dueDate = $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '';
+        $issueDate = $invoice->issue_date
+            ? (is_string($invoice->issue_date) ? substr($invoice->issue_date, 0, 10) : $invoice->issue_date->format('Y-m-d'))
+            : '';
+        $dueDate = $invoice->due_date
+            ? (is_string($invoice->due_date) ? substr($invoice->due_date, 0, 10) : $invoice->due_date->format('Y-m-d'))
+            : '';
         $termsText = $invoice->terms_conditions
             ?: ($invoice->company?->default_terms ?: 'Comprobante generado por el sistema. Para devoluciones o reclamos conserve este documento. Plazo máximo de reclamación: 3 días hábiles desde la fecha de emisión.');
 
         $viewName = $format === 'formato-2' ? 'pdf.modern' : 'pdf.classic';
-
-        $fontDir = storage_path('fonts');
-        if (! is_dir($fontDir)) {
-            @mkdir($fontDir, 0755, true);
-        }
-
-        $pdf = Pdf::loadView($viewName, [
-            'invoice' => $invoice,
-            'docInfo' => $docInfo,
-            'correlative' => $correlative,
-            'controlNumber' => $controlNumber,
-            'issueDate' => $issueDate,
-            'dueDate' => $dueDate,
-            'showBsConversion' => $showBsConversion,
-            'showTotals' => $showTotals,
-            'showSuggestedPrice' => $showSuggestedPrice,
-            'companyLogoUri' => $this->resolvePdfImageDataUri('images/corpoasia-square.png'),
-            'stampUri' => $stampPath ? $this->resolvePdfImageDataUri($stampPath) : null,
-            'items' => $items,
-            'groupedSpecs' => $groupedSpecs,
-            'termsText' => $termsText,
-            'equipmentYear' => $specsMeta['equipment_year'] ?? null,
-            'equipmentVin' => $specsMeta['equipment_vin'] ?? null,
-            'customsText' => $specsMeta['customs_text'] ?? null,
-            'milestone1Pct' => (int) ($specsMeta['payment_milestone_1_pct'] ?? 70),
-            'milestone1Text' => $specsMeta['payment_milestone_1_text'] ?? 'Al momento de firmar el contrato, para iniciar la verificación, compra del equipo y proceso de envío.',
-            'milestone2Pct' => (int) ($specsMeta['payment_milestone_2_pct'] ?? 30),
-            'milestone2Text' => $specsMeta['payment_milestone_2_text'] ?? '15 días antes de la llegada del equipo al puerto de destino en Venezuela.',
-            'shippingTermsNotes' => $invoice->shipping_terms_notes ?: 'Tiempo de carga: una vez confirmada la compra del equipo en China, el mismo cuenta con un plazo de hasta veinte (20) días hábiles para ser cargado en puerto, sujeto a la disponibilidad de espacio (booking) ofrecida por la naviera.',
-            'companySocialHandle' => $specsMeta['company_social_handle'] ?? null,
-        ])->setPaper('a4', 'portrait')->setOption([
-            'isRemoteEnabled' => false,
-            'defaultFont' => 'DejaVu Sans',
-        ]);
-
         $safeName = Str::slug($correlative ?: ('documento-' . $invoice->id)) . '.pdf';
 
-        return $pdf->download($safeName);
+        $watermark = match ($invoice->status) {
+            'anulada' => 'ANULADA',
+            'borrador' => 'BORRADOR',
+            default => null,
+        };
+
+        $margins = $format === 'formato-2'
+            ? ['top' => 11, 'right' => 13, 'bottom' => 13, 'left' => 13]
+            : ['top' => 12, 'right' => 14, 'bottom' => 14, 'left' => 14];
+
+        return $pdfGenerator->makePdfResponse(
+            $viewName,
+            [
+                'invoice' => $invoice,
+                'docInfo' => $docInfo,
+                'correlative' => $correlative,
+                'controlNumber' => $controlNumber,
+                'issueDate' => $issueDate,
+                'dueDate' => $dueDate,
+                'showBsConversion' => $showBsConversion,
+                'showTotals' => $showTotals,
+                'showSuggestedPrice' => $showSuggestedPrice,
+                'companyLogoUri' => $this->resolvePdfImageDataUri('images/corpoasia-square.png'),
+                'stampUri' => $stampPath ? $this->resolvePdfImageDataUri($stampPath) : null,
+                'items' => $items,
+                'groupedSpecs' => $groupedSpecs,
+                'termsText' => $termsText,
+                'equipmentYear' => $specsMeta['equipment_year'] ?? null,
+                'equipmentVin' => $specsMeta['equipment_vin'] ?? null,
+                'customsText' => $specsMeta['customs_text'] ?? null,
+                'milestone1Pct' => (int) ($specsMeta['payment_milestone_1_pct'] ?? 70),
+                'milestone1Text' => $specsMeta['payment_milestone_1_text'] ?? 'Al momento de firmar el contrato, para iniciar la verificación, compra del equipo y proceso de envío.',
+                'milestone2Pct' => (int) ($specsMeta['payment_milestone_2_pct'] ?? 30),
+                'milestone2Text' => $specsMeta['payment_milestone_2_text'] ?? '15 días antes de la llegada del equipo al puerto de destino en Venezuela.',
+                'shippingTermsNotes' => $invoice->shipping_terms_notes ?: 'Tiempo de carga: una vez confirmada la compra del equipo en China, el mismo cuenta con un plazo de hasta veinte (20) días hábiles para ser cargado en puerto, sujeto a la disponibilidad de espacio (booking) ofrecida por la naviera.',
+                'companySocialHandle' => $specsMeta['company_social_handle'] ?? null,
+            ],
+            $safeName,
+            [
+                'paper' => 'A4',
+                'margins' => $margins,
+                'title' => "{$docInfo['title']} {$correlative}",
+                'watermark' => $watermark,
+                'default_font_size' => $format === 'formato-2' ? 9 : 9.5,
+            ],
+            'attachment'
+        );
     }
 
     /**

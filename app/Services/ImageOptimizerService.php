@@ -101,6 +101,7 @@ class ImageOptimizerService
             'jpg', 'jpeg' => 'image/jpeg',
             'gif' => 'image/gif',
             'svg' => 'image/svg+xml',
+            'webp' => 'image/webp',
             default => null,
         };
         if (! $mime) {
@@ -108,7 +109,7 @@ class ImageOptimizerService
         }
 
         $size = @filesize($filePath) ?: 0;
-        if ($size <= 80 * 1024 || in_array($ext, ['svg', 'gif'], true)) {
+        if (($size <= 80 * 1024 && $ext !== 'webp') || in_array($ext, ['svg', 'gif'], true)) {
             $bytes = @file_get_contents($filePath);
 
             return $bytes !== false ? 'data:' . $mime . ';base64,' . base64_encode($bytes) : null;

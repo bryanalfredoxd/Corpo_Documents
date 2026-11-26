@@ -1556,6 +1556,75 @@ class FiscalSystemFunctionalityTest extends TestCase
         $this->assertStringStartsWith('%PDF-', $modernPdf->getContent());
     }
 
+    public function test_invoice_preview_pdf_endpoint_renders_mpdf_for_unsaved_and_live_forms(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::create([
+            'name' => 'Inversiones CorpoAsia CA',
+            'tax_id' => 'J-50123456-7',
+            'phone' => '+58 212 0000000',
+            'address' => 'Caracas, Venezuela',
+            'is_active' => true,
+        ]);
+        $client = Client::create([
+            'type' => 'empresa',
+            'name' => 'Agropecuaria Preview CA',
+            'tax_id' => 'J-40111222-3',
+            'phone' => '+58 414 9998877',
+            'address' => 'Barinas',
+            'is_active' => true,
+        ]);
+
+        // Vista previa sin guardar previamente en BD (formato-1)
+        $draftClassic = $this->actingAs($user)->post('/invoices/preview-pdf', [
+            'company_id' => $company->id,
+            'client_id' => $client->id,
+            'document_type' => 'factura',
+            'correlative_number' => 'F-0000777',
+            'control_number' => '00-000777',
+            'issue_date' => '2026-11-26',
+            'sale_condition' => 'Venta de Contado',
+            'bcv_exchange_rate' => 918.77,
+            'tax_percentage' => 16,
+            'format' => 'formato-1',
+            'items' => [[
+                'description' => 'Molino Pulverizador 170',
+                'quantity' => 2,
+                'unit' => 'unid',
+                'unit_price' => 500,
+                'is_tax_exempt' => false,
+                'show_image' => false,
+            ]],
+        ]);
+        $draftClassic->assertStatus(200);
+        $this->assertEquals('application/pdf', $draftClassic->headers->get('content-type'));
+        $this->assertStringStartsWith('%PDF-', $draftClassic->getContent());
+
+        // Vista previa en modo consignación (formato-2) sin cliente seleccionado aún
+        $draftModern = $this->actingAs($user)->post('/invoices/preview-pdf', [
+            'company_id' => $company->id,
+            'document_type' => 'nota_entrega',
+            'correlative_number' => 'NE-0000123',
+            'sale_condition' => 'Consignación',
+            'show_suggested_price' => true,
+            'show_totals' => false,
+            'bcv_exchange_rate' => 918.77,
+            'tax_percentage' => 0,
+            'format' => 'formato-2',
+            'items' => [[
+                'description' => 'Peletizadora KL-160',
+                'quantity' => 1,
+                'unit' => 'unid',
+                'unit_price' => 900,
+                'suggested_price' => 1100,
+                'is_tax_exempt' => true,
+            ]],
+        ]);
+        $draftModern->assertStatus(200);
+        $this->assertEquals('application/pdf', $draftModern->headers->get('content-type'));
+        $this->assertStringStartsWith('%PDF-', $draftModern->getContent());
+    }
+
     public function test_image_optimizer_resizes_and_stores_uploaded_and_base64_images(): void
     {
         Storage::fake('public');

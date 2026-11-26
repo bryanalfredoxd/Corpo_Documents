@@ -2,12 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Acta de Arqueo de Consignación - {{ $client->name }}</title>
     <style>
-        @page {
-            size: letter portrait;
-            margin: 12mm 14mm 14mm 14mm;
-        }
         * {
             box-sizing: border-box;
         }
@@ -292,7 +287,7 @@
         <table class="summary-table">
             <tr>
                 <td style="width: 60%; color: #475569;"><strong>Total Equipos en Poder del Cliente:</strong></td>
-                <td style="width: 40%; text-align: right;" class="font-mono font-bold" style="font-size: 10pt; color: #581c87;">
+                <td style="width: 40%; text-align: right; font-size: 10pt; color: #581c87;" class="font-mono font-bold">
                     {{ number_format($grandTotalQty, 0) }} unidades
                 </td>
             </tr>
@@ -391,16 +386,28 @@
     <table class="signature-table">
         <tr>
             <td>
-                <div style="height: 45px;"></div>
-                <div class="signature-line">Por la Empresa Consignante</div>
-                <div class="signature-sub">{{ $company->name ?? 'Corpo Asia' }}</div>
-                <div class="signature-sub">Despacho / Auditoría Central</div>
+                <table style="width: 100%;">
+                    <tr><td style="height: 45px;"></td></tr>
+                    <tr>
+                        <td class="signature-line">
+                            Por la Empresa Consignante<br>
+                            <span class="signature-sub" style="font-weight: normal; text-transform: none;">{{ $company->name ?? 'Corpo Asia' }}</span><br>
+                            <span class="signature-sub" style="font-weight: normal; text-transform: none;">Despacho / Auditoría Central</span>
+                        </td>
+                    </tr>
+                </table>
             </td>
             <td>
-                <div style="height: 45px;"></div>
-                <div class="signature-line">Por el Consignatario / Cliente</div>
-                <div class="signature-sub">{{ $client->name }}</div>
-                <div class="signature-sub">Recibido Conforme / Responsable del Local</div>
+                <table style="width: 100%;">
+                    <tr><td style="height: 45px;"></td></tr>
+                    <tr>
+                        <td class="signature-line">
+                            Por el Consignatario / Cliente<br>
+                            <span class="signature-sub" style="font-weight: normal; text-transform: none;">{{ $client->name }}</span><br>
+                            <span class="signature-sub" style="font-weight: normal; text-transform: none;">Recibido Conforme / Responsable del Local</span>
+                        </td>
+                    </tr>
+                </table>
             </td>
         </tr>
     </table>

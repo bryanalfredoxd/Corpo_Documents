@@ -36,21 +36,27 @@ Route::middleware(['auth'])->group(function () {
         $paginatedResult = InvoiceController::queryPaginatedInvoices($request);
         $auditResult = InvoiceController::queryAuditLogs(new Request());
 
+        // Condición SQL portable (MySQL + SQLite) que identifica documentos bajo modalidad de Consignación
+        // (incluso si fueron creados dejando el selector en 'factura' pero marcados con condición Consignación o PVP Sugerido sin sumatoria)
+        $consignSql = "(
+            LOWER(COALESCE(invoices.sale_condition, '')) LIKE '%consign%'
+            OR LOWER(COALESCE(invoices.payment_terms_notes, '')) LIKE '%consignac%'
+            OR (
+                (
+                    COALESCE(invoices.technical_specs, '') LIKE '%\"show_suggested_price\":true%'
+                    OR COALESCE(invoices.technical_specs, '') LIKE '%\"show_suggested_price\": true%'
+                )
+                AND (
+                    COALESCE(invoices.technical_specs, '') LIKE '%\"show_totals\":false%'
+                    OR COALESCE(invoices.technical_specs, '') LIKE '%\"show_totals\": false%'
+                )
+            )
+        )";
+
         $products = collect();
         if (Schema::hasTable('products')) {
             $products = Product::where('is_active', true)->orderBy('name')->get();
             if (Schema::hasColumn('invoice_items', 'product_id')) {
-                // Condición SQL que identifica documentos bajo modalidad de Consignación
-                // (incluso si fueron creados dejando el selector en 'factura' pero marcados con condición Consignación o PVP Sugerido)
-                $consignSql = "(
-                    LOWER(COALESCE(invoices.sale_condition, '')) LIKE '%consign%'
-                    OR LOWER(COALESCE(invoices.payment_terms_notes, '')) LIKE '%consignac%'
-                    OR (
-                        COALESCE(invoices.technical_specs, '') LIKE '%show_suggested_price%true%'
-                        AND COALESCE(invoices.technical_specs, '') LIKE '%show_totals%false%'
-                    )
-                )";
-
                 // Métricas de uso segmentadas por tipo de documento / modalidad PDF
                 $usageStats = DB::table('invoice_items')
                     ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
@@ -120,14 +126,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Métricas contables globales calculadas directamente en MySQL con SUM() / COUNT()
         // Las consignaciones (incluso si se crearon bajo la modalidad 'factura') representan mercancía en custodia, no ventas exigibles
-        $fiscalConsignFilter = "NOT (
-            LOWER(COALESCE(invoices.sale_condition, '')) LIKE '%consign%'
-            OR LOWER(COALESCE(invoices.payment_terms_notes, '')) LIKE '%consignac%'
-            OR (
-                COALESCE(invoices.technical_specs, '') LIKE '%show_suggested_price%true%'
-                AND COALESCE(invoices.technical_specs, '') LIKE '%show_totals%false%'
-            )
-        )";
+        $fiscalConsignFilter = "NOT {$consignSql}";
 
         if (Schema::hasTable('invoice_payments')) {
             $paymentsSub = DB::table('invoice_payments')
@@ -352,6 +351,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
 
     Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+    Route::post('/invoices/preview-pdf', [InvoiceController::class, 'previewPdf'])->name('invoices.preview-pdf');
     Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
     Route::get('/invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
     Route::patch('/invoices/{invoice}/status', [InvoiceController::class, 'updateStatus'])->name('invoices.update-status');

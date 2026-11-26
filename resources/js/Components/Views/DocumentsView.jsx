@@ -23,6 +23,7 @@ import {
 import { getDocumentTypeInfo } from '../../Utils/invoiceConstants';
 import { formatCaracasDate } from '../../Utils/dateUtils';
 import { useFeedback } from '../../Contexts/FeedbackContext';
+import { downloadPdfRequest } from '../../Utils/pdfDownload';
 
 export default function DocumentsView({
     invoices = [],
@@ -42,6 +43,33 @@ export default function DocumentsView({
 }) {
     const { confirm, notify } = useFeedback();
     const [openMenuInvoiceId, setOpenMenuInvoiceId] = useState(null);
+    const [downloadingPdfId, setDownloadingPdfId] = useState(null);
+
+    const handleDownloadInvoicePdf = async (inv) => {
+        if (downloadingPdfId === inv.id) return;
+        const fmt = inv.technical_specs?.pdf_format || ((inv.document_type === 'proforma') ? 'formato-2' : 'formato-1');
+        const safeSlug = String(inv.correlative_number || `documento-${inv.id}`)
+            .toLowerCase()
+            .replace(/[^a-z0-9-_]+/g, '-');
+        const url = typeof window.route === 'function'
+            ? window.route('invoices.pdf', inv.id, false)
+            : `/invoices/${inv.id}/pdf`;
+
+        setDownloadingPdfId(inv.id);
+        try {
+            await downloadPdfRequest({
+                url,
+                method: 'get',
+                params: { format: fmt },
+                fallbackFilename: `${safeSlug}.pdf`,
+            });
+            notify.success(`PDF ${inv.correlative_number || ''} descargado correctamente.`);
+        } catch (err) {
+            notify.error(err?.message || 'No se pudo descargar el PDF del documento.');
+        } finally {
+            setDownloadingPdfId(null);
+        }
+    };
 
     const isPaginator = !Array.isArray(invoices) && invoices && Array.isArray(invoices.data);
     const invoiceRows = isPaginator ? invoices.data : (Array.isArray(invoices) ? invoices : []);
@@ -350,14 +378,16 @@ export default function DocumentsView({
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            const fmt = inv.technical_specs?.pdf_format || ((inv.document_type === 'proforma') ? 'formato-2' : 'formato-1');
-                                            window.location.assign(`/invoices/${inv.id}/pdf?format=${fmt}`);
-                                        }}
-                                        className="h-8 px-2.5 rounded-lg bg-blue-700 text-white font-black text-xs flex items-center gap-1 cursor-pointer"
+                                        onClick={() => handleDownloadInvoicePdf(inv)}
+                                        disabled={downloadingPdfId === inv.id}
+                                        className="h-8 px-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-wait text-white font-black text-xs flex items-center gap-1 cursor-pointer transition-colors"
                                     >
-                                        <Printer className="w-3.5 h-3.5" />
-                                        <span>PDF</span>
+                                        {downloadingPdfId === inv.id ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <Printer className="w-3.5 h-3.5" />
+                                        )}
+                                        <span>{downloadingPdfId === inv.id ? '...' : 'PDF'}</span>
                                     </button>
                                     {inv.status !== 'anulada' && onOpenPaymentsModal && (
                                         <button
@@ -544,15 +574,17 @@ export default function DocumentsView({
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        const fmt = inv.technical_specs?.pdf_format || ((inv.document_type === 'proforma') ? 'formato-2' : 'formato-1');
-                                                        window.location.assign(`/invoices/${inv.id}/pdf?format=${fmt}`);
-                                                    }}
-                                                    className="h-8 px-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-black flex items-center gap-1 transition-colors cursor-pointer"
+                                                    onClick={() => handleDownloadInvoicePdf(inv)}
+                                                    disabled={downloadingPdfId === inv.id}
+                                                    className="h-8 px-2 rounded-lg bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-wait text-white font-black flex items-center gap-1 transition-colors cursor-pointer"
                                                     title="Descargar PDF oficial"
                                                 >
-                                                    <Printer className="w-3.5 h-3.5" />
-                                                    <span>PDF</span>
+                                                    {downloadingPdfId === inv.id ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Printer className="w-3.5 h-3.5" />
+                                                    )}
+                                                    <span>{downloadingPdfId === inv.id ? '...' : 'PDF'}</span>
                                                 </button>
                                                 {inv.status !== 'anulada' && onOpenPaymentsModal && (
                                                     <button
