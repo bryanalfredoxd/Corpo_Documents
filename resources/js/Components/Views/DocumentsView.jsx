@@ -328,7 +328,8 @@ export default function DocumentsView({
                 ) : (
                     invoiceRows.map(inv => {
                         const isAnnulled = inv.status === 'anulada';
-                        const isSoloUsd = inv.show_bs_conversion === false || inv.technical_specs?.show_bs_conversion === false;
+                        const isSoloBs = inv.currency === 'VES' || inv.currency === 'BS';
+                        const isSoloUsd = !isSoloBs && (inv.show_bs_conversion === false || inv.technical_specs?.show_bs_conversion === false);
                         return (
                             <div key={inv.id} className={`p-4 space-y-3 ${isAnnulled ? 'bg-red-50/40 opacity-80' : ''}`}>
                                 <div className="flex items-start justify-between gap-2">
@@ -347,13 +348,30 @@ export default function DocumentsView({
                                     </div>
                                     <div className="text-right">
                                         {statusBadge(inv.status)}
-                                        <div className={`font-mono font-black text-sm text-black mt-1 ${isAnnulled ? 'line-through text-slate-500' : ''}`}>
-                                            ${Number(inv.total_usd).toFixed(2)}
-                                        </div>
-                                        {!isSoloUsd && (
-                                            <div className="text-[10px] font-mono font-bold text-slate-600">
-                                                Bs. {Number(inv.total_ves).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                            </div>
+                                        {isSoloBs ? (
+                                            <>
+                                                <div className={`font-mono font-black text-sm text-purple-900 mt-1 ${isAnnulled ? 'line-through text-slate-500' : ''}`}>
+                                                    Bs. {Number(inv.total_ves).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                </div>
+                                                <span className="inline-block text-[9px] font-sans font-bold text-purple-700 bg-purple-50 px-1 py-0.2 rounded border border-purple-200">
+                                                    Solo Bs.
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className={`font-mono font-black text-sm text-black mt-1 ${isAnnulled ? 'line-through text-slate-500' : ''}`}>
+                                                    ${Number(inv.total_usd).toFixed(2)}
+                                                </div>
+                                                {isSoloUsd ? (
+                                                    <span className="inline-block text-[9px] font-sans font-bold text-slate-600 bg-slate-100 px-1 py-0.2 rounded border border-slate-200">
+                                                        Solo USD
+                                                    </span>
+                                                ) : (
+                                                    <div className="text-[10px] font-mono font-bold text-slate-600">
+                                                        Bs. {Number(inv.total_ves).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -470,7 +488,8 @@ export default function DocumentsView({
                         ) : (
                             invoiceRows.map((inv, rowIdx) => {
                                 const isAnnulled = inv.status === 'anulada';
-                                const isSoloUsd = inv.show_bs_conversion === false || inv.technical_specs?.show_bs_conversion === false;
+                                const isSoloBs = inv.currency === 'VES' || inv.currency === 'BS';
+                                const isSoloUsd = !isSoloBs && (inv.show_bs_conversion === false || inv.technical_specs?.show_bs_conversion === false);
                                 const isMenuOpen = openMenuInvoiceId === inv.id;
                                 const openUpward = rowIdx >= invoiceRows.length - 2 && invoiceRows.length > 3;
 
@@ -527,20 +546,36 @@ export default function DocumentsView({
 
                                         {/* Columna 3: Montos & Cobranza */}
                                         <td className="px-4 py-3.5 align-top text-right font-mono">
-                                            <div className={`font-black text-sm text-black ${isAnnulled ? 'line-through text-slate-500' : ''}`}>
-                                                ${Number(inv.total_usd).toFixed(2)}
-                                            </div>
-                                            {isSoloUsd ? (
-                                                <span className="inline-block mt-0.5 text-[10px] font-sans font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                                    Solo USD
-                                                </span>
-                                            ) : (
-                                                <div className={`text-[11px] font-bold text-slate-700 ${isAnnulled ? 'line-through text-slate-400' : ''}`}>
-                                                    Bs. {Number(inv.total_ves).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                            {isSoloBs ? (
+                                                <>
+                                                    <div className={`font-black text-sm text-purple-950 ${isAnnulled ? 'line-through text-slate-500' : ''}`}>
+                                                        Bs. {Number(inv.total_ves).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                    </div>
+                                                    <span className="inline-block mt-0.5 text-[10px] font-sans font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                                        Solo Bolívares
+                                                    </span>
                                                     <span className="block text-[9px] text-slate-500 font-normal">
                                                         Tasa Bs. {Number(inv.bcv_exchange_rate).toFixed(2)}
                                                     </span>
-                                                </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className={`font-black text-sm text-black ${isAnnulled ? 'line-through text-slate-500' : ''}`}>
+                                                        ${Number(inv.total_usd).toFixed(2)}
+                                                    </div>
+                                                    {isSoloUsd ? (
+                                                        <span className="inline-block mt-0.5 text-[10px] font-sans font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                                            Solo USD
+                                                        </span>
+                                                    ) : (
+                                                        <div className={`text-[11px] font-bold text-slate-700 ${isAnnulled ? 'line-through text-slate-400' : ''}`}>
+                                                            Bs. {Number(inv.total_ves).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                            <span className="block text-[9px] text-slate-500 font-normal">
+                                                                Tasa Bs. {Number(inv.bcv_exchange_rate).toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                             {!isAnnulled && Number(inv.paid_amount_usd) > 0 && Number(inv.balance_due_usd) > 0 && (
                                                 <div className="mt-1 text-[10px] font-sans leading-tight space-y-0.5">

@@ -109,6 +109,10 @@
     </style>
 </head>
 <body>
+    @php
+        $isSoloBs = ($invoice->currency === 'VES' || $invoice->currency === 'BS');
+        $bcvRate = (float)($invoice->bcv_exchange_rate ?: 1);
+    @endphp
     @if(empty($useMpdfEngine) && ($invoice->status === 'anulada' || $invoice->status === 'borrador'))
         <div class="watermark">{{ $invoice->status === 'anulada' ? 'ANULADA' : 'BORRADOR' }}</div>
     @endif
@@ -267,7 +271,7 @@
                                     @endif
                                     @if(!empty($showSuggestedPrice) && !empty($it['suggested_price']) && (float) $it['suggested_price'] > 0)
                                         <span style="font-size: 7.5pt; color: #dc2626; font-weight: bold; margin-left: 6px;">
-                                            • PVP Sugerido: USD {{ number_format((float) $it['suggested_price'], 2, '.', ',') }}
+                                            • PVP Sugerido: {{ $isSoloBs ? 'Bs. ' . number_format(((float) $it['suggested_price']) * $bcvRate, 2, ',', '.') : 'USD ' . number_format((float) $it['suggested_price'], 2, '.', ',') }}
                                         </span>
                                     @endif
                                 </td>
@@ -276,9 +280,12 @@
                     </td>
                     <td class="mono" style="width: 28%; padding: 6px 9px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-size: 8.5pt;">
                         @if($showTotals)
-                            USD {{ number_format($it['total'], 2, '.', ',') }}
+                            {{ $isSoloBs ? 'Bs. ' . number_format($it['total'] * $bcvRate, 2, ',', '.') : 'USD ' . number_format($it['total'], 2, '.', ',') }}
                         @else
-                            USD {{ number_format((!empty($showSuggestedPrice) && !empty($it['suggested_price']) && (float) $it['suggested_price'] > 0) ? (float) $it['suggested_price'] : (float) $it['unit_price'], 2, '.', ',') }}
+                            @php
+                                $refAmount = (!empty($showSuggestedPrice) && !empty($it['suggested_price']) && (float) $it['suggested_price'] > 0) ? (float) $it['suggested_price'] : (float) $it['unit_price'];
+                            @endphp
+                            {{ $isSoloBs ? 'Bs. ' . number_format($refAmount * $bcvRate, 2, ',', '.') : 'USD ' . number_format($refAmount, 2, '.', ',') }}
                         @endif
                     </td>
                 </tr>
@@ -289,7 +296,7 @@
                     <tr class="zebra">
                         <td style="padding: 6px 9px; border-bottom: 1px solid #e2e8f0; font-size: 8.5pt;">Flete y seguro internacional</td>
                         <td class="mono" style="padding: 6px 9px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-size: 8.5pt;">
-                            USD {{ number_format((float) $invoice->shipping_cost, 2, '.', ',') }}
+                            {{ $isSoloBs ? 'Bs. ' . number_format(((float) $invoice->shipping_cost) * $bcvRate, 2, ',', '.') : 'USD ' . number_format((float) $invoice->shipping_cost, 2, '.', ',') }}
                         </td>
                     </tr>
                 @endif
@@ -297,7 +304,7 @@
                 <tr>
                     <td style="padding: 6px 9px; border-bottom: 1px solid #e2e8f0; font-size: 8.5pt;">Nacionalización, aranceles y aduana en Venezuela</td>
                     <td class="mono" style="padding: 6px 9px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-size: 8.5pt;">
-                        {{ $customsText ?: ((float) $invoice->tax_amount > 0 ? 'USD ' . number_format((float) $invoice->tax_amount, 2, '.', ',') : 'INCLUIDO') }}
+                        {{ $customsText ?: ((float) $invoice->tax_amount > 0 ? ($isSoloBs ? 'Bs. ' . number_format(((float) $invoice->tax_amount) * $bcvRate, 2, ',', '.') : 'USD ' . number_format((float) $invoice->tax_amount, 2, '.', ',')) : 'INCLUIDO') }}
                     </td>
                 </tr>
 
@@ -305,7 +312,7 @@
                     <tr style="background-color: #ecfdf5; color: #065f46;">
                         <td style="padding: 6px 9px; border-bottom: 1px solid #e2e8f0; font-weight: bold; font-size: 8.5pt;">Descuento comercial aplicado</td>
                         <td class="mono" style="padding: 6px 9px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-size: 8.5pt;">
-                            -USD {{ number_format((float) $invoice->discount, 2, '.', ',') }}
+                            {{ $isSoloBs ? '-Bs. ' . number_format(((float) $invoice->discount) * $bcvRate, 2, ',', '.') : '-USD ' . number_format((float) $invoice->discount, 2, '.', ',') }}
                         </td>
                     </tr>
                 @endif
@@ -313,11 +320,11 @@
                 <tr style="background-color: #0E1C33; color: #ffffff;">
                     <td style="padding: 7px 9px; font-weight: bold; font-size: 8.5pt; text-transform: uppercase;">TOTAL DDP — Puesto en destino, Venezuela</td>
                     <td class="mono" style="padding: 7px 9px; text-align: right; font-weight: bold; font-size: 11pt;">
-                        USD {{ number_format((float) $invoice->total_usd, 2, '.', ',') }}
+                        {{ $isSoloBs ? 'Bs. ' . number_format((float) $invoice->total_ves, 2, ',', '.') : 'USD ' . number_format((float) $invoice->total_usd, 2, '.', ',') }}
                     </td>
                 </tr>
 
-                @if($showBsConversion)
+                @if(!$isSoloBs && $showBsConversion)
                     <tr style="background-color: #f1f5f9; color: #0E1C33; border-top: 1px solid #cbd5e1;">
                         <td style="padding: 5px 9px; font-weight: bold; font-size: 8pt;">
                             Equivalente en Bolívares (Tasa Bs. {{ number_format((float) $invoice->bcv_exchange_rate, 2, '.', '') }}):
@@ -357,7 +364,9 @@
                         {{ $milestone1Pct }}%
                     </td>
                     <td style="width: 86%; padding: 7px 9px; border-bottom: 1px solid #e2e8f0; font-size: 8.2pt; color: #1e293b;">
-                        <strong class="mono" style="color: #020617;">USD {{ number_format((float) $invoice->total_usd * ($milestone1Pct / 100), 2, '.', ',') }}</strong>
+                        <strong class="mono" style="color: #020617;">
+                            {{ $isSoloBs ? 'Bs. ' . number_format(((float) $invoice->total_ves) * ($milestone1Pct / 100), 2, ',', '.') : 'USD ' . number_format((float) $invoice->total_usd * ($milestone1Pct / 100), 2, '.', ',') }}
+                        </strong>
                         — {{ $milestone1Text }}
                     </td>
                 </tr>
@@ -366,7 +375,9 @@
                         {{ $milestone2Pct }}%
                     </td>
                     <td style="width: 86%; padding: 7px 9px; font-size: 8.2pt; color: #1e293b;">
-                        <strong class="mono" style="color: #020617;">USD {{ number_format((float) $invoice->total_usd * ($milestone2Pct / 100), 2, '.', ',') }}</strong>
+                        <strong class="mono" style="color: #020617;">
+                            {{ $isSoloBs ? 'Bs. ' . number_format(((float) $invoice->total_ves) * ($milestone2Pct / 100), 2, ',', '.') : 'USD ' . number_format((float) $invoice->total_usd * ($milestone2Pct / 100), 2, '.', ',') }}
+                        </strong>
                         — {{ $milestone2Text }}
                     </td>
                 </tr>

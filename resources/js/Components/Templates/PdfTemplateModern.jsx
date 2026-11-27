@@ -12,6 +12,8 @@ export default function PdfTemplateModern({
     totalVes = 0
 }) {
     const stampUrl = getSignatureStampUrl(invoiceForm.signature_stamp, invoiceForm.document_type);
+    const isSoloBs = invoiceForm.currency === 'VES' || invoiceForm.currency === 'BS';
+    const bcvRate = Number(invoiceForm.bcv_exchange_rate || 1);
 
     return (
         <div className="text-slate-900 text-xs relative">
@@ -236,15 +238,21 @@ export default function PdfTemplateModern({
                                         </span>
                                         {Boolean(invoiceForm.show_suggested_price) && it.suggested_price && Number(it.suggested_price) > 0 && (
                                             <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.2 rounded inline-block ml-2">
-                                                PVP Sugerido: USD {Number(it.suggested_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                PVP Sugerido: {isSoloBs
+                                                    ? `Bs. ${(Number(it.suggested_price) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                    : `USD ${Number(it.suggested_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                                             </span>
                                         )}
                                     </div>
                                 </div>
                                 <span className="font-mono font-bold text-slate-900">
                                     {invoiceForm.show_totals !== false
-                                        ? `USD ${Number(it.quantity * it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                                        : `USD ${Number((Boolean(invoiceForm.show_suggested_price) && it.suggested_price) ? it.suggested_price : it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                        ? (isSoloBs
+                                            ? `Bs. ${(Number(it.quantity * it.unit_price) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                            : `USD ${Number(it.quantity * it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}`)
+                                        : (isSoloBs
+                                            ? `Bs. ${(Number((Boolean(invoiceForm.show_suggested_price) && it.suggested_price) ? it.suggested_price : it.unit_price) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                            : `USD ${Number((Boolean(invoiceForm.show_suggested_price) && it.suggested_price) ? it.suggested_price : it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}`)
                                     }
                                 </span>
                             </div>
@@ -255,21 +263,29 @@ export default function PdfTemplateModern({
                                     <div className="flex justify-between px-3 py-2 border-b border-slate-200 bg-[#F4F5F7]">
                                         <span className="font-medium text-slate-800">Flete y seguro internacional</span>
                                         <span className="font-mono font-bold text-slate-900">
-                                            USD {Number(invoiceForm.shipping_cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            {isSoloBs
+                                                ? `Bs. ${(Number(invoiceForm.shipping_cost) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                : `USD ${Number(invoiceForm.shipping_cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                                         </span>
                                     </div>
                                 )}
                                 <div className="flex justify-between px-3 py-2 border-b border-slate-200">
                                     <span className="font-medium text-slate-800">Nacionalización, aranceles y aduana en Venezuela</span>
                                     <span className="font-mono font-bold text-slate-900">
-                                        {invoiceForm.customs_text || (taxAmount > 0 ? `USD ${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'INCLUIDO')}
+                                        {invoiceForm.customs_text || (taxAmount > 0
+                                            ? (isSoloBs
+                                                ? `Bs. ${(taxAmount * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                : `USD ${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`)
+                                            : 'INCLUIDO')}
                                     </span>
                                 </div>
                                 {Number(invoiceForm.discount || 0) > 0 && (
                                     <div className="flex justify-between px-3 py-2 border-b border-slate-200 bg-emerald-50/70 text-emerald-800">
                                         <span className="font-bold">Descuento comercial aplicado</span>
                                         <span className="font-mono font-bold">
-                                            -USD {Number(invoiceForm.discount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            {isSoloBs
+                                                ? `-Bs. ${(Number(invoiceForm.discount) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                : `-USD ${Number(invoiceForm.discount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                                         </span>
                                     </div>
                                 )}
@@ -278,10 +294,12 @@ export default function PdfTemplateModern({
                                 <div className="bg-[#0E1C33] text-white px-3 py-2.5 flex justify-between items-center font-black text-xs uppercase tracking-wide">
                                     <span>TOTAL DDP — Puesto en destino, Venezuela</span>
                                     <span className="font-mono text-base text-white">
-                                        USD {totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        {isSoloBs
+                                            ? `Bs. ${Number(totalVes || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                            : `USD ${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                                     </span>
                                 </div>
-                                {invoiceForm.show_bs_conversion !== false && (
+                                {!isSoloBs && invoiceForm.show_bs_conversion !== false && (
                                     <div className="bg-slate-100 text-[#0E1C33] px-3 py-1.5 flex justify-between items-center text-[11px] font-bold border-t border-slate-300">
                                         <span>Equivalente en Bolívares (Tasa Bs. {Number(invoiceForm.bcv_exchange_rate || 0).toFixed(2)}):</span>
                                         <span className="font-mono font-black">
@@ -313,7 +331,9 @@ export default function PdfTemplateModern({
                                     <div className="col-span-2 font-black text-sm text-[#0E1C33]">{invoiceForm.payment_milestone_1_pct || 70}%</div>
                                     <div className="col-span-10 text-slate-800">
                                         <span className="font-mono font-black text-black">
-                                            USD {(totalUsd * (Number(invoiceForm.payment_milestone_1_pct || 70) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            {isSoloBs
+                                                ? `Bs. ${(totalVes * (Number(invoiceForm.payment_milestone_1_pct || 70) / 100)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                : `USD ${(totalUsd * (Number(invoiceForm.payment_milestone_1_pct || 70) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                                         </span>{' '}
                                         — {invoiceForm.payment_milestone_1_text || 'Al momento de firmar el contrato, para iniciar la verificación, compra del equipo y proceso de envío.'}
                                     </div>
@@ -322,7 +342,9 @@ export default function PdfTemplateModern({
                                     <div className="col-span-2 font-black text-sm text-[#0E1C33]">{invoiceForm.payment_milestone_2_pct || 30}%</div>
                                     <div className="col-span-10 text-slate-800">
                                         <span className="font-mono font-black text-black">
-                                            USD {(totalUsd * (Number(invoiceForm.payment_milestone_2_pct || 30) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            {isSoloBs
+                                                ? `Bs. ${(totalVes * (Number(invoiceForm.payment_milestone_2_pct || 30) / 100)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                : `USD ${(totalUsd * (Number(invoiceForm.payment_milestone_2_pct || 30) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                                         </span>{' '}
                                         — {invoiceForm.payment_milestone_2_text || '15 días antes de la llegada del equipo al puerto de destino en Venezuela.'}
                                     </div>

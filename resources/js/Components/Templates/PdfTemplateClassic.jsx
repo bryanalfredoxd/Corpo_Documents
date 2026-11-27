@@ -13,6 +13,8 @@ export default function PdfTemplateClassic({
     totalVes
 }) {
     const stampUrl = getSignatureStampUrl(invoiceForm.signature_stamp, invoiceForm.document_type);
+    const isSoloBs = invoiceForm.currency === 'VES' || invoiceForm.currency === 'BS';
+    const bcvRate = Number(invoiceForm.bcv_exchange_rate || 1);
 
     return (
         <div className="printable-a4-page text-slate-900 text-xs relative">
@@ -150,14 +152,21 @@ export default function PdfTemplateClassic({
                             <span className="col-span-4 text-slate-600 font-bold">Canal:</span>
                             <span className="col-span-8 font-bold text-slate-950">{invoiceForm.sales_channel || 'Oficina / Presencial'}</span>
                         </div>
-                        {invoiceForm.show_bs_conversion !== false && (
+                        {isSoloBs ? (
+                            <div className="grid grid-cols-12 gap-1">
+                                <span className="col-span-4 text-slate-600 font-bold">Moneda:</span>
+                                <span className="col-span-8 font-mono font-bold text-slate-950">
+                                    Bolívares (VES / Bs.)
+                                </span>
+                            </div>
+                        ) : invoiceForm.show_bs_conversion !== false ? (
                             <div className="grid grid-cols-12 gap-1">
                                 <span className="col-span-4 text-slate-600 font-bold">Tasa BS:</span>
                                 <span className="col-span-8 font-mono font-bold text-slate-950">
                                     Bs. {Number(invoiceForm.bcv_exchange_rate || 876.80).toFixed(2)} / USD
                                 </span>
                             </div>
-                        )}
+                        ) : null}
                         {(invoiceForm.document_type === 'proforma' || invoiceForm.document_type === 'cotizacion') ? (
                             <div className="grid grid-cols-12 gap-1">
                                 <span className="col-span-4 text-slate-600 font-bold">Validez:</span>
@@ -186,10 +195,16 @@ export default function PdfTemplateClassic({
                             <th className="py-2.5 px-3">DESCRIPCIÓN DEL PRODUCTO</th>
                             <th className="py-2.5 px-3 text-center w-24">CANT.</th>
                             <th className="py-2.5 px-3 text-right w-28">
-                                {invoiceForm.show_totals === false ? 'PRECIO BASE ($)' : 'PRECIO UNIT. ($)'}
+                                {invoiceForm.show_totals === false
+                                    ? (isSoloBs ? 'PRECIO BASE (Bs.)' : 'PRECIO BASE ($)')
+                                    : (isSoloBs ? 'PRECIO UNIT. (Bs.)' : 'PRECIO UNIT. ($)')}
                             </th>
                             <th className="py-2.5 px-3 text-right w-28">
-                                {invoiceForm.show_totals === false ? (!invoiceForm.show_suggested_price ? 'MODALIDAD' : 'PVP SUGERIDO ($)') : 'TOTAL ($)'}
+                                {invoiceForm.show_totals === false
+                                    ? (!invoiceForm.show_suggested_price
+                                        ? 'MODALIDAD'
+                                        : (isSoloBs ? 'PVP SUGERIDO (Bs.)' : 'PVP SUGERIDO ($)'))
+                                    : (isSoloBs ? 'TOTAL (Bs.)' : 'TOTAL ($)')}
                             </th>
                         </tr>
                     </thead>
@@ -219,7 +234,9 @@ export default function PdfTemplateClassic({
                                             )}
                                             {invoiceForm.show_totals !== false && invoiceForm.show_suggested_price && it.suggested_price && Number(it.suggested_price) > 0 && (
                                                 <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.2 rounded inline-block mt-1">
-                                                    PVP Sugerido: ${Number(it.suggested_price).toFixed(2)}
+                                                    PVP Sugerido: {isSoloBs
+                                                        ? `Bs. ${(Number(it.suggested_price) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                        : `$${Number(it.suggested_price).toFixed(2)}`}
                                                 </span>
                                             )}
                                         </div>
@@ -229,13 +246,18 @@ export default function PdfTemplateClassic({
                                     {it.quantity} {it.unit}
                                 </td>
                                 <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                                    ${Number(it.unit_price || 0).toFixed(2)} {it.unit && <span className="text-[10px] text-slate-500 font-normal">/{it.unit}</span>}
+                                    {isSoloBs
+                                        ? `Bs. ${(Number(it.unit_price || 0) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                        : `$${Number(it.unit_price || 0).toFixed(2)}`}
+                                    {it.unit && <span className="text-[10px] text-slate-500 font-normal">/{it.unit}</span>}
                                 </td>
                                 <td className="py-3 px-3 text-right font-mono font-black text-slate-950">
                                     {invoiceForm.show_totals === false ? (
                                         invoiceForm.show_suggested_price && it.suggested_price && Number(it.suggested_price) > 0 ? (
                                             <span className="text-red-600 font-bold">
-                                                ${Number(it.suggested_price).toFixed(2)}
+                                                {isSoloBs
+                                                    ? `Bs. ${(Number(it.suggested_price) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                    : `$${Number(it.suggested_price).toFixed(2)}`}
                                             </span>
                                         ) : !invoiceForm.show_suggested_price ? (
                                             <span className="text-emerald-800 font-bold text-[10px] uppercase">
@@ -246,7 +268,9 @@ export default function PdfTemplateClassic({
                                         )
                                     ) : (
                                         <>
-                                            ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
+                                            {isSoloBs
+                                                ? `Bs. ${(Number(it.quantity || 0) * Number(it.unit_price || 0) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                : `$${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}`}
                                             {it.is_tax_exempt && (
                                                 <span className="text-[10px] text-blue-900 font-black ml-1">(E)</span>
                                             )}
@@ -277,10 +301,16 @@ export default function PdfTemplateClassic({
                         </p>
                     )}
 
-                    {invoiceForm.show_totals !== false && invoiceForm.show_bs_conversion !== false && (
-                        <div className="border-l-2 border-slate-400 pl-2.5 mt-3 py-0.5 text-[10px] text-slate-600 italic leading-snug">
-                            Monto en Bolívares (VES) calculado según la Tasa BS indicada a la fecha de la transacción.
-                        </div>
+                    {invoiceForm.show_totals !== false && (
+                        isSoloBs ? (
+                            <div className="border-l-2 border-purple-400 pl-2.5 mt-3 py-0.5 text-[10px] text-slate-600 italic leading-snug">
+                                Factura y liquidación emitida exclusivamente en Bolívares (VES / Bs.) a la tasa oficial del BCV.
+                            </div>
+                        ) : invoiceForm.show_bs_conversion !== false ? (
+                            <div className="border-l-2 border-slate-400 pl-2.5 mt-3 py-0.5 text-[10px] text-slate-600 italic leading-snug">
+                                Monto en Bolívares (VES) calculado según la Tasa BS indicada a la fecha de la transacción.
+                            </div>
+                        ) : null
                     )}
                 </div>
 
@@ -288,35 +318,60 @@ export default function PdfTemplateClassic({
                     <div className="space-y-1.5 font-mono text-right text-xs">
                         <div className="flex justify-between py-1 border-b border-slate-200">
                             <span className="font-sans font-bold text-slate-700">Subtotal:</span>
-                            <span className="font-bold text-slate-900">${itemsSubtotal.toFixed(2)}</span>
+                            <span className="font-bold text-slate-900">
+                                {isSoloBs
+                                    ? `Bs. ${(itemsSubtotal * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : `$${itemsSubtotal.toFixed(2)}`}
+                            </span>
                         </div>
                         {Number(invoiceForm.shipping_cost || 0) > 0 && (
                             <div className="flex justify-between py-1 border-b border-slate-200">
                                 <span className="font-sans font-bold text-slate-700">Flete / Delivery:</span>
-                                <span className="font-bold text-slate-900">${Number(invoiceForm.shipping_cost).toFixed(2)}</span>
+                                <span className="font-bold text-slate-900">
+                                    {isSoloBs
+                                        ? `Bs. ${(Number(invoiceForm.shipping_cost) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                        : `$${Number(invoiceForm.shipping_cost).toFixed(2)}`}
+                                </span>
                             </div>
                         )}
                         {Number(invoiceForm.discount || 0) > 0 && (
                             <div className="flex justify-between py-1 border-b border-slate-200 text-emerald-800">
                                 <span className="font-sans font-bold">Descuento:</span>
-                                <span className="font-bold">-${Number(invoiceForm.discount).toFixed(2)}</span>
+                                <span className="font-bold">
+                                    {isSoloBs
+                                        ? `-Bs. ${(Number(invoiceForm.discount) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                        : `-$${Number(invoiceForm.discount).toFixed(2)}`}
+                                </span>
                             </div>
                         )}
                         <div className="flex justify-between py-1 border-b-2 border-slate-950">
                             <span className="font-sans font-bold text-slate-700">
                                 {Number(invoiceForm.tax_percentage) === 0 ? 'IVA (0% Exento / Neto):' : `IVA (${Number(invoiceForm.tax_percentage)}%):`}
                             </span>
-                            <span className="font-bold text-slate-900">${taxAmount.toFixed(2)}</span>
+                            <span className="font-bold text-slate-900">
+                                {isSoloBs
+                                    ? `Bs. ${(taxAmount * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : `$${taxAmount.toFixed(2)}`}
+                            </span>
                         </div>
-                        <div className="flex justify-between pt-2 text-sm font-black">
-                            <span className="font-sans">TOTAL USD:</span>
-                            <span className="text-slate-950">${totalUsd.toFixed(2)}</span>
-                        </div>
-                        {invoiceForm.show_bs_conversion !== false && (
-                            <div className="flex justify-between text-xs font-bold text-blue-900 pt-0.5">
-                                <span className="font-sans font-bold text-slate-700">TOTAL VES:</span>
-                                <span>Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                        {isSoloBs ? (
+                            <div className="flex justify-between pt-2 text-sm font-black text-slate-950">
+                                <span className="font-sans">TOTAL VES:</span>
+                                <span>Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
+                        ) : (
+                            <>
+                                <div className="flex justify-between pt-2 text-sm font-black">
+                                    <span className="font-sans">TOTAL USD:</span>
+                                    <span className="text-slate-950">${totalUsd.toFixed(2)}</span>
+                                </div>
+                                {invoiceForm.show_bs_conversion !== false && (
+                                    <div className="flex justify-between text-xs font-bold text-blue-900 pt-0.5">
+                                        <span className="font-sans font-bold text-slate-700">TOTAL VES:</span>
+                                        <span>Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 ) : (

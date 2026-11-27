@@ -186,6 +186,10 @@
     </style>
 </head>
 <body>
+    @php
+        $isSoloBs = ($invoice->currency === 'VES' || $invoice->currency === 'BS');
+        $bcvRate = (float)($invoice->bcv_exchange_rate ?: 1);
+    @endphp
     @if(empty($useMpdfEngine) && ($invoice->status === 'anulada' || $invoice->status === 'borrador'))
         <div class="watermark">{{ $invoice->status === 'anulada' ? 'ANULADA' : 'BORRADOR' }}</div>
     @endif
@@ -279,7 +283,18 @@
                         <td class="kv-label">Canal:</td>
                         <td class="kv-value" style="font-weight: bold;">{{ $invoice->sales_channel ?: 'Oficina / Presencial' }}</td>
                     </tr>
-                    @if($showBsConversion)
+                    @if($isSoloBs)
+                        <tr>
+                            <td class="kv-label">Moneda:</td>
+                            <td class="kv-value mono" style="font-weight: bold;">Bolívares (VES / Bs.)</td>
+                        </tr>
+                        @if((float) $invoice->bcv_exchange_rate > 0)
+                            <tr>
+                                <td class="kv-label">Tasa BCV:</td>
+                                <td class="kv-value mono" style="font-weight: bold;">Bs. {{ number_format((float) $invoice->bcv_exchange_rate, 2, ',', '.') }} / USD</td>
+                            </tr>
+                        @endif
+                    @elseif($showBsConversion)
                         <tr>
                             <td class="kv-label">Tasa BS:</td>
                             <td class="kv-value mono" style="font-weight: bold;">Bs. {{ number_format((float) $invoice->bcv_exchange_rate, 2, '.', '') }} / USD</td>
@@ -308,8 +323,8 @@
                 <th style="width: 5%; text-align: center;">#</th>
                 <th style="width: 47%;">DESCRIPCIÓN DEL PRODUCTO</th>
                 <th style="width: 14%; text-align: center;">CANT.</th>
-                <th style="width: 17%; text-align: right;">{{ $showTotals ? 'PRECIO UNIT. ($)' : 'PRECIO BASE ($)' }}</th>
-                <th style="width: 17%; text-align: right;">{{ $showTotals ? 'TOTAL ($)' : (!empty($showSuggestedPrice) ? 'PVP SUGERIDO ($)' : 'MODALIDAD') }}</th>
+                <th style="width: 17%; text-align: right;">{{ $showTotals ? ($isSoloBs ? 'PRECIO UNIT. (Bs.)' : 'PRECIO UNIT. ($)') : ($isSoloBs ? 'PRECIO BASE (Bs.)' : 'PRECIO BASE ($)') }}</th>
+                <th style="width: 17%; text-align: right;">{{ $showTotals ? ($isSoloBs ? 'TOTAL (Bs.)' : 'TOTAL ($)') : (!empty($showSuggestedPrice) ? ($isSoloBs ? 'PVP SUGERIDO (Bs.)' : 'PVP SUGERIDO ($)') : 'MODALIDAD') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -331,7 +346,7 @@
                                     @endif
                                     @if($showTotals && !empty($showSuggestedPrice) && !empty($item['suggested_price']) && (float) $item['suggested_price'] > 0)
                                         <br><span style="font-size: 7.8pt; color: #dc2626; font-weight: bold;">
-                                            PVP Sugerido: ${{ number_format((float) $item['suggested_price'], 2, '.', '') }}
+                                            PVP Sugerido: {{ $isSoloBs ? 'Bs. ' . number_format(((float) $item['suggested_price']) * $bcvRate, 2, ',', '.') : '$' . number_format((float) $item['suggested_price'], 2, '.', '') }}
                                         </span>
                                     @endif
                                 </td>
@@ -342,20 +357,20 @@
                         {{ rtrim(rtrim(number_format($item['quantity'], 2, '.', ''), '0'), '.') }} {{ $item['unit'] }}
                     </td>
                     <td class="mono" style="text-align: right; font-weight: bold;">
-                        ${{ number_format($item['unit_price'], 2, '.', '') }}
+                        {{ $isSoloBs ? 'Bs. ' . number_format($item['unit_price'] * $bcvRate, 2, ',', '.') : '$' . number_format($item['unit_price'], 2, '.', '') }}
                         @if(!empty($item['unit']))
                             <span style="font-size: 7pt; color: #64748b; font-weight: normal;">/{{ $item['unit'] }}</span>
                         @endif
                     </td>
                     <td class="mono" style="text-align: right; font-weight: bold; color: #020617;">
                         @if($showTotals)
-                            ${{ number_format($item['total'], 2, '.', '') }}
+                            {{ $isSoloBs ? 'Bs. ' . number_format($item['total'] * $bcvRate, 2, ',', '.') : '$' . number_format($item['total'], 2, '.', '') }}
                             @if($item['is_tax_exempt'])
                                 <span style="font-size: 7pt; color: #1e3a8a; font-weight: bold;">(E)</span>
                             @endif
                         @else
                             @if(!empty($showSuggestedPrice) && !empty($item['suggested_price']) && (float) $item['suggested_price'] > 0)
-                                <span style="color: #dc2626; font-weight: bold;">${{ number_format((float) $item['suggested_price'], 2, '.', '') }}</span>
+                                <span style="color: #dc2626; font-weight: bold;">{{ $isSoloBs ? 'Bs. ' . number_format(((float) $item['suggested_price']) * $bcvRate, 2, ',', '.') : '$' . number_format((float) $item['suggested_price'], 2, '.', '') }}</span>
                             @elseif(empty($showSuggestedPrice))
                                 <span style="font-size: 7.5pt; color: #0f766e; font-weight: bold;">CONSIGNACIÓN</span>
                             @else
@@ -383,7 +398,15 @@
                         <span class="mono" style="font-weight: bold;">{{ $invoice->payment_reference }}</span>
                     </p>
                 @endif
-                @if($showBsConversion)
+                @if($isSoloBs)
+                    <table style="margin-top: 8px; width: 100%;">
+                        <tr>
+                            <td style="border-left: 2px solid #7e22ce; padding: 2px 0 2px 8px; font-size: 7.5pt; color: #475569; font-style: italic;">
+                                Factura y liquidación emitida exclusivamente en Bolívares (VES / Bs.) calculada según la Tasa oficial del BCV.
+                            </td>
+                        </tr>
+                    </table>
+                @elseif($showBsConversion)
                     <table style="margin-top: 8px; width: 100%;">
                         <tr>
                             <td style="border-left: 2px solid #94a3b8; padding: 2px 0 2px 8px; font-size: 7.5pt; color: #475569; font-style: italic;">
@@ -398,35 +421,50 @@
                     <table>
                         <tr class="totals-row">
                             <td style="font-weight: bold; color: #334155;">Subtotal:</td>
-                            <td class="mono" style="text-align: right; font-weight: bold;">${{ number_format((float) $invoice->subtotal, 2, '.', '') }}</td>
+                            <td class="mono" style="text-align: right; font-weight: bold;">
+                                {{ $isSoloBs ? 'Bs. ' . number_format(((float) $invoice->subtotal) * $bcvRate, 2, ',', '.') : '$' . number_format((float) $invoice->subtotal, 2, '.', '') }}
+                            </td>
                         </tr>
                         @if((float) $invoice->shipping_cost > 0)
                             <tr class="totals-row">
                                 <td style="font-weight: bold; color: #334155;">Flete / Delivery:</td>
-                                <td class="mono" style="text-align: right; font-weight: bold;">${{ number_format((float) $invoice->shipping_cost, 2, '.', '') }}</td>
+                                <td class="mono" style="text-align: right; font-weight: bold;">
+                                    {{ $isSoloBs ? 'Bs. ' . number_format(((float) $invoice->shipping_cost) * $bcvRate, 2, ',', '.') : '$' . number_format((float) $invoice->shipping_cost, 2, '.', '') }}
+                                </td>
                             </tr>
                         @endif
                         @if((float) $invoice->discount > 0)
                             <tr class="totals-row" style="color: #065f46;">
                                 <td style="font-weight: bold;">Descuento:</td>
-                                <td class="mono" style="text-align: right; font-weight: bold;">-${{ number_format((float) $invoice->discount, 2, '.', '') }}</td>
+                                <td class="mono" style="text-align: right; font-weight: bold;">
+                                    {{ $isSoloBs ? '-Bs. ' . number_format(((float) $invoice->discount) * $bcvRate, 2, ',', '.') : '-$' . number_format((float) $invoice->discount, 2, '.', '') }}
+                                </td>
                             </tr>
                         @endif
                         <tr class="totals-row totals-iva">
                             <td style="font-weight: bold; color: #334155;">
                                 {{ (float) $invoice->tax_percentage === 0.0 ? 'IVA (0% Exento / Neto):' : 'IVA (' . number_format((float) $invoice->tax_percentage, 0) . '%):' }}
                             </td>
-                            <td class="mono" style="text-align: right; font-weight: bold;">${{ number_format((float) $invoice->tax_amount, 2, '.', '') }}</td>
+                            <td class="mono" style="text-align: right; font-weight: bold;">
+                                {{ $isSoloBs ? 'Bs. ' . number_format(((float) $invoice->tax_amount) * $bcvRate, 2, ',', '.') : '$' . number_format((float) $invoice->tax_amount, 2, '.', '') }}
+                            </td>
                         </tr>
-                        <tr class="totals-final">
-                            <td>TOTAL USD:</td>
-                            <td class="mono" style="text-align: right;">${{ number_format((float) $invoice->total_usd, 2, '.', '') }}</td>
-                        </tr>
-                        @if($showBsConversion)
-                            <tr class="totals-ves">
-                                <td style="color: #334155;">TOTAL VES:</td>
+                        @if($isSoloBs)
+                            <tr class="totals-final">
+                                <td>TOTAL VES:</td>
                                 <td class="mono" style="text-align: right;">Bs. {{ number_format((float) $invoice->total_ves, 2, ',', '.') }}</td>
                             </tr>
+                        @else
+                            <tr class="totals-final">
+                                <td>TOTAL USD:</td>
+                                <td class="mono" style="text-align: right;">${{ number_format((float) $invoice->total_usd, 2, '.', '') }}</td>
+                            </tr>
+                            @if($showBsConversion)
+                                <tr class="totals-ves">
+                                    <td style="color: #334155;">TOTAL VES:</td>
+                                    <td class="mono" style="text-align: right;">Bs. {{ number_format((float) $invoice->total_ves, 2, ',', '.') }}</td>
+                                </tr>
+                            @endif
                         @endif
                     </table>
                 @else

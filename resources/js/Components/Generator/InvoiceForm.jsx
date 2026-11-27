@@ -110,6 +110,11 @@ export default function InvoiceForm({
         }
     };
 
+    const isSoloBs = invoiceForm.currency === 'VES' || invoiceForm.currency === 'BS';
+    const isSoloUsd = !isSoloBs && invoiceForm.show_bs_conversion === false;
+    const isDual = !isSoloBs && invoiceForm.show_bs_conversion !== false;
+    const bcvRate = Number(invoiceForm.bcv_exchange_rate || 1);
+
     const selectedClientOption = clients.find((cl) => String(cl.id) === String(invoiceForm.client_id)) || null;
     const filteredClients = clients.filter((cl) => {
         // 1. Filtrar por categoría / rubro si no es 'all'
@@ -451,36 +456,54 @@ export default function InvoiceForm({
                     Condiciones Comerciales & Tasa BS
                 </span>
 
-                {/* Régimen Monetario: Dólares + Bolívares o Solo Dólares */}
+                {/* Régimen Monetario: Dólares + Bolívares, Solo Dólares o Solo Bolívares */}
                 <div className="bg-white p-2.5 rounded-lg border border-slate-300 space-y-1.5 shadow-2xs">
                     <label className="text-[11px] font-black text-slate-800 uppercase tracking-wide block">
                         Régimen de Moneda en el Documento (PDF):
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <button
                             type="button"
-                            onClick={() => setInvoiceForm(prev => ({ ...prev, show_bs_conversion: true }))}
-                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${invoiceForm.show_bs_conversion !== false
+                            onClick={() => setInvoiceForm(prev => ({ ...prev, currency: 'USD', show_bs_conversion: true }))}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer border ${isDual
                                 ? 'bg-blue-700 text-white border-blue-800 shadow-2xs'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
                                 }`}
+                            title="Emisión bimonetaria en Dólares con conversión informativa a Bolívares al pie"
                         >
-                            <span>💵 Dólares + Bolívares (USD + BS)</span>
+                            <span>💵 Dólares + Bs. (USD + BS)</span>
                         </button>
                         <button
                             type="button"
-                            onClick={() => setInvoiceForm(prev => ({ ...prev, show_bs_conversion: false }))}
-                            className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${invoiceForm.show_bs_conversion === false
+                            onClick={() => setInvoiceForm(prev => ({ ...prev, currency: 'USD', show_bs_conversion: false }))}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer border ${isSoloUsd
                                 ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
                                 }`}
+                            title="Emisión exclusiva en Dólares sin mención ni conversión en Bolívares"
                         >
                             <span>💲 Solo Dólares (USD)</span>
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setInvoiceForm(prev => ({ ...prev, currency: 'VES', show_bs_conversion: false }))}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer border ${isSoloBs
+                                ? 'bg-purple-700 text-white border-purple-800 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                }`}
+                            title="Emisión y liquidación exclusiva en Bolívares (VES / Bs.) calculada según la tasa oficial del BCV"
+                        >
+                            <span>🇻🇪 Solo Bolívares (BS)</span>
+                        </button>
                     </div>
-                    {invoiceForm.show_bs_conversion === false && (
+                    {isSoloUsd && (
                         <p className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
                             ✓ Modo Solo Dólares activo: el PDF final no mostrará conversión en bolívares ni TOTAL VES.
+                        </p>
+                    )}
+                    {isSoloBs && (
+                        <p className="text-[10px] font-bold text-purple-900 bg-purple-50 px-2 py-1 rounded border border-purple-200">
+                            ✓ Modo Solo Bolívares activo: el documento y el PDF se emitirán exclusivamente en Bolívares (Bs. / VES) según la tasa oficial del BCV.
                         </p>
                     )}
                 </div>
@@ -611,9 +634,14 @@ export default function InvoiceForm({
                                 <label className="text-xs font-black text-black flex items-center gap-1.5 truncate">
                                     <span>Tasa de Cambio</span>
                                 </label>
-                                {invoiceForm.show_bs_conversion === false ? (
+                                {isSoloUsd ? (
                                     <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded">
                                         Oculta en PDF
+                                    </span>
+                                ) : isSoloBs ? (
+                                    <span className="text-[10px] font-black text-purple-800 bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></span>
+                                        BCV Oficial (Conversión a Bs.)
                                     </span>
                                 ) : (
                                     <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded flex items-center gap-1">
@@ -631,17 +659,17 @@ export default function InvoiceForm({
                                         type="number"
                                         step="0.0001"
                                         placeholder="0.00"
-                                        disabled={invoiceForm.show_bs_conversion === false}
+                                        disabled={isSoloUsd}
                                         value={invoiceForm.bcv_exchange_rate}
                                         onChange={(e) => setInvoiceForm(prev => ({ ...prev, bcv_exchange_rate: e.target.value === '' ? '' : Number(e.target.value) }))}
-                                        className={`h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg pl-8 pr-3 text-xs font-black text-black font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 ${invoiceForm.show_bs_conversion === false ? 'opacity-60 bg-slate-100 cursor-not-allowed' : ''
+                                        className={`h-9 w-full min-w-0 bg-white border border-slate-300 rounded-lg pl-8 pr-3 text-xs font-black text-black font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 ${isSoloUsd ? 'opacity-60 bg-slate-100 cursor-not-allowed' : ''
                                             }`}
                                     />
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => handleFetchLiveBcvRate(true)}
-                                    disabled={isFetchingBcv || invoiceForm.show_bs_conversion === false}
+                                    disabled={isFetchingBcv || isSoloUsd}
                                     className="h-9 px-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Consultar y sincronizar la tasa oficial del Banco Central de Venezuela en vivo"
                                 >
@@ -1162,11 +1190,13 @@ export default function InvoiceForm({
 
                                     <div className="col-span-4 sm:col-span-5">
                                         <span className="text-slate-800 block mb-1 text-[11px] font-bold truncate">
-                                            {invoiceForm.show_totals !== false ? 'Total Renglón ($)' : 'Modalidad'}
+                                            {invoiceForm.show_totals !== false ? (isSoloBs ? 'Total Renglón (Bs.)' : 'Total Renglón ($)') : 'Modalidad'}
                                         </span>
                                         {invoiceForm.show_totals !== false ? (
-                                            <div className="h-8.5 flex items-center justify-end px-3 bg-blue-50 border border-blue-200 rounded-lg font-mono font-black text-blue-900 text-xs shadow-2xs">
-                                                ${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}
+                                            <div className={`h-8.5 flex items-center justify-end px-3 border rounded-lg font-mono font-black text-xs shadow-2xs ${isSoloBs ? 'bg-purple-50 border-purple-200 text-purple-900' : 'bg-blue-50 border-blue-200 text-blue-900'}`}>
+                                                {isSoloBs
+                                                    ? `Bs. ${(Number(it.quantity || 0) * Number(it.unit_price || 0) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                    : `$${(Number(it.quantity || 0) * Number(it.unit_price || 0)).toFixed(2)}`}
                                             </div>
                                         ) : (
                                             <div className="h-8.5 flex items-center justify-center px-2 bg-amber-50 border border-amber-300 rounded-lg font-sans font-bold text-amber-900 text-xs text-center shadow-2xs" title="Modo consignación activo: sin sumatoria acumulada en el pie">
@@ -1208,7 +1238,9 @@ export default function InvoiceForm({
                                             />
                                         </div>
                                         <span className="text-[10px] font-medium text-slate-500 block">
-                                            Precio unitario de venta/costo.
+                                            {isSoloBs && bcvRate > 0
+                                                ? `≈ Bs. ${(Number(it.unit_price || 0) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en Bolívares.`
+                                                : 'Precio unitario de venta/costo.'}
                                         </span>
                                     </div>
 
@@ -1589,11 +1621,15 @@ export default function InvoiceForm({
                     }`}>
                     <div className="flex justify-between items-baseline">
                         <span className="text-xs font-black uppercase tracking-wider text-slate-300">
-                            {invoiceForm.show_totals !== false ? 'TOTAL FACTURA (USD)' : 'MODO SIN SUMATORIA (CONSIGNACIÓN)'}
+                            {invoiceForm.show_totals !== false
+                                ? (isSoloBs ? 'TOTAL FACTURA (VES / BS)' : 'TOTAL FACTURA (USD)')
+                                : 'MODO SIN SUMATORIA (CONSIGNACIÓN)'}
                         </span>
                         {invoiceForm.show_totals !== false ? (
-                            <span className="text-2xl font-mono font-black text-emerald-400">
-                                ${totalUsd.toFixed(2)}
+                            <span className={`text-2xl font-mono font-black ${isSoloBs ? 'text-purple-300' : 'text-emerald-400'}`}>
+                                {isSoloBs
+                                    ? `Bs. ${totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : `$${totalUsd.toFixed(2)}`}
                             </span>
                         ) : (
                             <span className="text-xs font-black text-amber-300 uppercase bg-amber-900/80 px-2 py-0.5 rounded border border-amber-600">
@@ -1602,7 +1638,14 @@ export default function InvoiceForm({
                         )}
                     </div>
                     {invoiceForm.show_totals !== false ? (
-                        invoiceForm.show_bs_conversion !== false ? (
+                        isSoloBs ? (
+                            <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-700 text-xs">
+                                <span className="font-bold text-slate-400">Régimen:</span>
+                                <span className="font-mono font-black text-purple-300 text-xs uppercase tracking-wide">
+                                    SOLO BOLÍVARES (VES / BS.)
+                                </span>
+                            </div>
+                        ) : invoiceForm.show_bs_conversion !== false ? (
                             <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-700 text-xs">
                                 <span className="font-bold text-slate-300">Total en Bolívares (VES):</span>
                                 <span className="font-mono font-black text-white text-base">
